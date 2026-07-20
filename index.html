@@ -219,7 +219,14 @@
         <label class="chk"><input type="checkbox" value="ar">🇸🇦 아랍어</label>
       </div>
 
-      <label>발행 포맷</label>
+      <label>콘텐츠 니치</label>
+      <select id="contentNiche" onchange="onNicheChange()">
+        <option value="general" selected>일반 바이럴 (충격·신기·미스터리 등)</option>
+        <option value="medical">🏥 의학·건강 충격 실화 (medical_newsroom 스타일)</option>
+      </select>
+      <div class="hint" id="nicheHint">캡션 구조: 훅 → 구체적 실화 사례 → 의학 배경 설명 → 전문가 권고 → 권위 출처 인용(예: The Sun, ○○학회) → 팔로우 CTA. 니치 선택 시 발굴 소스도 의학 전용으로 전환됩니다.</div>
+
+      <label style="margin-top:14px;">발행 포맷</label>
       <select id="pubFormat" onchange="onFormatChange()">
         <option value="thumb" selected>썸네일 1장 + 캡션 본문 (신규 · 릴스/도달 최적)</option>
         <option value="cards">멀티 카드뉴스 (기존 · 여러 장 캐러셀)</option>
@@ -693,6 +700,24 @@ async function callClaude(prompt){
   return text;
 }
 
+/* ---------- 콘텐츠 니치 토글 ---------- */
+function onNicheChange(){
+  const niche = (document.getElementById("contentNiche")||{}).value || "general";
+  const styleEl = document.getElementById("styleGuide");
+  if(niche === "medical"){
+    // 의학 니치: 발굴 소스를 의학 카테고리로 자동 전환 + 각색 지침 프리셋
+    document.querySelectorAll('#subRow input').forEach(cb=>{
+      const on = FEEDS[cb.value] && FEEDS[cb.value].cat === "medical";
+      cb.checked = on; cb.parentElement.classList.toggle("on", on);
+    });
+    updateSrcCount();
+    if(styleEl) styleEl.value = "실제 사례 기반 의학·건강 충격 실화. 진단·경고 신호 중심, 과장 없이 신뢰감 있게.";
+  }else{
+    selectDefaultSources();
+    if(styleEl) styleEl.value = "스크롤을 멈추게 하는 충격·반전 후킹. 궁금해서 캡션을 안 볼 수 없게. 자극적이되 사실 기반.";
+  }
+}
+
 /* ---------- 발행 포맷 토글 ---------- */
 function onFormatChange(){
   const fmt = (document.getElementById("pubFormat")||{}).value || "thumb";
@@ -754,6 +779,47 @@ Exact shape:
 {"results":[{"lang":"ko","hooks":[{"line1":"...","line2":"...","line3":"..."},{"line1":"...","line2":"...","line3":"..."},{"line1":"...","line2":"...","line3":"..."},{"line1":"...","line2":"...","line3":"..."}],"line1":"...","line2":"...","line3":"...","badge":"...","caption":"...","hashtags":"...","image_queries":["..."]}]}`;
 }
 
+/* ---------- 프롬프트: 의학·건강 충격 실화 (medical_newsroom 스타일) ---------- */
+function buildMedicalThumbPrompt(source, style, langs, handle){
+  const brand = handle ? ("The account handle is \"" + handle + "\" — use it in the follow-CTA line.") : "Use a generic 'follow this account' style follow-CTA line.";
+  return `You are the copywriter for a top Korean medical/health Instagram news account (style: medical_newsroom). Based ONLY on facts in the source, write ORIGINAL content — rewrite in your own words, never fabricate a diagnosis, statistic, or quote that isn't grounded in the source. Health claims must be careful and non-alarmist even while the headline is punchy.
+
+SOURCE:
+"""${source}"""
+
+EXTRA STYLE GUIDE: ${style || "credible, real-case-driven, warning-signs framing"}
+
+═══ THE FORMULA (medical_newsroom pattern) ═══
+Real, relatable medical stories hook through a SPECIFIC PERSON'S EXPERIENCE + a TWIST ENDING, then earn trust with expert guidance and a named source. Two proven templates:
+A) "증상→반전 진단" (symptom → shocking diagnosis): "[평범해 보이는 증상] 하던 [나이대/성별], 결국 [충격적 진단/결말]"
+   e.g. "'밤마다 두 번' 화장실 가던 40대 남성, 결국 시한부 판정"
+B) "놀라운 장면/사실 공개" (striking fact/scene reveal): "[숫자/스케일]한 [상황] [마치고/후], [놀라운 결과]가 공개됐다"
+   e.g. "32시간 뇌종양 수술 마치고 탈진한 모습이 공개됐다"
+Pick whichever template fits the source better. The headline must name a concrete detail (age, duration, number, body part, condition) — never vague ("건강 이상" 금지, "전립선암 4기" 등 구체적으로).
+
+For EACH of these languages: ${langs.join(", ")} produce a JSON object with:
+- "hooks": array of EXACTLY 4 DISTINCT headline options {"line1","line2","line3"} (line3 "" if 2 lines suffice), each using template A or B with a different angle/detail emphasized. Order STRONGEST FIRST. Each line ~8-16 chars Korean/Japanese, ~3-6 words Latin. No ** markup.
+- "line1","line2","line3": copy hooks[0] here.
+- "badge": short tone word (2-4 chars) fitting a medical-shock tone in that language (충격/경고/주의 · WARNING/ALERT · 警告).
+- "caption": the COMPLETE Instagram caption, real line breaks (\\n), structured EXACTLY like this:
+  (1) HOOK line: one sentence stating the core finding as a health headline (e.g. "밤에 소변 자주 보는 증상, 전립선암 신호일 수도 있다").
+  (2) blank line, then THE CASE paragraph (1-3 sentences): the concrete real-world case from the source — who (age/gender, anonymized), what symptom/situation, what happened. Concrete details only.
+  (3) blank line, then THE MEDICAL EXPLANATION paragraph(s) (1-2 short paragraphs): what this condition is, why the symptom is easy to mistake for something else, what the real warning signs are. Grounded in the source.
+  (4) blank line, then EXPERT GUIDANCE paragraph: what doctors/experts recommend (checkups, age thresholds, when to see a doctor) — actionable and specific if the source supports it.
+  (5) blank line, then a 📖 source line citing the ACTUAL named outlet/journal/association from the source (e.g. "📖 The Sun, 대한비뇨기종양학회" or "📖 American Association of Neurological Surgeons (AANS)"). Never invent a source not implied by the material.
+  (6) blank line, then a FOLLOW-CTA line inviting readers to follow for more health news. ${brand}
+  Tone: serious, credible, caring — NOT clickbait-trashy. This account's power is TRUST.
+- "hashtags": one line of 6-10 relevant health/medical hashtags for that language/market.
+- "image_queries": array with EXACTLY ONE short English stock-photo query (2-4 concrete words) for the cover — a real, credible medical/health scene (e.g. "man holding lower back", "hospital corridor night", "doctor reviewing scan"). AVOID close-up faces of named individuals; avoid gore.
+
+STRICT JSON RULES:
+- Respond with ONLY valid JSON. No markdown fences, no commentary.
+- All strings on a single line — escape line breaks as \\n. No unescaped double quotes inside strings (use '). No trailing commas.
+
+Exact shape:
+{"results":[{"lang":"ko","hooks":[{"line1":"...","line2":"...","line3":"..."},{"line1":"...","line2":"...","line3":"..."},{"line1":"...","line2":"...","line3":"..."},{"line1":"...","line2":"...","line3":"..."}],"line1":"...","line2":"...","line3":"...","badge":"...","caption":"...","hashtags":"...","image_queries":["..."]}]}`;
+}
+
 /* ---------- 프롬프트: 멀티 카드뉴스 (기존 포맷) ---------- */
 function buildCardsPrompt(source, style, langs, n){
   return `You are a viral social media card-news writer. Based ONLY on the facts in the source below, write ORIGINAL card-news content (do not copy source sentences verbatim — rewrite in your own words).
@@ -801,6 +867,7 @@ async function generate(){
   const n = document.getElementById("cardCount").value;
   const style = document.getElementById("styleGuide").value.trim();
   const fmt = (document.getElementById("pubFormat")||{}).value || "thumb";
+  const niche = (document.getElementById("contentNiche")||{}).value || "general";
   const handle = document.getElementById("handle").value.trim();
 
   const btn = document.getElementById("genBtn");
@@ -808,7 +875,7 @@ async function generate(){
   state.cardPhotos = [];
 
   const prompt = (fmt === "thumb")
-    ? buildThumbPrompt(source, style, langs, handle)
+    ? (niche === "medical" ? buildMedicalThumbPrompt(source, style, langs, handle) : buildThumbPrompt(source, style, langs, handle))
     : buildCardsPrompt(source, style, langs, n);
 
   try{
@@ -2027,6 +2094,8 @@ async function publishReel(){
 
 /* ================= DAILY DISCOVERY (자동 소재 발굴) ================= */
 const BONUS = {
+  // 의학·건강 충격 실화 신호 (진단·증상·경고류) — 최고 가중치
+  medical: {pts:20, words:["diagnosed","diagnosis","symptom","symptoms","warning sign","warning signs","mistook","mistaken for","cancer","tumor","tumour","terminal","turned out to be","doctors found","doctors say","rushed to hospital","went viral","exhausted","surgeon","surgery","brain scan","undiagnosed","misdiagnosed","stage 4","he thought","she thought","just a","she had no idea","he had no idea"]},
   // 후킹 강한 '충격·신기·반전' 신호에 가장 높은 가중치
   shock:   {pts:18, words:["mystery","mysterious","unexplained","secret","hidden","bizarre","strange","weird","shocking","stunned","unbelievable","incredible","insane","reveal","revealed","discovered","uncovered","forbidden","banned","rare","first ever","never before","turns out","actually","truth","real reason","why","exposed","creepy","eerie","unexpected","twist","accidentally","impossible","defies","baffled","puzzled","record-breaking","world's","oldest","largest","deepest","strangest"]},
   animal:  {pts:15, words:["dog","cat","puppy","kitten","elephant","whale","octopus","penguin","rescue","shelter","panda","otter","bear","turtle","parrot","gorilla","dolphin","fox","owl","animal","zoo","tortoise","kangaroo","raccoon","beaver"]},
@@ -2036,8 +2105,16 @@ const BONUS = {
 const BLACKLIST = ["trump","biden","harris","election","politic","congress","senate","parliament","war","gaza","israel","palestin","ukraine","russia","putin","missile","nuclear","shooting","shooter","gunman","murder","killed","stabbed","rape","assault","abuse","molest","suicide","overdose","terror","hostage","nazi","genocide","protest","riot","lawsuit","indict","court","tariff","layoff","recession","covid","pandemic","outbreak","crash","dead body","death toll","porn","onlyfans","gamble","casino","crypto scam"];
 
 /* 카테고리(cat)별로 정리된 광범위 소스 — 전부 실제 응답 검증 완료. def:true = 기본 선택 */
-const FEED_CATS = {shock:"😱 충격·미스터리·반전", odd:"🤪 기상천외·화제", uplift:"💗 감동·굿뉴스", animal:"🐾 동물", science:"🔬 과학", space:"🚀 우주", tech:"⚙️ 기술·미래", culture:"🏛 문화·호기심"};
+const FEED_CATS = {medical:"🏥 의학·건강 충격 실화", shock:"😱 충격·미스터리·반전", odd:"🤪 기상천외·화제", uplift:"💗 감동·굿뉴스", animal:"🐾 동물", science:"🔬 과학", space:"🚀 우주", tech:"⚙️ 기술·미래", culture:"🏛 문화·호기심"};
 const FEEDS = {
+  // 의학·건강 충격 실화 (medical_newsroom 스타일: 증상→진단→전문가 권고)
+  thesun_health:  {cat:"medical", label:"The Sun Health",     url:"https://www.thesun.co.uk/health/feed/",       base:20, def:true},
+  dailymail_health:{cat:"medical",label:"Daily Mail Health",  url:"https://www.dailymail.co.uk/health/index.rss",base:19, def:true},
+  nypost_health:  {cat:"medical", label:"NY Post Health",     url:"https://nypost.com/health/feed/",              base:18, def:true},
+  sciencedaily_health:{cat:"medical",label:"ScienceDaily 의학",url:"https://www.sciencedaily.com/rss/health_medicine.xml",base:16, def:true},
+  medicalxpress:  {cat:"medical", label:"Medical Xpress",     url:"https://medicalxpress.com/rss-feed/",          base:15},
+  cnn_health:     {cat:"medical", label:"CNN Health",         url:"http://rss.cnn.com/rss/cnn_health.rss",        base:14},
+  statnews:       {cat:"medical", label:"STAT News",          url:"https://www.statnews.com/feed/",               base:13},
   // 충격 / 미스터리 / 반전 / 소름 (후킹 강한 소재)
   ati:          {cat:"shock",   label:"충격 실화 (ATI)",  url:"https://allthatsinteresting.com/feed",                        base:22, def:true},
   vintagenews:  {cat:"shock",   label:"기묘한 역사",      url:"https://www.thevintagenews.com/feed/",                        base:20, def:true},
@@ -2336,5 +2413,5 @@ function escapeHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").repl
 </script>
 </body>
 </html>
-<!-- v3.7 — 중복 제거(본 소재 숨김)+셔플+풀 확대로 매번 새 소재 -->
+<!-- v3.8 — 의학·건강 충격 실화 전용 니치 추가 -->
 
