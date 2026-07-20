@@ -166,11 +166,13 @@
 
   <!-- DISCOVERY -->
   <div class="panel" id="sec-discovery" style="margin-bottom:20px;">
-    <h2>0. 오늘의 소재 자동 발굴 <small style="text-transform:none; color:var(--muted);">— 30여 개 해외 매체 RSS를 기준 점수로 랭킹 (정치·사건사고 자동 제외)</small></h2>
+    <h2>0. 오늘의 소재 자동 발굴 <small style="text-transform:none; color:var(--muted);">— 50여 개 해외 매체 RSS를 신뢰도·점수로 랭킹 (정치·사건사고 자동 제외)</small></h2>
+    <div class="hint" style="margin-bottom:8px;">⭐ 메이저 매체 = The Sun·Daily Mail·NY Post·CNN·BBC·Guardian·NY Times·Fox News·UPI·NASA 등 세계적 신문사·방송사·통신사·공식기관. 표시 없는 건 전문 매체, "(블로그)"·"(큐레이션)" 표기는 콘텐츠 큐레이션 사이트로 랭킹에서 가중치가 낮고 기본 선택에서 빠져 있습니다.</div>
     <div class="row" style="margin-bottom:8px; gap:6px;">
+      <button class="btn-ghost btn-sm" style="border-color:var(--ok); color:var(--ok);" onclick="selectMajorOnly()">⭐ 메이저 매체만</button>
+      <button class="btn-ghost btn-sm" onclick="selectDefaultSources()">추천 소스만</button>
       <button class="btn-ghost btn-sm" onclick="toggleAllSources(true)">전체 선택</button>
       <button class="btn-ghost btn-sm" onclick="toggleAllSources(false)">전체 해제</button>
-      <button class="btn-ghost btn-sm" onclick="selectDefaultSources()">추천 소스만</button>
       <span class="hint" id="srcCount" style="align-self:center;"></span>
     </div>
     <div id="subRow"></div>
@@ -2104,64 +2106,73 @@ const BONUS = {
 };
 const BLACKLIST = ["trump","biden","harris","election","politic","congress","senate","parliament","war","gaza","israel","palestin","ukraine","russia","putin","missile","nuclear","shooting","shooter","gunman","murder","killed","stabbed","rape","assault","abuse","molest","suicide","overdose","terror","hostage","nazi","genocide","protest","riot","lawsuit","indict","court","tariff","layoff","recession","covid","pandemic","outbreak","crash","dead body","death toll","porn","onlyfans","gamble","casino","crypto scam"];
 
-/* 카테고리(cat)별로 정리된 광범위 소스 — 전부 실제 응답 검증 완료. def:true = 기본 선택 */
+/* 카테고리(cat)별로 정리된 광범위 소스 — 전부 실제 응답 검증 완료. def:true = 기본 선택
+   tier: 1=세계적 메이저 매체(신문사·방송사·통신사·공식기관) 2=신뢰할 만한 전문 매체 3=콘텐츠 큐레이션·바이럴 블로그(신뢰도 낮음, 기본 해제) */
+const TIER_LABEL = {1:"⭐ 메이저 매체", 2:"전문 매체", 3:"큐레이션(주의)"};
 const FEED_CATS = {medical:"🏥 의학·건강 충격 실화", shock:"😱 충격·미스터리·반전", odd:"🤪 기상천외·화제", uplift:"💗 감동·굿뉴스", animal:"🐾 동물", science:"🔬 과학", space:"🚀 우주", tech:"⚙️ 기술·미래", culture:"🏛 문화·호기심"};
 const FEEDS = {
-  // 의학·건강 충격 실화 (medical_newsroom 스타일: 증상→진단→전문가 권고)
-  thesun_health:  {cat:"medical", label:"The Sun Health",     url:"https://www.thesun.co.uk/health/feed/",       base:20, def:true},
-  dailymail_health:{cat:"medical",label:"Daily Mail Health",  url:"https://www.dailymail.co.uk/health/index.rss",base:19, def:true},
-  nypost_health:  {cat:"medical", label:"NY Post Health",     url:"https://nypost.com/health/feed/",              base:18, def:true},
-  sciencedaily_health:{cat:"medical",label:"ScienceDaily 의학",url:"https://www.sciencedaily.com/rss/health_medicine.xml",base:16, def:true},
-  medicalxpress:  {cat:"medical", label:"Medical Xpress",     url:"https://medicalxpress.com/rss-feed/",          base:15},
-  cnn_health:     {cat:"medical", label:"CNN Health",         url:"http://rss.cnn.com/rss/cnn_health.rss",        base:14},
-  statnews:       {cat:"medical", label:"STAT News",          url:"https://www.statnews.com/feed/",               base:13},
-  // 충격 / 미스터리 / 반전 / 소름 (후킹 강한 소재)
-  ati:          {cat:"shock",   label:"충격 실화 (ATI)",  url:"https://allthatsinteresting.com/feed",                        base:22, def:true},
-  vintagenews:  {cat:"shock",   label:"기묘한 역사",      url:"https://www.thevintagenews.com/feed/",                        base:20, def:true},
-  weird_ls:     {cat:"shock",   label:"이상한 과학",      url:"https://www.livescience.com/feeds/tag/weird",                 base:20, def:true},
-  curiosmos:    {cat:"shock",   label:"우주·고대 미스터리",url:"https://curiosmos.com/feed/",                                base:19, def:true},
-  amusingplanet:{cat:"shock",   label:"경이로운 세계",    url:"https://www.amusingplanet.com/feeds/posts/default?alt=rss",   base:18},
-  historydefined:{cat:"shock",  label:"소름돋는 역사",    url:"https://www.historydefined.net/feed/",                        base:17},
-  bigthink:     {cat:"shock",   label:"발상 전환 (Big Think)",url:"https://bigthink.com/feed/",                             base:15},
+  // 의학·건강 충격 실화 (medical_newsroom 스타일: 증상→진단→전문가 권고) — 전부 메이저/전문 매체
+  thesun_health:  {cat:"medical", tier:1, label:"The Sun Health",     url:"https://www.thesun.co.uk/health/feed/",       base:20, def:true},
+  dailymail_health:{cat:"medical",tier:1, label:"Daily Mail Health",  url:"https://www.dailymail.co.uk/health/index.rss",base:19, def:true},
+  nypost_health:  {cat:"medical", tier:1, label:"NY Post Health",     url:"https://nypost.com/health/feed/",              base:18, def:true},
+  cnn_health:     {cat:"medical", tier:1, label:"CNN Health",         url:"http://rss.cnn.com/rss/cnn_health.rss",        base:17, def:true},
+  sciencedaily_health:{cat:"medical",tier:2,label:"ScienceDaily 의학",url:"https://www.sciencedaily.com/rss/health_medicine.xml",base:16, def:true},
+  medicalxpress:  {cat:"medical", tier:2, label:"Medical Xpress",     url:"https://medicalxpress.com/rss-feed/",          base:15},
+  statnews:       {cat:"medical", tier:2, label:"STAT News",          url:"https://www.statnews.com/feed/",               base:14},
+  // 충격 / 미스터리 / 반전 / 소름 — 메이저 매체 우선, 큐레이션 블로그는 기본 해제(참고용)
+  upi_odd:      {cat:"shock",   tier:1, label:"UPI 기상천외",     url:"https://rss.upi.com/news/odd_news.rss",                       base:22, def:true},
+  bbc_world:    {cat:"shock",   tier:1, label:"BBC World",        url:"https://feeds.bbci.co.uk/news/world/rss.xml",                 base:18, def:true},
+  metro_news:   {cat:"shock",   tier:1, label:"Metro UK",         url:"https://metro.co.uk/feed/",                                    base:17, def:true},
+  foxnews_science:{cat:"shock", tier:1, label:"Fox News Science", url:"https://moxie.foxnews.com/google-publisher/science.xml",       base:16, def:true},
+  weird_ls:     {cat:"shock",   tier:2, label:"이상한 과학 (LiveScience)",url:"https://www.livescience.com/feeds/tag/weird",           base:18, def:true},
+  bigthink:     {cat:"shock",   tier:2, label:"발상 전환 (Big Think)",url:"https://bigthink.com/feed/",                              base:14},
+  ati:          {cat:"shock",   tier:3, label:"충격 실화 (ATI)",  url:"https://allthatsinteresting.com/feed",                         base:12},
+  vintagenews:  {cat:"shock",   tier:3, label:"기묘한 역사 (블로그)",url:"https://www.thevintagenews.com/feed/",                       base:10},
+  curiosmos:    {cat:"shock",   tier:3, label:"우주·고대 미스터리 (블로그)",url:"https://curiosmos.com/feed/",                        base:10},
+  amusingplanet:{cat:"shock",   tier:3, label:"경이로운 세계 (블로그)",url:"https://www.amusingplanet.com/feeds/posts/default?alt=rss",base:9},
+  historydefined:{cat:"shock",  tier:3, label:"소름돋는 역사 (블로그)",url:"https://www.historydefined.net/feed/",                     base:9},
   // 기상천외 / 화제 / 바이럴
-  upi_odd:      {cat:"odd",     label:"UPI 기상천외",     url:"https://rss.upi.com/news/odd_news.rss",                       base:20, def:true},
-  oddity:       {cat:"odd",     label:"Oddity Central",   url:"http://feeds.feedburner.com/OddityCentral",                   base:18, def:true},
-  boredpanda:   {cat:"odd",     label:"Bored Panda",      url:"https://www.boredpanda.com/feed/",                            base:18, def:true},
-  boingboing:   {cat:"odd",     label:"Boing Boing",      url:"https://boingboing.net/feed",                                 base:14},
-  neatorama:    {cat:"odd",     label:"Neatorama",        url:"https://www.neatorama.com/feed/",                             base:15},
-  laughingsquid:{cat:"odd",     label:"Laughing Squid",   url:"https://laughingsquid.com/feed/",                             base:13},
-  brightside:   {cat:"odd",     label:"Bright Side",      url:"https://brightside.me/rss/",                                  base:14},
-  todayifound:  {cat:"odd",     label:"오늘 알게된 사실", url:"https://www.todayifoundout.com/index.php/feed/",              base:15},
+  dailymail_scitech:{cat:"odd", tier:1, label:"Daily Mail Sci/Tech",url:"https://www.dailymail.co.uk/sciencetech/index.rss",          base:18, def:true},
+  thesun_tech:  {cat:"odd",     tier:1, label:"The Sun Tech",      url:"https://www.thesun.co.uk/tech/feed/",                         base:16, def:true},
+  oddity:       {cat:"odd",     tier:3, label:"Oddity Central (블로그)",url:"http://feeds.feedburner.com/OddityCentral",              base:9},
+  boredpanda:   {cat:"odd",     tier:3, label:"Bored Panda (큐레이션)",url:"https://www.boredpanda.com/feed/",                        base:9},
+  boingboing:   {cat:"odd",     tier:3, label:"Boing Boing (블로그)",url:"https://boingboing.net/feed",                               base:8},
+  neatorama:    {cat:"odd",     tier:3, label:"Neatorama (블로그)",url:"https://www.neatorama.com/feed/",                             base:8},
+  laughingsquid:{cat:"odd",     tier:3, label:"Laughing Squid (블로그)",url:"https://laughingsquid.com/feed/",                        base:8},
+  brightside:   {cat:"odd",     tier:3, label:"Bright Side (큐레이션)",url:"https://brightside.me/rss/",                              base:8},
+  todayifound:  {cat:"odd",     tier:3, label:"오늘 알게된 사실 (블로그)",url:"https://www.todayifoundout.com/index.php/feed/",       base:9},
   // 감동 / 굿뉴스
-  gnn:          {cat:"uplift",  label:"GNN 감동",         url:"https://www.goodnewsnetwork.org/feed/",                       base:16, def:true},
-  gnn_inspiring:{cat:"uplift",  label:"GNN 영감",         url:"https://www.goodnewsnetwork.org/category/news/inspiring/feed/",base:16, def:true},
-  positivenews: {cat:"uplift",  label:"Positive News",    url:"https://www.positive.news/feed/",                             base:14},
-  optimist:     {cat:"uplift",  label:"Optimist Daily",   url:"https://www.optimistdaily.com/feed/",                         base:13},
+  gnn:          {cat:"uplift",  tier:2, label:"Good News Network", url:"https://www.goodnewsnetwork.org/feed/",                       base:14, def:true},
+  gnn_inspiring:{cat:"uplift",  tier:2, label:"GNN 영감",         url:"https://www.goodnewsnetwork.org/category/news/inspiring/feed/",base:13, def:true},
+  positivenews: {cat:"uplift",  tier:2, label:"Positive News",    url:"https://www.positive.news/feed/",                             base:12},
+  optimist:     {cat:"uplift",  tier:3, label:"Optimist Daily (블로그)",url:"https://www.optimistdaily.com/feed/",                    base:9},
   // 동물
-  gnn_animals:  {cat:"animal",  label:"GNN 동물",         url:"https://www.goodnewsnetwork.org/category/news/animals/feed/", base:20, def:true},
-  guardian_anim:{cat:"animal",  label:"Guardian 동물",    url:"https://www.theguardian.com/world/animals/rss",               base:16, def:true},
+  guardian_anim:{cat:"animal",  tier:1, label:"Guardian 동물",    url:"https://www.theguardian.com/world/animals/rss",               base:18, def:true},
+  gnn_animals:  {cat:"animal",  tier:2, label:"GNN 동물",         url:"https://www.goodnewsnetwork.org/category/news/animals/feed/", base:16, def:true},
   // 과학
-  sciencealert: {cat:"science", label:"ScienceAlert",     url:"https://www.sciencealert.com/feed",                           base:14, def:true},
-  livescience:  {cat:"science", label:"LiveScience",      url:"https://www.livescience.com/feeds.xml",                       base:13, def:true},
-  sciencedaily: {cat:"science", label:"ScienceDaily",     url:"https://www.sciencedaily.com/rss/all.xml",                    base:12},
-  phys:         {cat:"science", label:"Phys.org",         url:"https://phys.org/rss-feed/",                                  base:12},
-  smithsonian:  {cat:"science", label:"Smithsonian",      url:"https://www.smithsonianmag.com/rss/latest_articles/",         base:13},
-  zmescience:   {cat:"science", label:"ZME Science",      url:"https://www.zmescience.com/feed/",                            base:12},
-  popsci:       {cat:"science", label:"Popular Science",  url:"https://www.popsci.com/feed/",                                base:12},
-  earthsky:     {cat:"science", label:"EarthSky",         url:"https://earthsky.org/feed/",                                  base:11},
-  bbc_science:  {cat:"science", label:"BBC 과학·환경",    url:"https://feeds.bbci.co.uk/news/science_and_environment/rss.xml",base:11},
+  bbc_science:  {cat:"science", tier:1, label:"BBC 과학·환경",    url:"https://feeds.bbci.co.uk/news/science_and_environment/rss.xml",base:16, def:true},
+  guardian_sci: {cat:"science", tier:1, label:"Guardian Science", url:"https://www.theguardian.com/science/rss",                     base:16, def:true},
+  nytimes_sci:  {cat:"science", tier:1, label:"NY Times Science", url:"https://rss.nytimes.com/services/xml/rss/nyt/Science.xml",    base:16, def:true},
+  smithsonian:  {cat:"science", tier:1, label:"Smithsonian",      url:"https://www.smithsonianmag.com/rss/latest_articles/",         base:15},
+  sciencealert: {cat:"science", tier:2, label:"ScienceAlert",     url:"https://www.sciencealert.com/feed",                           base:14, def:true},
+  livescience:  {cat:"science", tier:2, label:"LiveScience",      url:"https://www.livescience.com/feeds.xml",                       base:13, def:true},
+  sciencedaily: {cat:"science", tier:2, label:"ScienceDaily",     url:"https://www.sciencedaily.com/rss/all.xml",                    base:12},
+  phys:         {cat:"science", tier:2, label:"Phys.org",         url:"https://phys.org/rss-feed/",                                  base:12},
+  zmescience:   {cat:"science", tier:2, label:"ZME Science",      url:"https://www.zmescience.com/feed/",                            base:11},
+  popsci:       {cat:"science", tier:2, label:"Popular Science",  url:"https://www.popsci.com/feed/",                                base:11},
+  earthsky:     {cat:"science", tier:2, label:"EarthSky",         url:"https://earthsky.org/feed/",                                  base:10},
   // 우주
-  nasa:         {cat:"space",   label:"NASA",             url:"https://www.nasa.gov/feed/",                                  base:11, def:true},
-  space:        {cat:"space",   label:"Space.com",        url:"https://www.space.com/feeds.xml",                             base:11},
+  nasa:         {cat:"space",   tier:1, label:"NASA (공식)",      url:"https://www.nasa.gov/feed/",                                  base:14, def:true},
+  space:        {cat:"space",   tier:2, label:"Space.com",        url:"https://www.space.com/feeds.xml",                             base:11},
   // 기술 / 미래 / 디자인
-  newatlas:     {cat:"tech",    label:"New Atlas",        url:"https://newatlas.com/index.rss",                              base:11},
-  interestingeng:{cat:"tech",   label:"Interesting Eng.", url:"https://interestingengineering.com/feed",                     base:11},
-  theverge:     {cat:"tech",    label:"The Verge",        url:"https://www.theverge.com/rss/index.xml",                      base:9},
-  gizmodo:      {cat:"tech",    label:"Gizmodo",          url:"https://gizmodo.com/feed",                                    base:9},
-  mymodernmet:  {cat:"tech",    label:"My Modern Met",    url:"https://mymodernmet.com/feed/",                               base:13},
-  designyoutrust:{cat:"tech",   label:"Design You Trust", url:"https://designyoutrust.com/feed/",                            base:11},
+  theverge:     {cat:"tech",    tier:1, label:"The Verge",        url:"https://www.theverge.com/rss/index.xml",                      base:14, def:true},
+  newatlas:     {cat:"tech",    tier:2, label:"New Atlas",        url:"https://newatlas.com/index.rss",                              base:11},
+  interestingeng:{cat:"tech",   tier:2, label:"Interesting Eng.", url:"https://interestingengineering.com/feed",                     base:11},
+  gizmodo:      {cat:"tech",    tier:2, label:"Gizmodo",          url:"https://gizmodo.com/feed",                                    base:10},
+  mymodernmet:  {cat:"tech",    tier:3, label:"My Modern Met (블로그)",url:"https://mymodernmet.com/feed/",                          base:9},
+  designyoutrust:{cat:"tech",   tier:3, label:"Design You Trust (블로그)",url:"https://designyoutrust.com/feed/",                    base:8},
   // 문화 / 호기심
-  atlasobscura: {cat:"culture", label:"Atlas Obscura",    url:"https://www.atlasobscura.com/feeds/latest",                   base:15, def:true},
+  atlasobscura: {cat:"culture", tier:2, label:"Atlas Obscura",    url:"https://www.atlasobscura.com/feeds/latest",                   base:13, def:true},
 };
 
 /* 소스 체크박스를 카테고리별로 동적 렌더 */
@@ -2186,12 +2197,16 @@ function renderSubSources(){
     };
     grp.appendChild(head);
     const row = document.createElement("div"); row.className = "row"; row.style.gap = "6px";
-    keys.forEach(k=>{
+    // 등급(tier) 순으로 정렬: 메이저 매체 먼저
+    keys.slice().sort((a,b)=>(FEEDS[a].tier||2)-(FEEDS[b].tier||2)).forEach(k=>{
       const f = FEEDS[k];
       const lab = document.createElement("label"); lab.className = "chk" + (f.def ? " on" : "");
+      lab.title = TIER_LABEL[f.tier||2];
+      if(f.tier === 1) lab.style.borderColor = "rgba(139,255,79,.4)";
       const cb = document.createElement("input"); cb.type = "checkbox"; cb.value = k; cb.checked = !!f.def;
       cb.addEventListener("change", ()=>{ lab.classList.toggle("on", cb.checked); updateSrcCount(); });
-      lab.appendChild(cb); lab.appendChild(document.createTextNode(f.label));
+      lab.appendChild(cb);
+      lab.appendChild(document.createTextNode((f.tier===1 ? "⭐ " : "") + f.label));
       row.appendChild(lab);
     });
     grp.appendChild(row);
@@ -2214,6 +2229,15 @@ function selectDefaultSources(){
   });
   updateSrcCount();
 }
+/* ⭐ 메이저 매체(tier 1)만 — 신문사·방송사·통신사·공식기관급 소스만 사용 */
+function selectMajorOnly(){
+  document.querySelectorAll('#subRow input').forEach(cb=>{
+    const on = !!(FEEDS[cb.value] && FEEDS[cb.value].tier === 1);
+    cb.checked = on; cb.parentElement.classList.toggle("on", on);
+  });
+  updateSrcCount();
+  toast("메이저 매체(⭐)만 선택됨 — The Sun·Daily Mail·BBC·Guardian·NYT·CNN·NASA 등");
+}
 
 function fetchWithTimeout(url, ms, opts){
   const ctrl = new AbortController();
@@ -2225,6 +2249,9 @@ function scoreItem(it){
   const t = it.title.toLowerCase();
   for(const b of BLACKLIST){ if(t.includes(b)) return -1; }
   let s = it.base || 10;
+  // 출처 신뢰도 가중치: 메이저 매체(tier1) 우대, 큐레이션 블로그(tier3) 감점
+  if(it.tier === 1) s += 15;
+  else if(it.tier === 3) s -= 6;
   for(const k in BONUS){ if(BONUS[k].words.some(w=>t.includes(w))) s += BONUS[k].pts; }
   if(/\d/.test(it.title)) s += 8;
   if(it.title.length < 90) s += 5;
@@ -2254,7 +2281,7 @@ function parseXmlItems(xml, f){
     const descRaw = get("description") || (n.getElementsByTagName("media:description")[0]||{}).textContent || "";
     const desc = descRaw.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 600);
     return { title:get("title").trim(), url:get("link").trim(), permalink:get("link").trim(),
-             sub:f.label, base:f.base, ageHours, thumb, desc };
+             sub:f.label, base:f.base, tier:f.tier, ageHours, thumb, desc };
   }).filter(it=>it.title && it.url);
 }
 
@@ -2282,7 +2309,7 @@ async function fetchFeed(key){
           const thumb = it.thumbnail || (it.enclosure && it.enclosure.link) || "";
           const desc = (it.description||"").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 600);
           return { title:(it.title||"").trim(), url:it.link, permalink:it.link,
-                   sub:f.label, base:f.base, ageHours, thumb, desc };
+                   sub:f.label, base:f.base, tier:f.tier, ageHours, thumb, desc };
         }).filter(it=>it.title && it.url);
       }else{
         const xml = await res.text();
@@ -2361,7 +2388,7 @@ function renderDiscovery(items){
     row.innerHTML =
       "<div style='min-width:44px; text-align:center; font-weight:800; color:"+scoreColor+";'>"+it.score+"</div>" +
       "<div style='flex:1;'><a href='"+it.permalink+"' target='_blank' style='color:var(--text); text-decoration:none;'>"+escapeHtml(it.title)+"</a>" +
-      "<div class='hint'>"+it.sub+age+"</div></div>";
+      "<div class='hint'>"+(it.tier===1?"⭐ ":"")+it.sub+age+"</div></div>";
     const btn = document.createElement("button");
     btn.className = "btn-ghost btn-sm";
     btn.style.whiteSpace = "nowrap";
@@ -2413,5 +2440,5 @@ function escapeHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").repl
 </script>
 </body>
 </html>
-<!-- v3.8 — 의학·건강 충격 실화 전용 니치 추가 -->
+<!-- v3.9 — 출처 신뢰도 등급(tier) 시스템 + 메이저 매체 대거 추가 -->
 
