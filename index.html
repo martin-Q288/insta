@@ -268,11 +268,11 @@
         <div>
           <label>헤드라인 폰트</label>
           <select id="headlineFont" onchange="onHeadlineFont()">
-            <option value="pretendard" selected>프리텐다드 (예시 계정 표준 · 추천)</option>
-            <option value="gmarket">지마켓 산스 (둥근 임팩트)</option>
+            <option value="gmarket" selected>지마켓 산스 (둥근 임팩트 · 추천)</option>
+            <option value="pretendard">프리텐다드 (예시 계정 표준)</option>
             <option value="suit">SUIT (모던 헤비)</option>
           </select>
-          <div class="hint">예시(hey.news·whynotmag) 서체 = 프리텐다드 Black</div>
+          <div class="hint">G마켓 산스 = 이슈·바이럴 카드의 대표 서체</div>
         </div>
         <div></div>
       </div>
@@ -1085,8 +1085,8 @@ function cardBox(id, label){
 }
 
 /* ---------- canvas drawing ---------- */
-/* FONT는 선택된 헤드라인 폰트에 따라 바뀜 (let). 예시 계정들의 표준 서체 = Pretendard Black */
-let FONT = "'CardSans','Pretendard','Malgun Gothic','Apple SD Gothic Neo','Hiragino Sans','Yu Gothic',sans-serif";
+/* FONT는 선택된 헤드라인 폰트에 따라 바뀜 (let). 기본 = G마켓 산스 */
+let FONT = "'GmarketSans','CardSans','Malgun Gothic','Apple SD Gothic Neo','Hiragino Sans','Yu Gothic',sans-serif";
 
 /* 사용 가능한 헤드라인 폰트 (전부 상용 무료 · woff2 CDN 검증 완료) */
 const PRE = "https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/woff2/";
@@ -1131,7 +1131,8 @@ function onHeadlineFont(){
   rerender();               // 즉시 반영(로드 전이면 잠깐 대체폰트)
   loadFontFamily(key);      // 로드되면 loadFontFamily가 rerender 재호출
 }
-/* 초기: 기본 폰트(프리텐다드) 로드 */
+/* 초기: 기본 폰트(G마켓 산스) 로드 + 대체용 프리텐다드도 로드 */
+loadFontFamily("gmarket");
 loadFontFamily("pretendard");
 
 function drawCover(cv, line1, line2, line3){
@@ -2165,5 +2166,5 @@ function escapeHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").repl
 </script>
 </body>
 </html>
-<!-- v3.3 — 폰트 로딩 수정(Pretendard CDN 경로) + 헤드라인 폰트 선택 -->
+<!-- v3.4 — 기본 헤드라인 폰트를 G마켓 산스로 -->
 
