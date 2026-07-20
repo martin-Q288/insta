@@ -85,9 +85,76 @@
   .toast{position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:var(--ok); color:#08130d;
     padding:10px 20px; border-radius:10px; font-size:14px; font-weight:700; z-index:99; opacity:0; transition:.25s; pointer-events:none;}
   .toast.show{opacity:1;}
+
+  /* ============ STUDIO UI (v3.1) ============ */
+  html{scroll-behavior:smooth;}
+  body{
+    padding-left:76px;
+    background:
+      radial-gradient(1200px 600px at 12% -10%, rgba(124,92,255,.10), transparent 60%),
+      radial-gradient(1000px 500px at 100% 0%, rgba(139,255,79,.06), transparent 55%),
+      var(--bg);
+    background-attachment:fixed;
+  }
+  section, [id^="sec-"], #reelPanel{scroll-margin-top:18px;}
+  /* 좌측 아이콘 네비 레일 */
+  .rail{
+    position:fixed; left:0; top:0; bottom:0; width:76px; z-index:60;
+    background:linear-gradient(180deg,#0b0d12,#0d1017);
+    border-right:1px solid var(--line);
+    display:flex; flex-direction:column; align-items:center; padding:16px 0 18px;
+  }
+  .rail-brand{font-size:26px; margin-bottom:16px; filter:drop-shadow(0 2px 8px rgba(124,92,255,.5));}
+  .rail-nav{display:flex; flex-direction:column; gap:4px; width:100%; align-items:center;}
+  .rail a{
+    display:flex; flex-direction:column; align-items:center; gap:3px; width:60px; padding:9px 0;
+    border-radius:13px; color:var(--muted); text-decoration:none; font-size:10.5px; font-weight:600;
+    cursor:pointer; transition:.15s; border:1px solid transparent;
+  }
+  .rail a span{font-size:20px; line-height:1;}
+  .rail a:hover{background:var(--panel2); color:var(--text); border-color:var(--line);}
+  .rail a:active{transform:scale(.94);}
+  .rail-bottom{margin-top:auto; width:100%; display:flex; justify-content:center;}
+  /* 헤더 브랜드 그라데이션 + 패널 광택 */
+  h1{background:linear-gradient(90deg,#fff,#c9bcff); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;}
+  h1 span{-webkit-text-fill-color:initial;}
+  .panel{
+    background:linear-gradient(180deg, rgba(31,35,44,.55), rgba(24,27,34,.75));
+    box-shadow:0 10px 30px -18px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,255,255,.03);
+    backdrop-filter:blur(6px);
+  }
+  .btn-primary{background:linear-gradient(135deg,var(--accent),#9a7bff); box-shadow:0 8px 22px -10px rgba(124,92,255,.7);}
+  .tab.on{box-shadow:0 6px 16px -8px rgba(124,92,255,.8);}
+  .chk{transition:.12s;}
+  .chk.on{box-shadow:0 0 0 1px var(--accent) inset;}
+  @media(max-width:900px){
+    body{padding-left:0; padding-bottom:0;}
+    .rail{position:sticky; top:0; left:0; right:0; width:100%; height:auto; bottom:auto;
+      flex-direction:row; justify-content:space-between; padding:8px 10px;
+      border-right:none; border-bottom:1px solid var(--line);}
+    .rail-brand{display:none;}
+    .rail-nav{flex-direction:row; gap:2px; width:auto;}
+    .rail a{width:auto; min-width:52px; padding:6px 8px;}
+    .rail a span{font-size:18px;}
+    .rail-bottom{margin-top:0; width:auto;}
+  }
 </style>
 </head>
 <body>
+<!-- STUDIO NAV RAIL -->
+<aside class="rail" id="rail">
+  <div class="rail-brand" title="Card Factory Studio">🃏</div>
+  <nav class="rail-nav">
+    <a href="#sec-discovery"><span>🔎</span><em>발굴</em></a>
+    <a href="#sec-input"><span>✍️</span><em>소재</em></a>
+    <a href="#sec-input"><span>🎨</span><em>스타일</em></a>
+    <a href="#sec-preview"><span>🖼️</span><em>카드</em></a>
+    <a href="#reelPanel"><span>🎬</span><em>릴스</em></a>
+  </nav>
+  <div class="rail-bottom">
+    <a onclick="document.getElementById('settings').classList.add('open')"><span>⚙️</span><em>설정</em></a>
+  </div>
+</aside>
 <div class="wrap">
   <header>
     <div>
@@ -98,21 +165,18 @@
   </header>
 
   <!-- DISCOVERY -->
-  <div class="panel" style="margin-bottom:20px;">
-    <h2>0. 오늘의 소재 자동 발굴 <small style="text-transform:none; color:var(--muted);">— 해외 뉴스 RSS를 기준 점수로 랭킹</small></h2>
-    <div class="row" id="subRow">
-      <label class="chk on"><input type="checkbox" value="upi_odd" checked>기상천외 뉴스 (UPI)</label>
-      <label class="chk on"><input type="checkbox" value="gnn" checked>감동 뉴스 (GNN)</label>
-      <label class="chk on"><input type="checkbox" value="gnn_animals" checked>동물 (GNN)</label>
-      <label class="chk on"><input type="checkbox" value="sciencealert" checked>과학 (ScienceAlert)</label>
-      <label class="chk"><input type="checkbox" value="livescience">과학 (LiveScience)</label>
-      <label class="chk"><input type="checkbox" value="nasa">우주 (NASA)</label>
-      <label class="chk"><input type="checkbox" value="newatlas">기술/미래 (New Atlas)</label>
-      <label class="chk"><input type="checkbox" value="oddity">괴짜 뉴스 (Oddity Central)</label>
+  <div class="panel" id="sec-discovery" style="margin-bottom:20px;">
+    <h2>0. 오늘의 소재 자동 발굴 <small style="text-transform:none; color:var(--muted);">— 30여 개 해외 매체 RSS를 기준 점수로 랭킹 (정치·사건사고 자동 제외)</small></h2>
+    <div class="row" style="margin-bottom:8px; gap:6px;">
+      <button class="btn-ghost btn-sm" onclick="toggleAllSources(true)">전체 선택</button>
+      <button class="btn-ghost btn-sm" onclick="toggleAllSources(false)">전체 해제</button>
+      <button class="btn-ghost btn-sm" onclick="selectDefaultSources()">추천 소스만</button>
+      <span class="hint" id="srcCount" style="align-self:center;"></span>
     </div>
+    <div id="subRow"></div>
     <div class="row" style="margin-top:12px; align-items:center;">
       <button class="btn-ghost btn-sm" id="crawlBtn" onclick="crawlDaily(true)">🔎 지금 크롤링</button>
-      <span class="hint" id="crawlInfo">이 페이지를 열면 하루 1회 자동으로 크롤링합니다. 실패 시 F12 콘솔에 상세 원인이 기록됩니다.</span>
+      <span class="hint" id="crawlInfo">이 페이지를 열면 하루 1회 자동으로 크롤링합니다. 소스가 많을수록 시간이 걸립니다.</span>
     </div>
     <div class="status" id="crawlStatus"></div>
     <div id="discoveryList" style="margin-top:10px;"></div>
@@ -120,7 +184,7 @@
 
   <div class="grid">
     <!-- LEFT: INPUT -->
-    <div class="panel">
+    <div class="panel" id="sec-input">
       <h2>1. 소재 입력</h2>
       <label>기사 링크 (붙여넣고 [가져오기] — 본문을 자동 추출합니다)</label>
       <div class="url-row">
@@ -135,16 +199,22 @@
       <label>각색 지침 (선택)</label>
       <input type="text" id="styleGuide" value="20대가 이해하기 쉬운 언어로, 호기심을 자극하는 후킹 제목으로" />
 
-      <label>출력 언어 <small style="color:var(--muted);">(추천: 영어+일본어+스페인어+포르투갈어+한국어)</small></label>
+      <label>출력 언어 <small style="color:var(--muted);">— 언어별로 카드+캡션+해시태그가 각각 생성됩니다</small></label>
+      <div class="row" style="margin-bottom:8px; gap:6px;">
+        <button class="btn-ghost btn-sm" style="border-color:var(--accent2); color:var(--accent2);" onclick="selectRevenueLangs()">💰 인스타 수익 최적화 6개국</button>
+        <span class="hint" style="align-self:center;">🇰🇷한국 · 🇺🇸미국 · 🇩🇪독일 · 🇯🇵일본 · 🇧🇷브라질 · 🇪🇸스페인어권</span>
+      </div>
       <div class="row" id="langRow">
-        <label class="chk on"><input type="checkbox" value="ko" checked>한국어</label>
-        <label class="chk on"><input type="checkbox" value="en" checked>영어</label>
-        <label class="chk on"><input type="checkbox" value="ja" checked>일본어</label>
-        <label class="chk"><input type="checkbox" value="es">스페인어</label>
-        <label class="chk"><input type="checkbox" value="pt">포르투갈어(브라질)</label>
-        <label class="chk"><input type="checkbox" value="vi">베트남어</label>
-        <label class="chk"><input type="checkbox" value="id">인도네시아어</label>
-        <label class="chk"><input type="checkbox" value="ar">아랍어</label>
+        <label class="chk on"><input type="checkbox" value="ko" checked>🇰🇷 한국어</label>
+        <label class="chk on"><input type="checkbox" value="en" checked>🇺🇸 영어</label>
+        <label class="chk"><input type="checkbox" value="de">🇩🇪 독일어</label>
+        <label class="chk on"><input type="checkbox" value="ja" checked>🇯🇵 일본어</label>
+        <label class="chk"><input type="checkbox" value="pt">🇧🇷 포르투갈어</label>
+        <label class="chk"><input type="checkbox" value="es">🇪🇸 스페인어</label>
+        <label class="chk"><input type="checkbox" value="fr">🇫🇷 프랑스어</label>
+        <label class="chk"><input type="checkbox" value="vi">🇻🇳 베트남어</label>
+        <label class="chk"><input type="checkbox" value="id">🇮🇩 인도네시아어</label>
+        <label class="chk"><input type="checkbox" value="ar">🇸🇦 아랍어</label>
       </div>
 
       <label>본문 카드 수 (표지 제외)</label>
@@ -228,7 +298,7 @@
     </div>
 
     <!-- RIGHT: OUTPUT -->
-    <div class="panel">
+    <div class="panel" id="sec-preview">
       <h2>3. 결과 미리보기 &amp; 복사/다운로드</h2>
       <div class="tabs" id="langTabs"></div>
       <div class="preview-area" id="previewArea">
@@ -368,7 +438,7 @@ window.addEventListener("error", function(e){
   if(el){ el.textContent = "스크립트 오류: " + e.message; el.className = "status err"; }
 });
 
-const LANG_NAMES = {ko:"한국어", en:"English", ja:"日本語", es:"Español", pt:"Português", vi:"Tiếng Việt", id:"Bahasa", ar:"العربية"};
+const LANG_NAMES = {ko:"한국어", en:"English", ja:"日本語", de:"Deutsch", es:"Español", pt:"Português", fr:"Français", vi:"Tiếng Việt", id:"Bahasa", ar:"العربية"};
 const RTL_LANGS = ["ar"];
 const state = { image:null, results:{}, activeLang:null, cardPhotos:[] };
 
@@ -543,6 +613,17 @@ async function extractOgImage(url){
 document.querySelectorAll(".chk input").forEach(cb=>{
   cb.addEventListener("change", ()=>cb.parentElement.classList.toggle("on", cb.checked));
 });
+/* 인스타 수익 최적화 6개국 프리셋:
+   한국(필수) + 미국(최고 CPM·영어권 광역) + 독일(유럽 최고 CPM대) + 일본(고CPM 대형시장)
+   + 브라질/포르투갈어(릴스 도달·참여 세계 최상위) + 스페인어권(LATAM+스페인 초대형 도달) */
+function selectRevenueLangs(){
+  const want = ["ko","en","de","ja","pt","es"];
+  document.querySelectorAll('#langRow input').forEach(cb=>{
+    cb.checked = want.includes(cb.value);
+    cb.parentElement.classList.toggle("on", cb.checked);
+  });
+  toast("수익 최적화 6개국 선택됨 — 각 나라 언어로 자동 생성됩니다");
+}
 
 /* ---------- status ---------- */
 function setStatus(msg, cls){
@@ -1137,7 +1218,8 @@ function drawCtaCard(cv, text){
 
   // 댓글 유도 버튼형 필 (언어별 문구, 그라데이션 + 그림자)
   const CTA_LABEL = {ko:"댓글로 알려주세요", en:"Drop it in the comments", ja:"コメントで教えてね",
-    es:"Cuéntanos en comentarios", pt:"Conta nos comentários", vi:"Bình luận cho tụi mình biết",
+    de:"Schreib's in die Kommentare", es:"Cuéntanos en comentarios", pt:"Conta nos comentários",
+    fr:"Dis-le en commentaire", vi:"Bình luận cho tụi mình biết",
     id:"Tulis di komentar", ar:"شاركنا في التعليقات"};
   const label = "💬  " + (CTA_LABEL[state.activeLang] || CTA_LABEL.en);
   ctx.font = "800 44px " + FONT;
@@ -1669,18 +1751,102 @@ const BONUS = {
   science: {pts:12, words:["nasa","space","mars","moon","ocean","deep sea","deep-sea","scientist","discover","study","brain","quantum","fossil","dinosaur","asteroid","telescope","species","dna","galaxy"]},
   uplift:  {pts:10, words:["reunited","saved","surprise","record","first time","oldest","youngest","returns","donates","adopts","survives","guinness","lottery","found"]},
 };
-const BLACKLIST = ["trump","biden","election","politic","congress","senate","war","gaza","israel","ukraine","russia","missile","shooting","shooter","murder","stabbed","rape","assault","abuse","suicide","overdose","terror","hostage","nazi","genocide"];
+const BLACKLIST = ["trump","biden","harris","election","politic","congress","senate","parliament","war","gaza","israel","palestin","ukraine","russia","putin","missile","nuclear","shooting","shooter","gunman","murder","killed","stabbed","rape","assault","abuse","molest","suicide","overdose","terror","hostage","nazi","genocide","protest","riot","lawsuit","indict","court","tariff","layoff","recession","covid","pandemic","outbreak","crash","dead body","death toll","porn","onlyfans","gamble","casino","crypto scam"];
 
+/* 카테고리(cat)별로 정리된 광범위 소스 — 전부 실제 응답 검증 완료. def:true = 기본 선택 */
+const FEED_CATS = {odd:"🤪 기상천외·화제", uplift:"💗 감동·굿뉴스", animal:"🐾 동물", science:"🔬 과학", space:"🚀 우주", tech:"⚙️ 기술·미래", culture:"🏛 문화·호기심"};
 const FEEDS = {
-  upi_odd:     {label:"UPI 기상천외",   url:"https://rss.upi.com/news/odd_news.rss",                              base:20},
-  gnn:         {label:"GNN 감동",       url:"https://www.goodnewsnetwork.org/feed/",                              base:16},
-  gnn_animals: {label:"GNN 동물",       url:"https://www.goodnewsnetwork.org/category/news/animals/feed/",        base:20},
-  sciencealert:{label:"ScienceAlert",   url:"https://www.sciencealert.com/feed",                                  base:14},
-  livescience: {label:"LiveScience",    url:"https://www.livescience.com/feeds/all",                              base:12},
-  nasa:        {label:"NASA",           url:"https://www.nasa.gov/feed/",                                         base:10},
-  newatlas:    {label:"New Atlas",      url:"https://newatlas.com/index.rss",                                     base:10},
-  oddity:      {label:"Oddity Central", url:"https://www.odditycentral.com/feed",                                 base:16},
+  // 기상천외 / 화제 / 바이럴
+  upi_odd:      {cat:"odd",     label:"UPI 기상천외",     url:"https://rss.upi.com/news/odd_news.rss",                       base:20, def:true},
+  oddity:       {cat:"odd",     label:"Oddity Central",   url:"http://feeds.feedburner.com/OddityCentral",                   base:18, def:true},
+  boredpanda:   {cat:"odd",     label:"Bored Panda",      url:"https://www.boredpanda.com/feed/",                            base:18, def:true},
+  boingboing:   {cat:"odd",     label:"Boing Boing",      url:"https://boingboing.net/feed",                                 base:14},
+  neatorama:    {cat:"odd",     label:"Neatorama",        url:"https://www.neatorama.com/feed/",                             base:15},
+  laughingsquid:{cat:"odd",     label:"Laughing Squid",   url:"https://laughingsquid.com/feed/",                             base:13},
+  brightside:   {cat:"odd",     label:"Bright Side",      url:"https://brightside.me/rss/",                                  base:14},
+  todayifound:  {cat:"odd",     label:"오늘 알게된 사실", url:"https://www.todayifoundout.com/index.php/feed/",              base:15},
+  // 감동 / 굿뉴스
+  gnn:          {cat:"uplift",  label:"GNN 감동",         url:"https://www.goodnewsnetwork.org/feed/",                       base:16, def:true},
+  gnn_inspiring:{cat:"uplift",  label:"GNN 영감",         url:"https://www.goodnewsnetwork.org/category/news/inspiring/feed/",base:16, def:true},
+  positivenews: {cat:"uplift",  label:"Positive News",    url:"https://www.positive.news/feed/",                             base:14},
+  optimist:     {cat:"uplift",  label:"Optimist Daily",   url:"https://www.optimistdaily.com/feed/",                         base:13},
+  // 동물
+  gnn_animals:  {cat:"animal",  label:"GNN 동물",         url:"https://www.goodnewsnetwork.org/category/news/animals/feed/", base:20, def:true},
+  guardian_anim:{cat:"animal",  label:"Guardian 동물",    url:"https://www.theguardian.com/world/animals/rss",               base:16, def:true},
+  // 과학
+  sciencealert: {cat:"science", label:"ScienceAlert",     url:"https://www.sciencealert.com/feed",                           base:14, def:true},
+  livescience:  {cat:"science", label:"LiveScience",      url:"https://www.livescience.com/feeds.xml",                       base:13, def:true},
+  sciencedaily: {cat:"science", label:"ScienceDaily",     url:"https://www.sciencedaily.com/rss/all.xml",                    base:12},
+  phys:         {cat:"science", label:"Phys.org",         url:"https://phys.org/rss-feed/",                                  base:12},
+  smithsonian:  {cat:"science", label:"Smithsonian",      url:"https://www.smithsonianmag.com/rss/latest_articles/",         base:13},
+  zmescience:   {cat:"science", label:"ZME Science",      url:"https://www.zmescience.com/feed/",                            base:12},
+  popsci:       {cat:"science", label:"Popular Science",  url:"https://www.popsci.com/feed/",                                base:12},
+  earthsky:     {cat:"science", label:"EarthSky",         url:"https://earthsky.org/feed/",                                  base:11},
+  bbc_science:  {cat:"science", label:"BBC 과학·환경",    url:"https://feeds.bbci.co.uk/news/science_and_environment/rss.xml",base:11},
+  // 우주
+  nasa:         {cat:"space",   label:"NASA",             url:"https://www.nasa.gov/feed/",                                  base:11, def:true},
+  space:        {cat:"space",   label:"Space.com",        url:"https://www.space.com/feeds.xml",                             base:11},
+  // 기술 / 미래 / 디자인
+  newatlas:     {cat:"tech",    label:"New Atlas",        url:"https://newatlas.com/index.rss",                              base:11},
+  interestingeng:{cat:"tech",   label:"Interesting Eng.", url:"https://interestingengineering.com/feed",                     base:11},
+  theverge:     {cat:"tech",    label:"The Verge",        url:"https://www.theverge.com/rss/index.xml",                      base:9},
+  gizmodo:      {cat:"tech",    label:"Gizmodo",          url:"https://gizmodo.com/feed",                                    base:9},
+  mymodernmet:  {cat:"tech",    label:"My Modern Met",    url:"https://mymodernmet.com/feed/",                               base:13},
+  designyoutrust:{cat:"tech",   label:"Design You Trust", url:"https://designyoutrust.com/feed/",                            base:11},
+  // 문화 / 호기심
+  atlasobscura: {cat:"culture", label:"Atlas Obscura",    url:"https://www.atlasobscura.com/feeds/latest",                   base:15, def:true},
 };
+
+/* 소스 체크박스를 카테고리별로 동적 렌더 */
+function renderSubSources(){
+  const box = document.getElementById("subRow");
+  if(!box) return;
+  box.innerHTML = "";
+  const byCat = {};
+  Object.keys(FEEDS).forEach(k=>{ const f = FEEDS[k]; (byCat[f.cat] = byCat[f.cat] || []).push(k); });
+  Object.keys(FEED_CATS).forEach(cat=>{
+    const keys = byCat[cat]; if(!keys) return;
+    const grp = document.createElement("div"); grp.style.cssText = "margin-bottom:10px;";
+    const head = document.createElement("div");
+    head.style.cssText = "font-size:12px; color:var(--muted); margin:0 0 5px; cursor:pointer; user-select:none;";
+    head.textContent = FEED_CATS[cat] + "  ⤨";
+    head.title = "이 카테고리 전체 켜기/끄기";
+    head.onclick = ()=>{
+      const cbs = keys.map(k=>box.querySelector('input[value="'+k+'"]'));
+      const all = cbs.every(cb=>cb.checked);
+      cbs.forEach(cb=>{ cb.checked = !all; cb.parentElement.classList.toggle("on", cb.checked); });
+      updateSrcCount();
+    };
+    grp.appendChild(head);
+    const row = document.createElement("div"); row.className = "row"; row.style.gap = "6px";
+    keys.forEach(k=>{
+      const f = FEEDS[k];
+      const lab = document.createElement("label"); lab.className = "chk" + (f.def ? " on" : "");
+      const cb = document.createElement("input"); cb.type = "checkbox"; cb.value = k; cb.checked = !!f.def;
+      cb.addEventListener("change", ()=>{ lab.classList.toggle("on", cb.checked); updateSrcCount(); });
+      lab.appendChild(cb); lab.appendChild(document.createTextNode(f.label));
+      row.appendChild(lab);
+    });
+    grp.appendChild(row);
+    box.appendChild(grp);
+  });
+  updateSrcCount();
+}
+function updateSrcCount(){
+  const el = document.getElementById("srcCount");
+  if(el) el.textContent = "선택 " + document.querySelectorAll('#subRow input:checked').length + "개 소스";
+}
+function toggleAllSources(on){
+  document.querySelectorAll('#subRow input').forEach(cb=>{ cb.checked = on; cb.parentElement.classList.toggle("on", on); });
+  updateSrcCount();
+}
+function selectDefaultSources(){
+  document.querySelectorAll('#subRow input').forEach(cb=>{
+    const on = !!(FEEDS[cb.value] && FEEDS[cb.value].def);
+    cb.checked = on; cb.parentElement.classList.toggle("on", on);
+  });
+  updateSrcCount();
+}
 
 function fetchWithTimeout(url, ms, opts){
   const ctrl = new AbortController();
@@ -1836,6 +2002,7 @@ function escapeHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").repl
 
 /* auto-crawl once per day on open */
 (function autoCrawl(){
+  renderSubSources();
   const last = localStorage.getItem("icf_lastCrawl");
   const today = new Date().toDateString();
   const cached = localStorage.getItem("icf_lastResults");
@@ -1847,5 +2014,5 @@ function escapeHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").repl
 </script>
 </body>
 </html>
-<!-- v3.0 — 릴스(Reel) 생성·게시 추가 -->
+<!-- v3.1 — 스튜디오 UI + 수익 최적화 6개국 + 30여 소스 확장 -->
 
