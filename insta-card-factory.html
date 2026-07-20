@@ -197,7 +197,7 @@
       <textarea id="source" placeholder="기사 본문, 흥미로운 사실, 연구 내용 등"></textarea>
 
       <label>각색 지침 (선택)</label>
-      <input type="text" id="styleGuide" value="20대가 이해하기 쉬운 언어로, 호기심을 자극하는 후킹 제목으로" />
+      <input type="text" id="styleGuide" value="스크롤을 멈추게 하는 충격·반전 후킹. 궁금해서 캡션을 안 볼 수 없게. 자극적이되 사실 기반." />
 
       <label>출력 언어 <small style="color:var(--muted);">— 언어별로 카드+캡션+해시태그가 각각 생성됩니다</small></label>
       <div class="row" style="margin-bottom:8px; gap:6px;">
@@ -706,36 +706,50 @@ function onFormatChange(){
 /* ---------- 프롬프트: 썸네일 1장 + 캡션 본문 (신규 포맷) ---------- */
 function buildThumbPrompt(source, style, langs, handle){
   const brand = handle ? ("The account handle is \"" + handle + "\" — use it in the follow-CTA line.") : "Use a generic 'follow us' style follow-CTA line.";
-  return `You are an elite viral Instagram news-card copywriter (Korean issue-account style: whynotmag_, hey.news, kinetic_trigger). Based ONLY on the facts in the source, write ORIGINAL content — rewrite in your own words, never copy sentences verbatim.
+  return `You are a WORLD-CLASS viral Instagram hook copywriter for a faceless "shocking & fascinating global news" account (Korean issue-account style: whynotmag_, hey.news, kinetic_trigger). Your ONE job: write a thumbnail headline so magnetic that a thumb SToPS mid-scroll. Base everything ONLY on facts in the source — rewrite in your own words, never copy verbatim, never fabricate.
 
 SOURCE:
 """${source}"""
 
-STYLE GUIDE: ${style || "curiosity-driven, punchy, easy to understand"}
+EXTRA STYLE GUIDE: ${style || "punchy, provocative, curiosity-gap"}
 
-FORMAT: ONE cover photo with a strong hooking headline overlaid, and the FULL body written as the Instagram CAPTION. There are NO body cards.
+═══ THE HOOK IS EVERYTHING ═══
+First, silently find the SINGLE most shocking / unbelievable / counter-intuitive / "wait, WHAT?" detail in this story. That detail — not a bland summary — is your headline. Then WITHHOLD the payoff: the headline must open a curiosity gap that FORCES the reader into the caption. Weak = summarizing. Strong = making them NEED to know.
+
+PROVEN HOOK PATTERNS (use a DIFFERENT one for each variant):
+1. 반전/배신 (reversal): "X인 줄 알았는데… 알고 보니 Y"
+2. 충격 숫자·스케일 (shock number): "단 0.001초에 1.5억", "매년 8만 명이 사라진다"
+3. 금기·직설 충격 (taboo/blunt): state the shocking fact bluntly (like the '슈퍼 성병' example)
+4. 미스터리·떡밥 (open loop): "과학자도 설명 못 한…", "아무도 몰랐던 진짜 이유"
+5. 최상급·세계기록 (superlative): "세계 최초로…", "역사상 가장 ~한"
+6. 경고·손실회피 (warning): "당신도 예외가 아니다", "지금 확인 안 하면…"
+7. 정체 공개 (the reveal): "현실판 배트맨의 정체", "그가 숨긴 것"
+
+RULES for headlines:
+- Provocative but TRUE — the caption must be able to deliver on the promise. No fake clickbait.
+- Use 이슈-계정 tone: 구어체, 자극적, 말줄임표(…)·따옴표('' "") 적극 활용. Numbers and superlatives hit hard — keep them.
+- Each line ~8-16 chars for Korean/Japanese, ~3-6 words for Latin. 2-3 BALANCED lines. No ** markup.
 
 For EACH of these languages: ${langs.join(", ")} produce a JSON object with:
-- "line1","line2","line3": the big cover HEADLINE split into 2-3 balanced lines (line3 = "" if two lines are enough). This is the scroll-stopping hook shown in large WHITE bold text on the photo. Make it punchy and specific (real subject + the twist). Each line ~8-16 chars for Korean/Japanese, ~3-6 words for Latin languages. Keep lines BALANCED in length. Do NOT use ** markup here. It must read as a complete headline, e.g. line1="항문 성접촉으로 전파되는", line2="'슈퍼 성병' 확산…", line3="약도 안 듣는다".
-- "badge": a short tone word (2-4 chars) in that language (화제/충격/신기 · WOW/WILD · 話題). Optional.
-- "caption": the COMPLETE Instagram caption in that language, using real line breaks (\\n). Structure it EXACTLY like top Korean news accounts:
-  (1) HOOK line: one punchy sentence restating the headline as a bold statement.
-  (2) blank line, then 2-4 SHORT body paragraphs (1-3 sentences each) covering WHO/WHERE/WHAT then HOW/WHY, each with CONCRETE facts from the source (real names, numbers, dates, places). You MAY prefix key paragraphs with a fitting emoji marker like 📌, 💡, ⚠️, 🔎 (as those accounts do). Money → convert to the reader's local currency.
-  (3) blank line, then ONE closing "payoff" line that lands the point (reader thinks "아 그렇구나 / 신기하다").
-  (4) blank line, then a FOLLOW-CTA line inviting readers to follow for more global issues. ${brand}
-  (5) blank line, then a source line starting with "출처:" (or the language's word for Source:) citing the origin org/outlet from the source.
-  Keep it engaging and TRUE to the source — no invented facts, no false clickbait.
+- "hooks": an array of EXACTLY 4 DISTINCT headline options, each {"line1","line2","line3"} (line3 "" if 2 lines suffice). Use 4 DIFFERENT hook patterns from the list. Order them STRONGEST FIRST (hooks[0] = the single most scroll-stopping one).
+- "line1","line2","line3": copy hooks[0] here (the strongest headline).
+- "badge": a short punchy tone word (2-4 chars) in that language (충격/경악/소름/반전/신기 · SHOCK/INSANE/WOW · 衝撃/驚愕).
+- "caption": the COMPLETE Instagram caption in that language, real line breaks (\\n):
+  (1) HOOK line: one punchy sentence that escalates the headline (don't just repeat it).
+  (2) blank line, then 2-4 SHORT body paragraphs (1-3 sentences each): WHO/WHERE/WHAT then HOW/WHY, each with CONCRETE facts from the source (names, numbers, dates, places). Lead with the most surprising fact. You MAY prefix paragraphs with 📌 💡 ⚠️ 🔎 😱. Money → convert to reader's local currency.
+  (3) blank line, then ONE closing payoff line that resolves the curiosity gap (reader: "헐… 진짜 신기하다").
+  (4) blank line, then a FOLLOW-CTA line. ${brand}
+  (5) blank line, then a source line starting with "출처:" (or that language's "Source:") citing the org/outlet from the source.
+  Engaging and TRUE — no invented facts.
 - "hashtags": one line of 6-10 relevant hashtags for that language/market.
-- "image_queries": array with EXACTLY ONE short English stock-photo query (2-4 concrete words) for the cover — the single most scroll-stopping visual for this story. Prefer concrete photographable nouns/scenes; AVOID close-up human faces (they look AI-generated) unless the story is about a specific famous person.
+- "image_queries": array with EXACTLY ONE short English stock-photo query (2-4 concrete words) — the single most scroll-stopping visual. Prefer concrete photographable nouns/scenes; AVOID close-up human faces (they look AI-generated) unless the story is about a specific famous person.
 
 STRICT JSON RULES:
 - Respond with ONLY valid JSON. No markdown fences, no commentary.
-- All strings on a single line — escape line breaks as \\n.
-- Never use unescaped double quotes inside strings (use ' instead).
-- No trailing commas.
+- All strings on a single line — escape line breaks as \\n. No unescaped double quotes inside strings (use '). No trailing commas.
 
 Exact shape:
-{"results":[{"lang":"ko","line1":"...","line2":"...","line3":"...","badge":"...","caption":"...","hashtags":"...","image_queries":["..."]}]}`;
+{"results":[{"lang":"ko","hooks":[{"line1":"...","line2":"...","line3":"..."},{"line1":"...","line2":"...","line3":"..."},{"line1":"...","line2":"...","line3":"..."},{"line1":"...","line2":"...","line3":"..."}],"line1":"...","line2":"...","line3":"...","badge":"...","caption":"...","hashtags":"...","image_queries":["..."]}]}`;
 }
 
 /* ---------- 프롬프트: 멀티 카드뉴스 (기존 포맷) ---------- */
@@ -888,6 +902,25 @@ function renderLang(l){
   in3.oninput = ()=>{ r.line3 = in3.value; redraw(); };
   ce.append(in1, in2, in3);
   coverBox.box.appendChild(ce);
+  // 🔄 다른 후킹 — AI가 만든 4개 후보를 순환
+  if(r.hooks && r.hooks.length > 1){
+    if(r._hookIdx == null) r._hookIdx = 0;
+    const hb = document.createElement("button");
+    hb.className = "btn-ghost btn-sm";
+    hb.style.cssText = "border-color:var(--accent2); color:var(--accent2);";
+    const label = ()=>"🔄 다른 후킹 (" + (r._hookIdx+1) + "/" + r.hooks.length + ")";
+    hb.textContent = label();
+    hb.title = "AI가 만든 다른 후킹 헤드라인으로 교체";
+    hb.onclick = ()=>{
+      r._hookIdx = (r._hookIdx + 1) % r.hooks.length;
+      const h = r.hooks[r._hookIdx] || {};
+      r.line1 = h.line1 || ""; r.line2 = h.line2 || ""; r.line3 = h.line3 || "";
+      in1.value = r.line1; in2.value = r.line2; in3.value = r.line3;
+      hb.textContent = label();
+      redraw();
+    };
+    coverBox.box.querySelector(".card-btns").appendChild(hb);
+  }
   area.appendChild(coverBox.box);
   drawCover(coverBox.canvas, r.line1||"", r.line2||"", r.line3||"");
 
@@ -1992,6 +2025,8 @@ async function publishReel(){
 
 /* ================= DAILY DISCOVERY (자동 소재 발굴) ================= */
 const BONUS = {
+  // 후킹 강한 '충격·신기·반전' 신호에 가장 높은 가중치
+  shock:   {pts:18, words:["mystery","mysterious","unexplained","secret","hidden","bizarre","strange","weird","shocking","stunned","unbelievable","incredible","insane","reveal","revealed","discovered","uncovered","forbidden","banned","rare","first ever","never before","turns out","actually","truth","real reason","why","exposed","creepy","eerie","unexpected","twist","accidentally","impossible","defies","baffled","puzzled","record-breaking","world's","oldest","largest","deepest","strangest"]},
   animal:  {pts:15, words:["dog","cat","puppy","kitten","elephant","whale","octopus","penguin","rescue","shelter","panda","otter","bear","turtle","parrot","gorilla","dolphin","fox","owl","animal","zoo","tortoise","kangaroo","raccoon","beaver"]},
   science: {pts:12, words:["nasa","space","mars","moon","ocean","deep sea","deep-sea","scientist","discover","study","brain","quantum","fossil","dinosaur","asteroid","telescope","species","dna","galaxy"]},
   uplift:  {pts:10, words:["reunited","saved","surprise","record","first time","oldest","youngest","returns","donates","adopts","survives","guinness","lottery","found"]},
@@ -1999,8 +2034,16 @@ const BONUS = {
 const BLACKLIST = ["trump","biden","harris","election","politic","congress","senate","parliament","war","gaza","israel","palestin","ukraine","russia","putin","missile","nuclear","shooting","shooter","gunman","murder","killed","stabbed","rape","assault","abuse","molest","suicide","overdose","terror","hostage","nazi","genocide","protest","riot","lawsuit","indict","court","tariff","layoff","recession","covid","pandemic","outbreak","crash","dead body","death toll","porn","onlyfans","gamble","casino","crypto scam"];
 
 /* 카테고리(cat)별로 정리된 광범위 소스 — 전부 실제 응답 검증 완료. def:true = 기본 선택 */
-const FEED_CATS = {odd:"🤪 기상천외·화제", uplift:"💗 감동·굿뉴스", animal:"🐾 동물", science:"🔬 과학", space:"🚀 우주", tech:"⚙️ 기술·미래", culture:"🏛 문화·호기심"};
+const FEED_CATS = {shock:"😱 충격·미스터리·반전", odd:"🤪 기상천외·화제", uplift:"💗 감동·굿뉴스", animal:"🐾 동물", science:"🔬 과학", space:"🚀 우주", tech:"⚙️ 기술·미래", culture:"🏛 문화·호기심"};
 const FEEDS = {
+  // 충격 / 미스터리 / 반전 / 소름 (후킹 강한 소재)
+  ati:          {cat:"shock",   label:"충격 실화 (ATI)",  url:"https://allthatsinteresting.com/feed",                        base:22, def:true},
+  vintagenews:  {cat:"shock",   label:"기묘한 역사",      url:"https://www.thevintagenews.com/feed/",                        base:20, def:true},
+  weird_ls:     {cat:"shock",   label:"이상한 과학",      url:"https://www.livescience.com/feeds/tag/weird",                 base:20, def:true},
+  curiosmos:    {cat:"shock",   label:"우주·고대 미스터리",url:"https://curiosmos.com/feed/",                                base:19, def:true},
+  amusingplanet:{cat:"shock",   label:"경이로운 세계",    url:"https://www.amusingplanet.com/feeds/posts/default?alt=rss",   base:18},
+  historydefined:{cat:"shock",  label:"소름돋는 역사",    url:"https://www.historydefined.net/feed/",                        base:17},
+  bigthink:     {cat:"shock",   label:"발상 전환 (Big Think)",url:"https://bigthink.com/feed/",                             base:15},
   // 기상천외 / 화제 / 바이럴
   upi_odd:      {cat:"odd",     label:"UPI 기상천외",     url:"https://rss.upi.com/news/odd_news.rss",                       base:20, def:true},
   oddity:       {cat:"odd",     label:"Oddity Central",   url:"http://feeds.feedburner.com/OddityCentral",                   base:18, def:true},
@@ -2261,5 +2304,5 @@ function escapeHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").repl
 </script>
 </body>
 </html>
-<!-- v3.5 — 언어별 다중 계정 매핑·라우팅 발행 -->
+<!-- v3.6 — 후킹 대폭 강화(바이럴 공식+후킹 후보 4개) + 충격 소스 -->
 
