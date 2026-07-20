@@ -266,6 +266,18 @@
       </div>
       <div class="style-row" style="margin-top:10px;">
         <div>
+          <label>헤드라인 폰트</label>
+          <select id="headlineFont" onchange="onHeadlineFont()">
+            <option value="pretendard" selected>프리텐다드 (예시 계정 표준 · 추천)</option>
+            <option value="gmarket">지마켓 산스 (둥근 임팩트)</option>
+            <option value="suit">SUIT (모던 헤비)</option>
+          </select>
+          <div class="hint">예시(hey.news·whynotmag) 서체 = 프리텐다드 Black</div>
+        </div>
+        <div></div>
+      </div>
+      <div class="style-row" style="margin-top:10px;">
+        <div>
           <label>제목 위치</label>
           <select id="txtPos" onchange="rerender()">
             <option value="bottom">하단</option>
@@ -1073,20 +1085,54 @@ function cardBox(id, label){
 }
 
 /* ---------- canvas drawing ---------- */
-const FONT = "'CardSans','Pretendard','Malgun Gothic','Apple SD Gothic Neo','Hiragino Sans','Yu Gothic',sans-serif";
-/* 프리텐다드 웹폰트 로드 (이슈 계정 표준 서체) */
-(async function loadFonts(){
-  const base = "https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/woff2/";
-  const defs = [["Pretendard-Black.woff2","900"],["Pretendard-ExtraBold.woff2","800"],["Pretendard-SemiBold.woff2","600"],["Pretendard-Medium.woff2","500"]];
-  try{
-    for(const [file, weight] of defs){
-      const f = new FontFace("CardSans", "url(" + base + file + ") format('woff2')", {weight});
-      await f.load();
-      document.fonts.add(f);
-    }
-    rerender();
-  }catch(e){ console.warn("웹폰트 로드 실패 — 시스템 폰트로 대체", e); }
-})();
+/* FONT는 선택된 헤드라인 폰트에 따라 바뀜 (let). 예시 계정들의 표준 서체 = Pretendard Black */
+let FONT = "'CardSans','Pretendard','Malgun Gothic','Apple SD Gothic Neo','Hiragino Sans','Yu Gothic',sans-serif";
+
+/* 사용 가능한 헤드라인 폰트 (전부 상용 무료 · woff2 CDN 검증 완료) */
+const PRE = "https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/woff2/";
+const HEADLINE_FONTS = {
+  pretendard: { label:"프리텐다드", family:"CardSans", loaded:false,
+    stack:"'CardSans','Pretendard','Malgun Gothic','Apple SD Gothic Neo','Hiragino Sans','Yu Gothic',sans-serif",
+    files:[[PRE+"Pretendard-Black.woff2","900"],[PRE+"Pretendard-ExtraBold.woff2","800"],
+           [PRE+"Pretendard-Bold.woff2","700"],[PRE+"Pretendard-SemiBold.woff2","600"],[PRE+"Pretendard-Medium.woff2","500"]] },
+  gmarket: { label:"지마켓 산스", family:"GmarketSans", loaded:false,
+    stack:"'GmarketSans','CardSans','Malgun Gothic','Apple SD Gothic Neo',sans-serif",
+    files:[["https://cdn.jsdelivr.net/gh/fonts-archive/GmarketSans/GmarketSansBold.woff2","900"],
+           ["https://cdn.jsdelivr.net/gh/fonts-archive/GmarketSans/GmarketSansBold.woff2","800"],
+           ["https://cdn.jsdelivr.net/gh/fonts-archive/GmarketSans/GmarketSansBold.woff2","700"],
+           ["https://cdn.jsdelivr.net/gh/fonts-archive/GmarketSans/GmarketSansMedium.woff2","500"]] },
+  suit: { label:"SUIT (모던 헤비)", family:"SUIT", loaded:false,
+    stack:"'SUIT','CardSans','Malgun Gothic','Apple SD Gothic Neo',sans-serif",
+    files:[["https://cdn.jsdelivr.net/gh/sunn-us/SUIT/fonts/static/woff2/SUIT-Heavy.woff2","900"],
+           ["https://cdn.jsdelivr.net/gh/sunn-us/SUIT/fonts/static/woff2/SUIT-Heavy.woff2","800"],
+           ["https://cdn.jsdelivr.net/gh/sunn-us/SUIT/fonts/static/woff2/SUIT-Bold.woff2","700"],
+           ["https://cdn.jsdelivr.net/gh/sunn-us/SUIT/fonts/static/woff2/SUIT-Bold.woff2","600"],
+           ["https://cdn.jsdelivr.net/gh/sunn-us/SUIT/fonts/static/woff2/SUIT-Medium.woff2","500"]] },
+};
+/* 폰트별 로드 (각 파일 독립적으로 — 하나 실패해도 나머지는 적용) */
+async function loadFontFamily(key){
+  const f = HEADLINE_FONTS[key];
+  if(!f || f.loaded) return;
+  f.loaded = true;
+  await Promise.all(f.files.map(async ([url, weight])=>{
+    try{
+      const ff = new FontFace(f.family, "url(" + url + ") format('woff2')", { weight });
+      await ff.load();
+      document.fonts.add(ff);
+    }catch(e){ console.warn("폰트 로드 실패:", url.split("/").pop(), e.message); }
+  }));
+  rerender();
+}
+/* 헤드라인 폰트 변경 */
+function onHeadlineFont(){
+  const key = (document.getElementById("headlineFont")||{}).value || "pretendard";
+  const f = HEADLINE_FONTS[key] || HEADLINE_FONTS.pretendard;
+  FONT = f.stack;
+  rerender();               // 즉시 반영(로드 전이면 잠깐 대체폰트)
+  loadFontFamily(key);      // 로드되면 loadFontFamily가 rerender 재호출
+}
+/* 초기: 기본 폰트(프리텐다드) 로드 */
+loadFontFamily("pretendard");
 
 function drawCover(cv, line1, line2, line3){
   const ctx = cv.getContext("2d");
@@ -2119,5 +2165,5 @@ function escapeHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").repl
 </script>
 </body>
 </html>
-<!-- v3.2 — 썸네일 1장+캡션 본문 포맷(신규 기본) + 헤드라인 커버 스타일 -->
+<!-- v3.3 — 폰트 로딩 수정(Pretendard CDN 경로) + 헤드라인 폰트 선택 -->
 
