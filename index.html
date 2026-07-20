@@ -521,26 +521,27 @@ function toast(msg){
 }
 
 /* ---------- article fetch (URL crawling) ---------- */
+/* 여러 프록시를 동시에 경쟁 실행 — 가장 먼저 성공(200자 이상 확보)하는 것을 채택.
+   순차 시도(최악 85초+) 대신 병렬 레이스로 바꿔 체감 속도·안정성을 크게 개선. */
 async function fetchArticle(){
   const url = document.getElementById("articleUrl").value.trim();
   if(!/^https?:\/\//.test(url)){ setStatus("올바른 URL을 입력하세요 (https:// 포함).", "err"); return; }
   const btn = document.getElementById("fetchBtn");
-  btn.disabled = true; setStatus("기사 본문 추출 중...", "busy");
+  btn.disabled = true; setStatus("기사 본문 추출 중... (여러 경로 동시 시도)", "busy");
   try{
-    let text = await tryJina(url);
-    if(!text) text = await tryAllOrigins(url);
-    if(!text && window._pendingMeta && window._pendingMeta.desc){
+    const found = await raceExtract(url);
+    if(!found && window._pendingMeta && window._pendingMeta.desc){
       // 최후 수단: RSS에 포함된 제목+요약문을 소재로 사용
       const m = window._pendingMeta;
-      text = "[기사 제목] " + m.title + "\n\n[기사 요약] " + m.desc + "\n\n(출처: " + url + ")";
-      document.getElementById("source").value = text;
+      const t2 = "[기사 제목] " + m.title + "\n\n[기사 요약] " + m.desc + "\n\n(출처: " + url + ")";
+      document.getElementById("source").value = t2;
       setStatus("본문 추출은 실패했지만 RSS 요약문을 소재로 불러왔습니다. 이대로 생성 가능합니다.", "ok");
-    }else if(!text){
-      throw new Error("본문을 추출하지 못했습니다. 본문을 직접 붙여넣어 주세요.");
+    }else if(!found){
+      throw new Error("모든 추출 경로가 실패했습니다. 본문을 직접 복사해서 붙여넣어 주세요.");
     }else{
-      text = text.replace(/\n{3,}/g, "\n\n").trim().slice(0, 6000);
-      document.getElementById("source").value = text;
-      setStatus("본문 추출 완료 (" + text.length + "자). 필요하면 편집 후 생성하세요.", "ok");
+      const clean = found.text.replace(/\n{3,}/g, "\n\n").trim().slice(0, 6000);
+      document.getElementById("source").value = clean;
+      setStatus("본문 추출 완료 (" + clean.length + "자, " + found.src + " 경로). 필요하면 편집 후 생성하세요.", "ok");
     }
     window._pendingMeta = null;
     // 기사 이미지 자동 적용: RSS 썸네일이 있으면 그것을, 없으면 og:image 추출
@@ -552,14 +553,6 @@ async function fetchArticle(){
     btn.disabled = false;
   }
 }
-async function tryJina(url){
-  try{
-    const res = await fetchWithTimeout("https://r.jina.ai/" + url, 25000);
-    if(!res.ok) return null;
-    const t = await res.text();
-    return t.length > 200 ? t : null;
-  }catch(e){ return null; }
-}
 function extractTextFromHtml(html){
   const doc = new DOMParser().parseFromString(html, "text/html");
   doc.querySelectorAll("script,style,nav,header,footer,aside,form").forEach(n=>n.remove());
@@ -567,22 +560,20 @@ function extractTextFromHtml(html){
   const text = ps.join("\n\n");
   return text.length > 200 ? text : null;
 }
-async function tryAllOrigins(url){
+async function raceExtract(url){
   const enc = encodeURIComponent(url);
-  const proxies = [
-    "https://api.allorigins.win/raw?url=" + enc,
-    "https://corsproxy.io/?url=" + enc,
-    "https://api.codetabs.com/v1/proxy?quest=" + url,
+  const attempts = [
+    { name:"Jina Reader",  fn: async()=>{ const r = await fetchWithTimeout("https://r.jina.ai/"+url, 20000); if(!r.ok) throw 0; const t = await r.text(); if(t.length<=200) throw 0; return t; } },
+    { name:"AllOrigins",   fn: async()=>{ const r = await fetchWithTimeout("https://api.allorigins.win/raw?url="+enc, 18000); if(!r.ok) throw 0; const t = extractTextFromHtml(await r.text()); if(!t) throw 0; return t; } },
+    { name:"CorsProxy",    fn: async()=>{ const r = await fetchWithTimeout("https://corsproxy.io/?url="+enc, 18000); if(!r.ok) throw 0; const t = extractTextFromHtml(await r.text()); if(!t) throw 0; return t; } },
+    { name:"CodeTabs",     fn: async()=>{ const r = await fetchWithTimeout("https://api.codetabs.com/v1/proxy?quest="+url, 18000); if(!r.ok) throw 0; const t = extractTextFromHtml(await r.text()); if(!t) throw 0; return t; } },
   ];
-  for(const p of proxies){
-    try{
-      const res = await fetchWithTimeout(p, 20000);
-      if(!res.ok) continue;
-      const text = extractTextFromHtml(await res.text());
-      if(text) return text;
-    }catch(e){ /* next */ }
+  const races = attempts.map(a => a.fn().then(t=>({ text:t, src:a.name })));
+  try{
+    return await Promise.any(races);
+  }catch(e){
+    return null; // 전부 실패
   }
-  return null;
 }
 
 /* ---------- image upload ---------- */
@@ -2440,5 +2431,5 @@ function escapeHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").repl
 </script>
 </body>
 </html>
-<!-- v3.9 — 출처 신뢰도 등급(tier) 시스템 + 메이저 매체 대거 추가 -->
+<!-- v3.10 — 기사 URL 추출을 병렬 경쟁 방식으로 개선(속도·안정성) -->
 
