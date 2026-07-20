@@ -217,14 +217,23 @@
         <label class="chk"><input type="checkbox" value="ar">🇸🇦 아랍어</label>
       </div>
 
-      <label>본문 카드 수 (표지 제외)</label>
-      <select id="cardCount">
-        <option value="auto" selected>자동 — 내용량에 맞게 AI가 결정 (추천)</option>
-        <option value="2">2장</option>
-        <option value="3">3장</option>
-        <option value="4">4장</option>
-        <option value="5">5장</option>
+      <label>발행 포맷</label>
+      <select id="pubFormat" onchange="onFormatChange()">
+        <option value="thumb" selected>썸네일 1장 + 캡션 본문 (신규 · 릴스/도달 최적)</option>
+        <option value="cards">멀티 카드뉴스 (기존 · 여러 장 캐러셀)</option>
       </select>
+      <div class="hint" id="formatHint">사진 1장에 강한 후킹 헤드라인을 얹고, 본문은 캡션에 넣는 방식. 사진 1장이라 릴스(음원)로 그대로 쓰기 좋습니다.</div>
+
+      <div id="cardCountWrap" style="display:none;">
+        <label>본문 카드 수 (표지 제외)</label>
+        <select id="cardCount">
+          <option value="auto" selected>자동 — 내용량에 맞게 AI가 결정 (추천)</option>
+          <option value="2">2장</option>
+          <option value="3">3장</option>
+          <option value="4">4장</option>
+          <option value="5">5장</option>
+        </select>
+      </div>
 
       <h2 style="margin-top:22px;">2. 표지 이미지 &amp; 스타일</h2>
       <div class="dropzone" id="dropzone">클릭 또는 드래그해서 이미지 업로드<br>
@@ -237,7 +246,8 @@
         <div>
           <label>표지 스타일</label>
           <select id="hlStyle" onchange="rerender()">
-            <option value="youmad" selected>이슈계정 스타일 (흰 + 형광 2줄)</option>
+            <option value="headline" selected>뉴스 헤드라인 (흰 볼드 + 구분선·로고)</option>
+            <option value="youmad">이슈계정 스타일 (흰 + 형광 2줄)</option>
             <option value="yellow">노란 형광 하이라이트 바</option>
             <option value="black">검은 바 + 흰 글씨</option>
             <option value="purple">보라 바 + 흰 글씨</option>
@@ -275,8 +285,11 @@
       </div>
       <div class="style-row" style="margin-top:10px;">
         <div>
-          <label>계정 핸들 (핸들 칩으로 표시)</label>
-          <input type="text" id="handle" placeholder="@your_account" oninput="rerender()" />
+          <label>헤드라인 정렬</label>
+          <select id="txtAlign" onchange="rerender()">
+            <option value="left" selected>왼쪽</option>
+            <option value="center">가운데</option>
+          </select>
         </div>
         <div>
           <label>다운로드 형식</label>
@@ -286,8 +299,15 @@
           </select>
         </div>
       </div>
+      <div class="style-row" style="margin-top:10px;">
+        <div>
+          <label>계정 핸들 (로고/구분선에 표시)</label>
+          <input type="text" id="handle" placeholder="@your_account" oninput="rerender()" />
+        </div>
+        <div></div>
+      </div>
 
-      <button class="btn-primary" id="genBtn" onclick="generate()">⚡ 카드뉴스 생성</button>
+      <button class="btn-primary" id="genBtn" onclick="generate()">⚡ 콘텐츠 생성</button>
       <div class="status" id="status"></div>
 
       <div class="notice">
@@ -662,20 +682,56 @@ async function callClaude(prompt){
   return text;
 }
 
-/* ---------- generate ---------- */
-async function generate(){
-  const source = document.getElementById("source").value.trim();
-  if(!source){ setStatus("원문 소재를 입력하거나 기사 링크에서 가져오세요.", "err"); return; }
-  const langs = [...document.querySelectorAll("#langRow input:checked")].map(c=>c.value);
-  if(!langs.length){ setStatus("언어를 하나 이상 선택하세요.", "err"); return; }
-  const n = document.getElementById("cardCount").value;
-  const style = document.getElementById("styleGuide").value.trim();
+/* ---------- 발행 포맷 토글 ---------- */
+function onFormatChange(){
+  const fmt = (document.getElementById("pubFormat")||{}).value || "thumb";
+  const isThumb = fmt === "thumb";
+  const wrap = document.getElementById("cardCountWrap");
+  if(wrap) wrap.style.display = isThumb ? "none" : "block";
+  const hint = document.getElementById("formatHint");
+  if(hint) hint.style.display = isThumb ? "block" : "none";
+  const gen = document.getElementById("genBtn");
+  if(gen) gen.textContent = isThumb ? "⚡ 썸네일 + 캡션 생성" : "⚡ 카드뉴스 생성";
+}
 
-  const btn = document.getElementById("genBtn");
-  btn.disabled = true; setStatus("AI가 각색·번역 중... (10~30초)", "busy");
-  state.cardPhotos = [];
+/* ---------- 프롬프트: 썸네일 1장 + 캡션 본문 (신규 포맷) ---------- */
+function buildThumbPrompt(source, style, langs, handle){
+  const brand = handle ? ("The account handle is \"" + handle + "\" — use it in the follow-CTA line.") : "Use a generic 'follow us' style follow-CTA line.";
+  return `You are an elite viral Instagram news-card copywriter (Korean issue-account style: whynotmag_, hey.news, kinetic_trigger). Based ONLY on the facts in the source, write ORIGINAL content — rewrite in your own words, never copy sentences verbatim.
 
-  const prompt = `You are a viral social media card-news writer. Based ONLY on the facts in the source below, write ORIGINAL card-news content (do not copy source sentences verbatim — rewrite in your own words).
+SOURCE:
+"""${source}"""
+
+STYLE GUIDE: ${style || "curiosity-driven, punchy, easy to understand"}
+
+FORMAT: ONE cover photo with a strong hooking headline overlaid, and the FULL body written as the Instagram CAPTION. There are NO body cards.
+
+For EACH of these languages: ${langs.join(", ")} produce a JSON object with:
+- "line1","line2","line3": the big cover HEADLINE split into 2-3 balanced lines (line3 = "" if two lines are enough). This is the scroll-stopping hook shown in large WHITE bold text on the photo. Make it punchy and specific (real subject + the twist). Each line ~8-16 chars for Korean/Japanese, ~3-6 words for Latin languages. Keep lines BALANCED in length. Do NOT use ** markup here. It must read as a complete headline, e.g. line1="항문 성접촉으로 전파되는", line2="'슈퍼 성병' 확산…", line3="약도 안 듣는다".
+- "badge": a short tone word (2-4 chars) in that language (화제/충격/신기 · WOW/WILD · 話題). Optional.
+- "caption": the COMPLETE Instagram caption in that language, using real line breaks (\\n). Structure it EXACTLY like top Korean news accounts:
+  (1) HOOK line: one punchy sentence restating the headline as a bold statement.
+  (2) blank line, then 2-4 SHORT body paragraphs (1-3 sentences each) covering WHO/WHERE/WHAT then HOW/WHY, each with CONCRETE facts from the source (real names, numbers, dates, places). You MAY prefix key paragraphs with a fitting emoji marker like 📌, 💡, ⚠️, 🔎 (as those accounts do). Money → convert to the reader's local currency.
+  (3) blank line, then ONE closing "payoff" line that lands the point (reader thinks "아 그렇구나 / 신기하다").
+  (4) blank line, then a FOLLOW-CTA line inviting readers to follow for more global issues. ${brand}
+  (5) blank line, then a source line starting with "출처:" (or the language's word for Source:) citing the origin org/outlet from the source.
+  Keep it engaging and TRUE to the source — no invented facts, no false clickbait.
+- "hashtags": one line of 6-10 relevant hashtags for that language/market.
+- "image_queries": array with EXACTLY ONE short English stock-photo query (2-4 concrete words) for the cover — the single most scroll-stopping visual for this story. Prefer concrete photographable nouns/scenes; AVOID close-up human faces (they look AI-generated) unless the story is about a specific famous person.
+
+STRICT JSON RULES:
+- Respond with ONLY valid JSON. No markdown fences, no commentary.
+- All strings on a single line — escape line breaks as \\n.
+- Never use unescaped double quotes inside strings (use ' instead).
+- No trailing commas.
+
+Exact shape:
+{"results":[{"lang":"ko","line1":"...","line2":"...","line3":"...","badge":"...","caption":"...","hashtags":"...","image_queries":["..."]}]}`;
+}
+
+/* ---------- 프롬프트: 멀티 카드뉴스 (기존 포맷) ---------- */
+function buildCardsPrompt(source, style, langs, n){
+  return `You are a viral social media card-news writer. Based ONLY on the facts in the source below, write ORIGINAL card-news content (do not copy source sentences verbatim — rewrite in your own words).
 
 SOURCE:
 """${source}"""
@@ -709,6 +765,26 @@ STRICT JSON RULES:
 
 Exact shape:
 {"results":[{"lang":"ko","line1":"...","line2":"...","badge":"...","cards":["..."],"cta":"...","caption":"...","hashtags":"...","image_queries":["..."]}]}`;
+}
+
+/* ---------- generate ---------- */
+async function generate(){
+  const source = document.getElementById("source").value.trim();
+  if(!source){ setStatus("원문 소재를 입력하거나 기사 링크에서 가져오세요.", "err"); return; }
+  const langs = [...document.querySelectorAll("#langRow input:checked")].map(c=>c.value);
+  if(!langs.length){ setStatus("언어를 하나 이상 선택하세요.", "err"); return; }
+  const n = document.getElementById("cardCount").value;
+  const style = document.getElementById("styleGuide").value.trim();
+  const fmt = (document.getElementById("pubFormat")||{}).value || "thumb";
+  const handle = document.getElementById("handle").value.trim();
+
+  const btn = document.getElementById("genBtn");
+  btn.disabled = true; setStatus("AI가 각색·번역 중... (10~30초)", "busy");
+  state.cardPhotos = [];
+
+  const prompt = (fmt === "thumb")
+    ? buildThumbPrompt(source, style, langs, handle)
+    : buildCardsPrompt(source, style, langs, n);
 
   try{
     let text = await callClaude(prompt);
@@ -720,7 +796,10 @@ Exact shape:
     }
     if(!parsed) throw new Error("AI가 유효한 JSON을 반환하지 않았습니다. 다시 시도해주세요.");
     state.results = {};
-    parsed.results.forEach(r=>state.results[r.lang] = r);
+    parsed.results.forEach(r=>{
+      if(fmt === "thumb"){ r.cards = []; r.cta = ""; }   // 썸네일 1장 포맷: 본문/CTA 카드 없음
+      state.results[r.lang] = r;
+    });
     buildTabs(langs);
     setActiveLang(langs[0]);
     setStatus("생성 완료. 카드 클릭 = 복사, ⬇ = 저장.", "ok");
@@ -788,17 +867,20 @@ function renderLang(l){
   const area = document.getElementById("previewArea");
   area.innerHTML = "";
 
-  const coverBox = cardBox("cover_"+l, "표지");
-  // 표지 제목 직접 수정 (1줄/2줄)
+  const coverBox = cardBox("cover_"+l, "썸네일 (표지)");
+  // 헤드라인 직접 수정 (1~3줄)
   const ce = document.createElement("div"); ce.className = "cover-edit";
-  const in1 = document.createElement("input"); in1.type="text"; in1.value = r.line1||""; in1.placeholder="제목 1줄 (흰색)";
-  const in2 = document.createElement("input"); in2.type="text"; in2.value = r.line2||""; in2.placeholder="제목 2줄 (강조색)";
-  in1.oninput = ()=>{ r.line1 = in1.value; drawCover(coverBox.canvas, r.line1, r.line2); };
-  in2.oninput = ()=>{ r.line2 = in2.value; drawCover(coverBox.canvas, r.line1, r.line2); };
-  ce.append(in1, in2);
+  const in1 = document.createElement("input"); in1.type="text"; in1.value = r.line1||""; in1.placeholder="헤드라인 1줄";
+  const in2 = document.createElement("input"); in2.type="text"; in2.value = r.line2||""; in2.placeholder="헤드라인 2줄";
+  const in3 = document.createElement("input"); in3.type="text"; in3.value = r.line3||""; in3.placeholder="헤드라인 3줄 (선택)";
+  const redraw = ()=>drawCover(coverBox.canvas, r.line1||"", r.line2||"", r.line3||"");
+  in1.oninput = ()=>{ r.line1 = in1.value; redraw(); };
+  in2.oninput = ()=>{ r.line2 = in2.value; redraw(); };
+  in3.oninput = ()=>{ r.line3 = in3.value; redraw(); };
+  ce.append(in1, in2, in3);
   coverBox.box.appendChild(ce);
   area.appendChild(coverBox.box);
-  drawCover(coverBox.canvas, r.line1||"", r.line2||"");
+  drawCover(coverBox.canvas, r.line1||"", r.line2||"", r.line3||"");
 
   const total = (r.cards||[]).length;
   (r.cards||[]).forEach((txt,i)=>{
@@ -1006,7 +1088,7 @@ const FONT = "'CardSans','Pretendard','Malgun Gothic','Apple SD Gothic Neo','Hir
   }catch(e){ console.warn("웹폰트 로드 실패 — 시스템 폰트로 대체", e); }
 })();
 
-function drawCover(cv, line1, line2){
+function drawCover(cv, line1, line2, line3){
   const ctx = cv.getContext("2d");
   const W=cv.width, H=cv.height;
 
@@ -1017,29 +1099,44 @@ function drawCover(cv, line1, line2){
     ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
   }
 
-  const pos = document.getElementById("txtPos").value;
-  const g2 = ctx.createLinearGradient(0, pos==="bottom"?H*0.4:0, 0, pos==="bottom"?H:H*0.6);
-  if(pos==="bottom"){ g2.addColorStop(0,"rgba(0,0,0,0)"); g2.addColorStop(1,"rgba(0,0,0,.88)"); }
-  else{ g2.addColorStop(0,"rgba(0,0,0,.88)"); g2.addColorStop(1,"rgba(0,0,0,0)"); }
-  ctx.fillStyle = g2; ctx.fillRect(0,0,W,H);
-
   const style = document.getElementById("hlStyle").value;
   const accent = document.getElementById("accentColor").value;
-  const fontSize = 76;
+  const align = (document.getElementById("txtAlign")||{}).value || "left";
+  const rtl = RTL_LANGS.includes(state.activeLang);
+  const isHeadline = style === "headline";
+
+  const pos = document.getElementById("txtPos").value;
+  const g2 = ctx.createLinearGradient(0, pos==="bottom"?H*0.35:0, 0, pos==="bottom"?H:H*0.65);
+  const dark = isHeadline ? .94 : .88;
+  if(pos==="bottom"){ g2.addColorStop(0,"rgba(0,0,0,0)"); g2.addColorStop(1,"rgba(0,0,0,"+dark+")"); }
+  else{ g2.addColorStop(0,"rgba(0,0,0,"+dark+")"); g2.addColorStop(1,"rgba(0,0,0,0)"); }
+  ctx.fillStyle = g2; ctx.fillRect(0,0,W,H);
+
+  const fontSize = isHeadline ? 84 : 76;
   ctx.font = "900 " + fontSize + "px " + FONT;
   ctx.textBaseline = "alphabetic";
 
-  const l1 = wrapText(ctx, line1, W-160);
-  const l2 = wrapText(ctx, line2, W-160);
-  const lh = fontSize*1.35;
-  const totalLines = l1.length + l2.length;
+  const maxW = W - 160;
+  const l1 = wrapText(ctx, line1, maxW);
+  const l2 = wrapText(ctx, line2, maxW);
+  const l3 = wrapText(ctx, line3, maxW);
+  const lh = fontSize * (isHeadline ? 1.28 : 1.35);
+  const allLines = []
+    .concat(l1.map(t=>({t, accent:false})))
+    .concat(l2.map(t=>({t, accent: style==="youmad"})))
+    .concat(l3.map(t=>({t, accent:false})));
+  const totalLines = allLines.length;
+  if(!totalLines) return;
+
   const chipH = 52;
   const bsel = document.getElementById("badge").value;
   const badge = bsel === "auto" ? (((state.results||{})[state.activeLang]||{}).badge || "") : bsel;
-  let y = pos==="bottom" ? H - 90 - (totalLines-1)*lh : 150 + (badge?70:0) + chipH + fontSize;
-  let topY = (pos==="bottom" ? y - (totalLines-1)*lh : y) - fontSize;
+  const firstY = pos==="bottom" ? (H - 90 - (totalLines-1)*lh) : (150 + (badge?70:0) + chipH + fontSize);
+  const topY = firstY - fontSize;
+  const handle = document.getElementById("handle").value.trim();
 
-  if(badge){
+  // 배지/핸들 칩 — 헤드라인 스타일에선 깔끔하게 생략(구분선으로 대체)
+  if(badge && !isHeadline){
     ctx.font = "800 34px " + FONT;
     const bw = ctx.measureText(badge).width + 44;
     const by = topY - chipH - 24 - 62;
@@ -1048,9 +1145,7 @@ function drawCover(cv, line1, line2){
     ctx.fillStyle = "#fff";
     ctx.fillText(badge, 102, by+39);
   }
-
-  const handle = document.getElementById("handle").value.trim();
-  if(handle){
+  if(handle && !isHeadline){
     ctx.font = "600 32px " + FONT;
     const hw = ctx.measureText(handle).width + 40;
     const hy = topY - chipH - 16;
@@ -1059,23 +1154,31 @@ function drawCover(cv, line1, line2){
     ctx.fillStyle = "rgba(255,255,255,.92)";
     ctx.fillText(handle, 100, hy+37);
   }
+  // 헤드라인 스타일: 핸들이 있으면 텍스트 위에 구분선 + 브랜드 마크
+  if(isHeadline && handle){
+    const dy = topY - 34;
+    ctx.font = "700 30px " + FONT;
+    ctx.textAlign = "center";
+    const hwText = ctx.measureText(handle).width, gap = 26;
+    ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(90, dy); ctx.lineTo(W/2 - hwText/2 - gap, dy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(W/2 + hwText/2 + gap, dy); ctx.lineTo(W-90, dy); ctx.stroke();
+    ctx.shadowColor = "rgba(0,0,0,.6)"; ctx.shadowBlur = 8;
+    ctx.fillStyle = "rgba(255,255,255,.96)";
+    ctx.fillText(handle, W/2, dy + 10);
+    ctx.shadowBlur = 0;
+  }
 
   ctx.font = "900 " + fontSize + "px " + FONT;
-  const rtl = RTL_LANGS.includes(state.activeLang);
-  ctx.textAlign = rtl ? "right" : "left";
-  const allLines = l1.map(t=>({t, second:false})).concat(l2.map(t=>({t, second:true})));
-  let yy = pos==="bottom" ? H - 90 - (allLines.length-1)*lh : topY + fontSize;
-  allLines.forEach(({t, second})=>{
-    const x = rtl ? W - 80 : 80;
+  const textAlign = rtl ? "right" : (align === "center" ? "center" : "left");
+  ctx.textAlign = textAlign;
+  const x = textAlign === "center" ? W/2 : (rtl ? W - 80 : 80);
+  let yy = firstY;
+  allLines.forEach(({t, accent:isAcc})=>{
     const tw = ctx.measureText(t).width;
-    if(style==="youmad"){
-      ctx.shadowColor = "rgba(0,0,0,.9)"; ctx.shadowBlur = 16;
-      ctx.fillStyle = second ? accent : "#ffffff";
-      ctx.fillText(t, x, yy);
-      ctx.shadowBlur = 0;
-    }else if(style==="none"){
-      ctx.fillStyle = "#fff";
-      ctx.shadowColor = "rgba(0,0,0,.85)"; ctx.shadowBlur = 18;
+    if(isHeadline || style==="none" || style==="youmad"){
+      ctx.shadowColor = "rgba(0,0,0,.92)"; ctx.shadowBlur = isHeadline ? 22 : 16;
+      ctx.fillStyle = (style==="youmad" && isAcc) ? accent : "#ffffff";
       ctx.fillText(t, x, yy);
       ctx.shadowBlur = 0;
     }else{
@@ -1083,8 +1186,9 @@ function drawCover(cv, line1, line2){
       if(style==="yellow"){ barColor="rgba(255,212,0,.95)"; txtColor="#111"; }
       else if(style==="black"){ barColor="rgba(0,0,0,.88)"; txtColor="#fff"; }
       else{ barColor="rgba(124,92,255,.92)"; txtColor="#fff"; }
+      const bx = textAlign==="center" ? x - tw/2 - 14 : (rtl ? x - tw - 14 : x - 14);
       ctx.fillStyle = barColor;
-      ctx.fillRect(rtl ? x-tw-14 : x-14, yy-fontSize+8, tw+28, fontSize+14);
+      ctx.fillRect(bx, yy-fontSize+8, tw+28, fontSize+14);
       ctx.fillStyle = txtColor;
       ctx.fillText(t, x, yy);
     }
@@ -1537,7 +1641,7 @@ async function buildReelFrames(lang, W, H){
   try{
     const frames = [];
     let c = makeCanvas(W, H);
-    drawCover(c, r.line1 || "", r.line2 || "");
+    drawCover(c, r.line1 || "", r.line2 || "", r.line3 || "");
     frames.push(await canvasToPng(c));
     const cards = r.cards || [];
     for(let i=0; i<cards.length; i++){
@@ -2003,6 +2107,7 @@ function escapeHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").repl
 /* auto-crawl once per day on open */
 (function autoCrawl(){
   renderSubSources();
+  onFormatChange();
   const last = localStorage.getItem("icf_lastCrawl");
   const today = new Date().toDateString();
   const cached = localStorage.getItem("icf_lastResults");
@@ -2014,5 +2119,5 @@ function escapeHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").repl
 </script>
 </body>
 </html>
-<!-- v3.1 — 스튜디오 UI + 수익 최적화 6개국 + 30여 소스 확장 -->
+<!-- v3.2 — 썸네일 1장+캡션 본문 포맷(신규 기본) + 헤드라인 커버 스타일 -->
 
