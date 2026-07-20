@@ -342,8 +342,9 @@
         <div class="row" style="margin-top:10px;">
           <button class="btn-ghost btn-sm" onclick="copyCaption()">📋 캡션 복사</button>
           <button class="btn-ghost btn-sm" onclick="downloadAll()">⬇ 이 언어 카드 전체 다운로드</button>
-          <button class="btn-ghost btn-sm" id="pubBtn" onclick="publishCurrent()" style="border-color:var(--ok); color:var(--ok);">🚀 인스타에 게시 (캐러셀)</button>
+          <button class="btn-ghost btn-sm" id="pubBtn" onclick="publishCurrent()" style="border-color:var(--ok); color:var(--ok);">🚀 이 계정에 게시</button>
         </div>
+        <div class="hint" id="acctTarget" style="margin-top:6px;"></div>
         <div class="status" id="pubStatus"></div>
       </div>
       <div class="footer-note">
@@ -423,16 +424,12 @@
     </select>
     <div class="notice">키는 이 브라우저의 localStorage에만 저장됩니다 (Anthropic API 호출 외 외부 전송 없음).</div>
 
-    <h2 style="margin:20px 0 4px; font-size:15px;">인스타그램 게시 연동 (선택)</h2>
-    <label>API 방식</label>
-    <select id="igApiMode">
-      <option value="iglogin">Instagram 로그인 (신형 — 앱 대시보드에서 토큰 생성, 권장)</option>
-      <option value="fblogin">Facebook 로그인 (구형 — 그래프 탐색기 토큰)</option>
-    </select>
-    <label>인스타그램 사용자 ID (IG 계정 ID — 숫자)</label>
-    <input type="text" id="igUserId" placeholder="17841400000000000">
-    <label>액세스 토큰</label>
-    <input type="password" id="igToken" placeholder="IGAAR... 또는 EAAG...">
+    <h2 style="margin:20px 0 4px; font-size:15px;">인스타그램 계정 (언어별 발행)</h2>
+    <div class="notice" style="margin-top:6px;">각 <b>언어</b>는 여기서 매핑한 <b>계정</b>으로 발행됩니다 (🇰🇷한국어 → 한국 계정, 🇺🇸영어 → 영어 계정 …). 계정마다 <b>비즈니스/크리에이터 전환 + 액세스 토큰</b>이 필요해요. 아래 이미지 호스트·소스 설정은 모든 계정 공용입니다.</div>
+    <div id="accountsList"></div>
+    <button class="btn-ghost btn-sm" style="margin-top:10px;" onclick="addAccount()">＋ 계정 추가</button>
+
+    <h2 style="margin:22px 0 4px; font-size:15px;">공용 — 이미지 호스팅 &amp; 소스</h2>
     <label>이미지 호스트 (게시용 공개 URL 생성)</label>
     <select id="imgHost">
       <option value="imgbb">ImgBB — 간단 (API 키 하나면 끝, 권장)</option>
@@ -478,7 +475,7 @@ const state = { image:null, results:{}, activeLang:null, cardPhotos:[] };
 function saveSettings(){
   localStorage.setItem("icf_key", document.getElementById("apiKey").value.trim());
   localStorage.setItem("icf_model", document.getElementById("model").value);
-  ["igUserId","igToken","cldName","cldPreset","imgbbKey","imgHost","igApiMode","pexelsKey","imgSource"].forEach(id=>
+  ["cldName","cldPreset","imgbbKey","imgHost","pexelsKey","imgSource"].forEach(id=>
     localStorage.setItem("icf_"+id, document.getElementById(id).value.trim()));
   document.getElementById("settings").classList.remove("open");
   toast("설정 저장됨");
@@ -487,13 +484,13 @@ function saveSettings(){
   document.getElementById("apiKey").value = localStorage.getItem("icf_key") || "";
   const m = localStorage.getItem("icf_model");
   if(m) document.getElementById("model").value = m;
-  ["igUserId","igToken","cldName","cldPreset","imgbbKey","imgHost","igApiMode","pexelsKey","imgSource"].forEach(id=>{
+  ["cldName","cldPreset","imgbbKey","imgHost","pexelsKey","imgSource"].forEach(id=>{
     const v = localStorage.getItem("icf_"+id);
     if(v) document.getElementById(id).value = v;
   });
   // 자동 저장: 입력하는 즉시 저장 (저장 버튼이 안 눌리는 환경 대비)
   const KEYMAP = {apiKey:"icf_key", model:"icf_model"};
-  ["apiKey","model","igApiMode","igUserId","igToken","imgHost","imgbbKey","cldName","cldPreset","pexelsKey","imgSource"].forEach(id=>{
+  ["apiKey","model","imgHost","imgbbKey","cldName","cldPreset","pexelsKey","imgSource"].forEach(id=>{
     const el = document.getElementById(id);
     if(!el) return;
     const ev = el.tagName === "SELECT" ? "change" : "input";
@@ -932,7 +929,21 @@ function renderLang(l){
 
   document.getElementById("captionWrap").style.display = "block";
   document.getElementById("captionBox").textContent = r.caption + "\n\n" + r.hashtags;
+  updateAcctTarget();
   showReelPanel();
+}
+
+/* 현재 언어가 어느 계정으로 발행되는지 표시 */
+function updateAcctTarget(){
+  const el = document.getElementById("acctTarget");
+  if(!el) return;
+  const lang = state.activeLang;
+  const acct = getAccountForLang(lang);
+  if(acct){
+    el.innerHTML = "발행 대상: <b style='color:var(--ok)'>" + (acct.label||"계정") + "</b> (" + (LANG_NAMES[lang]||lang) + ")";
+  }else{
+    el.innerHTML = "<b style='color:var(--err)'>" + (LANG_NAMES[lang]||lang) + " 언어에 매핑된 계정 없음</b> — ⚙ 설정 → 인스타그램 계정에서 추가하세요";
+  }
 }
 
 /* ---------- Pexels 카드별 이미지 ---------- */
@@ -1517,9 +1528,84 @@ function copyCaption(){
   toast("캡션이 클립보드에 복사되었습니다");
 }
 
+/* ================= 다국어 계정 관리 (언어 → 계정 매핑) ================= */
+function loadAccounts(){
+  try{ const a = JSON.parse(localStorage.getItem("icf_accounts") || "[]"); if(Array.isArray(a)) return a; }catch(e){}
+  return [];
+}
+function saveAccounts(){ localStorage.setItem("icf_accounts", JSON.stringify(ACCOUNTS)); }
+let ACCOUNTS = loadAccounts();
+/* 레거시 단일 계정(icf_igUserId 등) → 계정 배열로 1회 마이그레이션 */
+(function migrateLegacyAccount(){
+  if(ACCOUNTS.length) return;
+  const id = localStorage.getItem("icf_igUserId"), tok = localStorage.getItem("icf_igToken");
+  if(id && tok){
+    ACCOUNTS = [{ label:"계정 1", lang:"ko", apiMode: localStorage.getItem("icf_igApiMode") || "iglogin", igUserId:id, igToken:tok }];
+    saveAccounts();
+  }
+})();
+
+/* 해당 언어로 발행할 계정을 결정 */
+function getAccountForLang(lang){
+  const ready = ACCOUNTS.filter(a=>a.igUserId && a.igToken);
+  if(ready.length){
+    const m = ready.find(a=>a.lang === lang);
+    if(m) return m;
+    if(ready.length === 1) return ready[0];   // 계정 1개면 그걸로
+    return null;                               // 여러 개인데 이 언어 매핑 없음
+  }
+  const id = localStorage.getItem("icf_igUserId"), tok = localStorage.getItem("icf_igToken");
+  if(id && tok) return { label:"기본 계정", lang, apiMode: localStorage.getItem("icf_igApiMode") || "iglogin", igUserId:id, igToken:tok };
+  return null;
+}
+
+/* 계정 매니저 UI */
+function addAccount(){
+  const usedLangs = ACCOUNTS.map(a=>a.lang);
+  const nextLang = ["ko","en","de","ja","pt","es","fr"].find(l=>!usedLangs.includes(l)) || "ko";
+  ACCOUNTS.push({ label:"계정 " + (ACCOUNTS.length+1), lang:nextLang, apiMode:"iglogin", igUserId:"", igToken:"" });
+  saveAccounts(); renderAccounts();
+}
+function removeAccount(i){
+  ACCOUNTS.splice(i,1); saveAccounts(); renderAccounts();
+}
+function renderAccounts(){
+  const box = document.getElementById("accountsList");
+  if(!box) return;
+  box.innerHTML = "";
+  if(!ACCOUNTS.length){
+    box.innerHTML = "<div class='hint'>아직 계정이 없습니다. [＋ 계정 추가]로 언어별 계정을 등록하세요.</div>";
+    return;
+  }
+  ACCOUNTS.forEach((a, i)=>{
+    const card = document.createElement("div");
+    card.style.cssText = "background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:12px; margin-top:10px;";
+    const langOpts = Object.keys(LANG_NAMES).map(l=>"<option value='"+l+"'"+(a.lang===l?" selected":"")+">"+LANG_NAMES[l]+"</option>").join("");
+    card.innerHTML =
+      "<div style='display:flex; gap:8px; align-items:center; margin-bottom:8px;'>"+
+        "<input type='text' data-f='label' placeholder='계정 이름' value='"+(a.label||"").replace(/'/g,"&#39;")+"' style='flex:1;'>"+
+        "<select data-f='lang' style='width:130px;'>"+langOpts+"</select>"+
+        "<button class='btn-ghost btn-sm' data-f='del' title='삭제' style='color:var(--err); border-color:var(--err);'>✕</button>"+
+      "</div>"+
+      "<select data-f='apiMode' style='margin-bottom:8px;'>"+
+        "<option value='iglogin'"+(a.apiMode!=="fblogin"?" selected":"")+">Instagram 로그인 (신형·권장)</option>"+
+        "<option value='fblogin'"+(a.apiMode==="fblogin"?" selected":"")+">Facebook 로그인 (구형)</option>"+
+      "</select>"+
+      "<input type='text' data-f='igUserId' placeholder='IG 사용자 ID (숫자)' value='"+(a.igUserId||"")+"' style='margin-bottom:8px;'>"+
+      "<input type='password' data-f='igToken' placeholder='액세스 토큰 (IGAAR... 또는 EAAG...)' value='"+(a.igToken||"")+"'>";
+    card.querySelectorAll("[data-f]").forEach(el=>{
+      const f = el.getAttribute("data-f");
+      if(f === "del"){ el.onclick = ()=>{ if(confirm("이 계정을 삭제할까요?")) removeAccount(i); }; return; }
+      const ev = el.tagName === "SELECT" ? "change" : "input";
+      el.addEventListener(ev, ()=>{ a[f] = el.value.trim(); saveAccounts(); });
+    });
+    box.appendChild(card);
+  });
+}
+
 /* ================= INSTAGRAM PUBLISH (반자동 게시) ================= */
-function GRAPH(){
-  const mode = localStorage.getItem("icf_igApiMode") || "iglogin";
+function GRAPH(apiMode){
+  const mode = apiMode || localStorage.getItem("icf_igApiMode") || "iglogin";
   return mode === "iglogin" ? "https://graph.instagram.com/v21.0" : "https://graph.facebook.com/v21.0";
 }
 
@@ -1553,10 +1639,11 @@ async function uploadImage(cv){
   }
 }
 
-async function graphPost(path, params){
-  const token = localStorage.getItem("icf_igToken");
+async function graphPost(path, params, acct){
+  const token = acct ? acct.igToken : localStorage.getItem("icf_igToken");
+  const mode = acct ? acct.apiMode : null;
   params.access_token = token;
-  const res = await fetch(GRAPH() + path, {
+  const res = await fetch(GRAPH(mode) + path, {
     method:"POST",
     headers:{"content-type":"application/x-www-form-urlencoded"},
     body: new URLSearchParams(params).toString()
@@ -1566,11 +1653,12 @@ async function graphPost(path, params){
   return j;
 }
 
-async function waitContainer(id, maxTries, interval){
+async function waitContainer(id, acct, maxTries, interval){
   maxTries = maxTries || 10; interval = interval || 2500;
-  const token = localStorage.getItem("icf_igToken");
+  const token = acct ? acct.igToken : localStorage.getItem("icf_igToken");
+  const mode = acct ? acct.apiMode : null;
   for(let i=0; i<maxTries; i++){
-    const res = await fetch(GRAPH() + "/" + id + "?fields=status_code&access_token=" + encodeURIComponent(token));
+    const res = await fetch(GRAPH(mode) + "/" + id + "?fields=status_code&access_token=" + encodeURIComponent(token));
     const j = await res.json();
     if(j.status_code === "FINISHED") return;
     if(j.status_code === "ERROR") throw new Error("미디어 처리 실패 (컨테이너 오류)");
@@ -1580,18 +1668,23 @@ async function waitContainer(id, maxTries, interval){
 }
 
 async function publishCurrent(){
-  const igId = localStorage.getItem("icf_igUserId");
-  const token = localStorage.getItem("icf_igToken");
+  const lang = state.activeLang;
+  const acct = getAccountForLang(lang);
   const host = localStorage.getItem("icf_imgHost") || "imgbb";
   const hostReady = host === "imgbb" ? !!localStorage.getItem("icf_imgbbKey") : !!localStorage.getItem("icf_cldName");
-  if(!igId || !token || !hostReady){
-    setPubStatus("연동 정보가 없습니다. ⚙ API 설정에서 인스타그램 게시 연동 항목을 채워주세요.", "err");
+  if(!acct){
+    setPubStatus((LANG_NAMES[lang]||lang) + " 언어에 연결된 계정이 없습니다. ⚙ 설정 → 인스타그램 계정에서 이 언어의 계정을 추가·매핑하세요.", "err");
     return;
   }
+  if(!hostReady){
+    setPubStatus("이미지 호스트가 설정되지 않았습니다. ⚙ 설정에서 ImgBB 또는 Cloudinary를 채워주세요.", "err");
+    return;
+  }
+  const igId = acct.igUserId;
   const canvases = [...document.querySelectorAll("#previewArea canvas")];
   if(!canvases.length){ setPubStatus("게시할 카드가 없습니다. 먼저 생성하세요.", "err"); return; }
   const caption = document.getElementById("captionBox").textContent.trim();
-  if(!confirm("현재 언어의 카드 " + canvases.length + "장을 캐러셀로 인스타그램에 게시합니다. 진행할까요?")) return;
+  if(!confirm("[" + acct.label + "] 계정에 " + (LANG_NAMES[lang]||lang) + " 카드 " + canvases.length + "장을 게시합니다. 진행할까요?")) return;
 
   const btn = document.getElementById("pubBtn");
   btn.disabled = true;
@@ -1599,33 +1692,33 @@ async function publishCurrent(){
     // 1) 이미지 호스팅
     const urls = [];
     for(let i=0; i<canvases.length; i++){
-      setPubStatus("이미지 업로드 중... (" + (i+1) + "/" + canvases.length + ")", "busy");
+      setPubStatus("[" + acct.label + "] 이미지 업로드 중... (" + (i+1) + "/" + canvases.length + ")", "busy");
       urls.push(await uploadImage(canvases[i]));
     }
     let creationId;
     if(urls.length === 1){
       setPubStatus("미디어 컨테이너 생성 중...", "busy");
-      const c = await graphPost("/" + igId + "/media", {image_url: urls[0], caption});
+      const c = await graphPost("/" + igId + "/media", {image_url: urls[0], caption}, acct);
       creationId = c.id;
     }else{
       // 2) 캐러셀 자식 컨테이너
       const children = [];
       for(let i=0; i<urls.length; i++){
         setPubStatus("캐러셀 항목 등록 중... (" + (i+1) + "/" + urls.length + ")", "busy");
-        const c = await graphPost("/" + igId + "/media", {image_url: urls[i], is_carousel_item:"true"});
+        const c = await graphPost("/" + igId + "/media", {image_url: urls[i], is_carousel_item:"true"}, acct);
         children.push(c.id);
       }
       setPubStatus("캐러셀 컨테이너 생성 중...", "busy");
-      const carousel = await graphPost("/" + igId + "/media", {media_type:"CAROUSEL", children: children.join(","), caption});
+      const carousel = await graphPost("/" + igId + "/media", {media_type:"CAROUSEL", children: children.join(","), caption}, acct);
       creationId = carousel.id;
     }
     // 3) 처리 대기 후 게시
     setPubStatus("미디어 처리 대기 중...", "busy");
-    await waitContainer(creationId);
+    await waitContainer(creationId, acct);
     setPubStatus("게시 중...", "busy");
-    const pub = await graphPost("/" + igId + "/media_publish", {creation_id: creationId});
-    setPubStatus("✅ 게시 완료! (media id: " + pub.id + ") 인스타그램 앱에서 확인하세요.", "ok");
-    toast("인스타그램에 게시되었습니다");
+    const pub = await graphPost("/" + igId + "/media_publish", {creation_id: creationId}, acct);
+    setPubStatus("✅ [" + acct.label + "]에 게시 완료! (media id: " + pub.id + ")", "ok");
+    toast("[" + acct.label + "] 계정에 게시되었습니다");
   }catch(e){
     setPubStatus("게시 실패: " + e.message, "err");
   }finally{
@@ -1860,16 +1953,17 @@ function downloadReel(){
 
 async function publishReel(){
   if(!window._reelBlob){ setReelPubStatus("먼저 릴스를 생성하세요.", "err"); return; }
-  const igId = localStorage.getItem("icf_igUserId");
-  const token = localStorage.getItem("icf_igToken");
+  const lang = state.activeLang;
+  const acct = getAccountForLang(lang);
   const cldName = localStorage.getItem("icf_cldName");
   const cldPreset = localStorage.getItem("icf_cldPreset");
-  if(!igId || !token){ setReelPubStatus("인스타 연동 정보가 없습니다 (⚙ API 설정).", "err"); return; }
+  if(!acct){ setReelPubStatus((LANG_NAMES[lang]||lang) + " 언어에 연결된 계정이 없습니다. ⚙ 설정 → 인스타그램 계정에서 매핑하세요.", "err"); return; }
   if(!cldName || !cldPreset){
-    setReelPubStatus("릴스 게시엔 동영상 호스팅이 필요합니다 → ⚙ API 설정에서 Cloudinary(Cloud name + unsigned preset)를 채워주세요. ImgBB는 동영상 미지원.", "err");
+    setReelPubStatus("릴스 게시엔 동영상 호스팅이 필요합니다 → ⚙ 설정에서 Cloudinary(Cloud name + unsigned preset)를 채워주세요. ImgBB는 동영상 미지원.", "err");
     return;
   }
-  if(!confirm("현재 릴스를 인스타그램에 게시합니다.\n\n※ API로 올린 릴스에는 인스타 인기 음원을 붙일 수 없습니다.\n최대 도달을 원하면 [MP4 저장] 후 앱에서 인기 음원을 얹어 올리는 걸 권장합니다.\n\n계속할까요?")) return;
+  const igId = acct.igUserId;
+  if(!confirm("[" + acct.label + "] 계정에 " + (LANG_NAMES[lang]||lang) + " 릴스를 게시합니다.\n\n※ API로 올린 릴스에는 인스타 인기 음원을 붙일 수 없습니다.\n최대 도달을 원하면 [MP4 저장] 후 앱에서 인기 음원을 얹어 올리는 걸 권장합니다.\n\n계속할까요?")) return;
 
   const caption = document.getElementById("captionBox").textContent.trim();
   try{
@@ -1881,16 +1975,16 @@ async function publishReel(){
     const uj = await up.json();
     if(!uj.secure_url) throw new Error("Cloudinary 업로드 실패: " + ((uj.error && uj.error.message) || "preset이 동영상 업로드를 허용하는지 확인"));
 
-    setReelPubStatus("② 릴스 컨테이너 생성 중...", "busy");
-    const c = await graphPost("/" + igId + "/media", { media_type:"REELS", video_url:uj.secure_url, caption, share_to_feed:"true" });
+    setReelPubStatus("② [" + acct.label + "] 릴스 컨테이너 생성 중...", "busy");
+    const c = await graphPost("/" + igId + "/media", { media_type:"REELS", video_url:uj.secure_url, caption, share_to_feed:"true" }, acct);
 
     setReelPubStatus("③ 인스타 처리 대기 중 (릴스는 30초~2분 소요)...", "busy");
-    await waitContainer(c.id, 40, 3000);
+    await waitContainer(c.id, acct, 40, 3000);
 
     setReelPubStatus("④ 게시 중...", "busy");
-    const pub = await graphPost("/" + igId + "/media_publish", { creation_id:c.id });
-    setReelPubStatus("✅ 릴스 게시 완료! (media id: " + pub.id + ")", "ok");
-    toast("릴스가 게시되었습니다");
+    const pub = await graphPost("/" + igId + "/media_publish", { creation_id:c.id }, acct);
+    setReelPubStatus("✅ [" + acct.label + "]에 릴스 게시 완료! (media id: " + pub.id + ")", "ok");
+    toast("[" + acct.label + "] 릴스가 게시되었습니다");
   }catch(e){
     setReelPubStatus("릴스 게시 실패: " + e.message, "err");
   }
@@ -2155,6 +2249,7 @@ function escapeHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").repl
 (function autoCrawl(){
   renderSubSources();
   onFormatChange();
+  renderAccounts();
   const last = localStorage.getItem("icf_lastCrawl");
   const today = new Date().toDateString();
   const cached = localStorage.getItem("icf_lastResults");
@@ -2166,5 +2261,5 @@ function escapeHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").repl
 </script>
 </body>
 </html>
-<!-- v3.4 — 기본 헤드라인 폰트를 G마켓 산스로 -->
+<!-- v3.5 — 언어별 다중 계정 매핑·라우팅 발행 -->
 
