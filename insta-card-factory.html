@@ -1,0 +1,1851 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Insta Card Factory — 카드뉴스 자동 생성기</title>
+<!-- iPhone 홈 화면 앱(PWA) 설정 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Card Factory">
+<meta name="theme-color" content="#0f1115">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  :root{
+    --bg:#0f1115; --panel:#181b22; --panel2:#1f232c; --line:#2a2f3a;
+    --text:#e8eaf0; --muted:#8b93a3; --accent:#7c5cff; --accent2:#ffd400;
+    --ok:#3ecf8e; --err:#ff6b6b; --radius:12px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{background:var(--bg); color:var(--text); font-family:'Pretendard','Malgun Gothic','Apple SD Gothic Neo',sans-serif; line-height:1.55;}
+  .wrap{max-width:1240px; margin:0 auto; padding:28px 20px 80px;}
+  header{display:flex; align-items:center; justify-content:space-between; margin-bottom:24px;}
+  h1{font-size:22px; letter-spacing:-.3px;}
+  h1 span{color:var(--accent);}
+  .sub{color:var(--muted); font-size:13px; margin-top:2px;}
+  .grid{display:grid; grid-template-columns:430px 1fr; gap:20px;}
+  @media(max-width:900px){.grid{grid-template-columns:1fr;}}
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:18px;}
+  .panel h2{font-size:14px; color:var(--muted); text-transform:uppercase; letter-spacing:.6px; margin-bottom:12px;}
+  label{display:block; font-size:13px; color:var(--muted); margin:12px 0 5px;}
+  textarea,input[type=text],input[type=password],select{
+    width:100%; background:var(--panel2); border:1px solid var(--line); border-radius:8px;
+    color:var(--text); padding:10px 12px; font-size:14px; font-family:inherit; outline:none;
+  }
+  textarea:focus,input:focus,select:focus{border-color:var(--accent);}
+  textarea{resize:vertical; min-height:100px;}
+  .row{display:flex; gap:10px; flex-wrap:wrap;}
+  .url-row{display:flex; gap:8px;}
+  .url-row input{flex:1;}
+  .chk{display:flex; align-items:center; gap:6px; background:var(--panel2); border:1px solid var(--line);
+    padding:7px 12px; border-radius:20px; font-size:13px; cursor:pointer; user-select:none;}
+  .chk input{accent-color:var(--accent);}
+  .chk.on{border-color:var(--accent); color:#fff;}
+  button{border:none; border-radius:8px; padding:11px 18px; font-size:14px; font-weight:600; cursor:pointer; font-family:inherit;}
+  .btn-primary{background:var(--accent); color:#fff; width:100%; margin-top:16px;}
+  .btn-primary:hover{filter:brightness(1.12);}
+  .btn-primary:disabled{opacity:.45; cursor:wait;}
+  .btn-ghost{background:var(--panel2); color:var(--text); border:1px solid var(--line);}
+  .btn-ghost:hover{border-color:var(--accent);}
+  .btn-ghost:disabled{opacity:.45; cursor:wait;}
+  .btn-sm{padding:7px 12px; font-size:13px;}
+  .dropzone{border:2px dashed var(--line); border-radius:var(--radius); padding:20px; text-align:center;
+    color:var(--muted); font-size:13px; cursor:pointer; transition:.15s; margin-top:6px;}
+  .dropzone:hover,.dropzone.drag{border-color:var(--accent); color:var(--text);}
+  .dropzone img{max-width:100%; max-height:130px; border-radius:8px; margin-top:8px;}
+  .tabs{display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;}
+  .tab{padding:8px 16px; border-radius:8px; background:var(--panel2); border:1px solid var(--line);
+    cursor:pointer; font-size:13px; font-weight:600; color:var(--muted);}
+  .tab.on{background:var(--accent); color:#fff; border-color:var(--accent);}
+  .preview-area{display:flex; gap:16px; flex-wrap:wrap;}
+  .card-box{display:flex; flex-direction:column; gap:8px; align-items:center;}
+  canvas{width:270px; height:337px; border-radius:10px; border:1px solid var(--line); background:#000; cursor:pointer;}
+  canvas:hover{border-color:var(--accent);}
+  .card-btns{display:flex; gap:6px;}
+  .card-edit{width:270px; background:var(--panel2); border:1px solid var(--line); border-radius:8px;
+    color:var(--text); font-size:12px; padding:8px 10px; min-height:52px; resize:vertical; font-family:inherit; line-height:1.5;}
+  .card-edit:focus{border-color:var(--accent); outline:none;}
+  .cover-edit{width:270px; display:flex; flex-direction:column; gap:5px;}
+  .cover-edit input{font-size:12px; padding:7px 10px;}
+  .caption-box{background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:12px;
+    font-size:13px; white-space:pre-wrap; margin-top:14px; max-height:220px; overflow:auto; cursor:pointer;}
+  .caption-box:hover{border-color:var(--accent);}
+  .status{font-size:13px; margin-top:10px; min-height:18px;}
+  .status.ok{color:var(--ok);} .status.err{color:var(--err);} .status.busy{color:var(--accent2);}
+  .settings{display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:50; align-items:center; justify-content:center;}
+  .settings.open{display:flex;}
+  .settings .inner{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:24px; width:min(480px,92vw); max-height:88vh; overflow-y:auto; -webkit-overflow-scrolling:touch;}
+  .notice{background:#1d2230; border:1px solid #2c3450; border-radius:8px; padding:10px 12px; font-size:12.5px; color:#aab4d0; margin-top:14px;}
+  .notice b{color:#ffd400;}
+  .footer-note{color:var(--muted); font-size:12px; margin-top:26px; border-top:1px solid var(--line); padding-top:14px;}
+  .style-row{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .lang-empty{color:var(--muted); font-size:14px; padding:40px 0; text-align:center; width:100%;}
+  .hint{font-size:11.5px; color:var(--muted); margin-top:4px;}
+  .toast{position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:var(--ok); color:#08130d;
+    padding:10px 20px; border-radius:10px; font-size:14px; font-weight:700; z-index:99; opacity:0; transition:.25s; pointer-events:none;}
+  .toast.show{opacity:1;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Insta <span>Card Factory</span></h1>
+      <div class="sub">기사 URL → AI 각색 → 카드뉴스(캐러셀) + <b style="color:var(--accent2)">릴스 영상</b> + 캡션 (다국어)</div>
+    </div>
+    <button class="btn-ghost btn-sm" onclick="document.getElementById('settings').classList.add('open')">⚙ API 설정</button>
+  </header>
+
+  <!-- DISCOVERY -->
+  <div class="panel" style="margin-bottom:20px;">
+    <h2>0. 오늘의 소재 자동 발굴 <small style="text-transform:none; color:var(--muted);">— 해외 뉴스 RSS를 기준 점수로 랭킹</small></h2>
+    <div class="row" id="subRow">
+      <label class="chk on"><input type="checkbox" value="upi_odd" checked>기상천외 뉴스 (UPI)</label>
+      <label class="chk on"><input type="checkbox" value="gnn" checked>감동 뉴스 (GNN)</label>
+      <label class="chk on"><input type="checkbox" value="gnn_animals" checked>동물 (GNN)</label>
+      <label class="chk on"><input type="checkbox" value="sciencealert" checked>과학 (ScienceAlert)</label>
+      <label class="chk"><input type="checkbox" value="livescience">과학 (LiveScience)</label>
+      <label class="chk"><input type="checkbox" value="nasa">우주 (NASA)</label>
+      <label class="chk"><input type="checkbox" value="newatlas">기술/미래 (New Atlas)</label>
+      <label class="chk"><input type="checkbox" value="oddity">괴짜 뉴스 (Oddity Central)</label>
+    </div>
+    <div class="row" style="margin-top:12px; align-items:center;">
+      <button class="btn-ghost btn-sm" id="crawlBtn" onclick="crawlDaily(true)">🔎 지금 크롤링</button>
+      <span class="hint" id="crawlInfo">이 페이지를 열면 하루 1회 자동으로 크롤링합니다. 실패 시 F12 콘솔에 상세 원인이 기록됩니다.</span>
+    </div>
+    <div class="status" id="crawlStatus"></div>
+    <div id="discoveryList" style="margin-top:10px;"></div>
+  </div>
+
+  <div class="grid">
+    <!-- LEFT: INPUT -->
+    <div class="panel">
+      <h2>1. 소재 입력</h2>
+      <label>기사 링크 (붙여넣고 [가져오기] — 본문을 자동 추출합니다)</label>
+      <div class="url-row">
+        <input type="text" id="articleUrl" placeholder="https://example.com/news/article...">
+        <button class="btn-ghost" id="fetchBtn" onclick="fetchArticle()">가져오기</button>
+      </div>
+      <div class="hint">※ 공개 리더 프록시(r.jina.ai)를 경유합니다. 일부 사이트는 차단될 수 있으며, 그 경우 아래에 본문을 직접 붙여넣으세요.</div>
+
+      <label>원문 소재 (자동 추출 결과 또는 직접 붙여넣기)</label>
+      <textarea id="source" placeholder="기사 본문, 흥미로운 사실, 연구 내용 등"></textarea>
+
+      <label>각색 지침 (선택)</label>
+      <input type="text" id="styleGuide" value="20대가 이해하기 쉬운 언어로, 호기심을 자극하는 후킹 제목으로" />
+
+      <label>출력 언어 <small style="color:var(--muted);">(추천: 영어+일본어+스페인어+포르투갈어+한국어)</small></label>
+      <div class="row" id="langRow">
+        <label class="chk on"><input type="checkbox" value="ko" checked>한국어</label>
+        <label class="chk on"><input type="checkbox" value="en" checked>영어</label>
+        <label class="chk on"><input type="checkbox" value="ja" checked>일본어</label>
+        <label class="chk"><input type="checkbox" value="es">스페인어</label>
+        <label class="chk"><input type="checkbox" value="pt">포르투갈어(브라질)</label>
+        <label class="chk"><input type="checkbox" value="vi">베트남어</label>
+        <label class="chk"><input type="checkbox" value="id">인도네시아어</label>
+        <label class="chk"><input type="checkbox" value="ar">아랍어</label>
+      </div>
+
+      <label>본문 카드 수 (표지 제외)</label>
+      <select id="cardCount">
+        <option value="auto" selected>자동 — 내용량에 맞게 AI가 결정 (추천)</option>
+        <option value="2">2장</option>
+        <option value="3">3장</option>
+        <option value="4">4장</option>
+        <option value="5">5장</option>
+      </select>
+
+      <h2 style="margin-top:22px;">2. 표지 이미지 &amp; 스타일</h2>
+      <div class="dropzone" id="dropzone">클릭 또는 드래그해서 이미지 업로드<br>
+        <small>※ 무료 라이선스(Pexels/Unsplash) 또는 직접 촬영·AI 생성 이미지 사용</small>
+        <div id="thumbWrap"></div>
+      </div>
+      <input type="file" id="fileInput" accept="image/*" style="display:none">
+
+      <div class="style-row" style="margin-top:14px;">
+        <div>
+          <label>표지 스타일</label>
+          <select id="hlStyle" onchange="rerender()">
+            <option value="youmad" selected>이슈계정 스타일 (흰 + 형광 2줄)</option>
+            <option value="yellow">노란 형광 하이라이트 바</option>
+            <option value="black">검은 바 + 흰 글씨</option>
+            <option value="purple">보라 바 + 흰 글씨</option>
+            <option value="none">하이라이트 없음 (그림자만)</option>
+          </select>
+        </div>
+        <div>
+          <label>강조 색 (2번째 줄)</label>
+          <select id="accentColor" onchange="rerender()">
+            <option value="#8bff4f" selected>형광 초록</option>
+            <option value="#ffd400">형광 노랑</option>
+            <option value="#4fc3f7">하늘색</option>
+            <option value="#ff7ad9">핑크</option>
+          </select>
+        </div>
+      </div>
+      <div class="style-row" style="margin-top:10px;">
+        <div>
+          <label>제목 위치</label>
+          <select id="txtPos" onchange="rerender()">
+            <option value="bottom">하단</option>
+            <option value="top">상단</option>
+          </select>
+        </div>
+        <div>
+          <label>배지</label>
+          <select id="badge" onchange="rerender()">
+            <option value="auto" selected>자동 — AI가 내용 보고 선택</option>
+            <option value="">없음</option>
+            <option value="NEWS PICK">NEWS PICK</option>
+            <option value="이슈">이슈</option>
+            <option value="화제">화제</option>
+          </select>
+        </div>
+      </div>
+      <div class="style-row" style="margin-top:10px;">
+        <div>
+          <label>계정 핸들 (핸들 칩으로 표시)</label>
+          <input type="text" id="handle" placeholder="@your_account" oninput="rerender()" />
+        </div>
+        <div>
+          <label>다운로드 형식</label>
+          <select id="fileFormat">
+            <option value="png">PNG</option>
+            <option value="jpeg">JPEG</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="btn-primary" id="genBtn" onclick="generate()">⚡ 카드뉴스 생성</button>
+      <div class="status" id="status"></div>
+
+      <div class="notice">
+        <b>원본성 안내</b> — 이 도구는 기사 <u>내용(사실)을 AI가 새 문장으로 재작성</u>합니다.
+        타인의 게시물 캡처를 그대로 재업로드하는 용도로 쓰지 마세요. 메타 원본 콘텐츠 정책 위반으로
+        계정 제재 대상이 됩니다. 이미지는 라이선스가 확보된 것만 사용하세요.
+      </div>
+    </div>
+
+    <!-- RIGHT: OUTPUT -->
+    <div class="panel">
+      <h2>3. 결과 미리보기 &amp; 복사/다운로드</h2>
+      <div class="tabs" id="langTabs"></div>
+      <div class="preview-area" id="previewArea">
+        <div class="lang-empty">소재를 입력하고 [카드뉴스 생성]을 누르면 미리보기가 나타납니다.<br><small>카드 이미지를 클릭하면 클립보드에 복사됩니다.</small></div>
+      </div>
+      <div id="captionWrap" style="display:none;">
+        <label style="margin-top:18px;">캡션 + 해시태그 <small style="color:var(--muted);">(직접 수정 가능)</small></label>
+        <div class="caption-box" id="captionBox" contenteditable="true" style="cursor:text;"></div>
+        <div class="row" style="margin-top:10px;">
+          <button class="btn-ghost btn-sm" onclick="copyCaption()">📋 캡션 복사</button>
+          <button class="btn-ghost btn-sm" onclick="downloadAll()">⬇ 이 언어 카드 전체 다운로드</button>
+          <button class="btn-ghost btn-sm" id="pubBtn" onclick="publishCurrent()" style="border-color:var(--ok); color:var(--ok);">🚀 인스타에 게시 (캐러셀)</button>
+        </div>
+        <div class="status" id="pubStatus"></div>
+      </div>
+      <div class="footer-note">
+        이미지 클릭 = 클립보드 복사 (인스타 웹/PC앱에 바로 붙여넣기 가능) · ⬇ = 파일 저장.
+        모바일 업로드는 카카오톡 "나에게 보내기"로 파일을 옮기면 편합니다. 생성 비용: 회당 약 $0.01~0.03.
+      </div>
+    </div>
+  </div>
+
+  <!-- REEL PANEL (릴스 만들기) -->
+  <div class="panel" id="reelPanel" style="display:none; margin-top:20px;">
+    <h2>4. 릴스(Reel) 만들기 <small style="text-transform:none; color:var(--muted);">— 방금 만든 카드뉴스를 세로 영상으로 이어붙여 <b style="color:var(--accent2)">비팔로워</b>에게 도달</small></h2>
+    <div class="notice" style="margin-top:0;">
+      <b>왜 릴스인가</b> — 카드뉴스(캐러셀)는 주로 <u>이미 나를 팔로우한 사람</u>에게 도달합니다. 새 유입은 <b>릴스</b>가 만듭니다 (릴스탭·탐색탭 노출 → 프로필 방문 → 팔로우 → 그때부터 카드뉴스가 그들에게 도달). 아래에서 현재 언어 탭의 카드들을 <b>9:16 세로 영상</b>으로 자동 변환합니다.<br>
+      <b>음원 팁 (꼭 읽으세요)</b> — 인스타 <u>인기 음원</u>은 <b>앱에서 직접 올릴 때만</b> 붙일 수 있고, 릴스 도달에 가장 큰 영향을 줍니다. <b>최대 도달을 원하면 [MP4 저장] → 인스타 앱에서 릴스로 올리며 인기 음원 선택</b>을 권장합니다. 아래 "배경 음원"은 <b>저작권 free 음원을 영상에 직접 입힐 때만</b> 사용하세요 (API 자동 게시용).
+    </div>
+    <div class="style-row" style="margin-top:14px;">
+      <div>
+        <label>카드당 노출 시간</label>
+        <select id="reelDur" onchange="updateReelEstimate()">
+          <option value="2">2초 (빠른 템포)</option>
+          <option value="2.5" selected>2.5초 (권장)</option>
+          <option value="3">3초</option>
+          <option value="3.5">3.5초 (여유)</option>
+        </select>
+      </div>
+      <div>
+        <label>전환 효과</label>
+        <select id="reelTrans">
+          <option value="fade" selected>크로스페이드 (부드러움)</option>
+          <option value="slide">슬라이드</option>
+          <option value="cut">컷 (가장 빠르고 안정적)</option>
+        </select>
+      </div>
+    </div>
+    <div class="style-row" style="margin-top:10px;">
+      <div>
+        <label>해상도</label>
+        <select id="reelRes">
+          <option value="1080" selected>1080×1920 (고화질 · PC 권장)</option>
+          <option value="720">720×1280 (가벼움 · 모바일)</option>
+        </select>
+      </div>
+      <div>
+        <label>모션</label>
+        <label class="chk on" style="display:inline-flex; margin-top:2px;"><input type="checkbox" id="reelZoom" checked>잔잔한 줌 효과 (권장)</label>
+      </div>
+    </div>
+    <label>배경 음원 (선택 — 저작권 free 음원만)</label>
+    <input type="file" id="reelAudioFile" accept="audio/*">
+    <div class="hint">무료 음원: YouTube 오디오 보관함 · Pixabay Music · Uppbeat. ⚠ 인스타 인기 음원은 여기에 넣지 말고 <b>앱에서 올릴 때</b> 선택하세요 (여기 넣으면 저작권 제재 위험 + 인기 음원 도달 부스트 못 받음).</div>
+    <button class="btn-primary" id="reelBtn" onclick="generateReel()">🎬 릴스 MP4 생성</button>
+    <div class="status" id="reelStatus"><span id="reelEstimate" class="hint"></span></div>
+    <div style="margin-top:14px; display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start;">
+      <video id="reelVideo" controls playsinline style="display:none; width:250px; border-radius:12px; border:1px solid var(--line); background:#000;"></video>
+      <div id="reelActions" style="display:none; flex-direction:column; gap:8px; min-width:230px;">
+        <button class="btn-primary" style="margin-top:0;" onclick="downloadReel()">⬇ MP4 저장</button>
+        <div class="hint" style="margin-top:-2px;">👍 권장 경로 — 저장 후 인스타 앱에서 릴스로 올리며 <b>인기 음원</b> 선택 = 도달 최대화</div>
+        <button class="btn-ghost btn-sm" style="border-color:var(--ok); color:var(--ok);" onclick="publishReel()">🚀 릴스로 바로 게시 (API · 편의용)</button>
+        <div class="hint" style="margin-top:-2px;">API 게시는 동영상 호스팅(Cloudinary) 필요 · 인기 음원 불가</div>
+        <div class="status" id="reelPubStatus"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="settings" id="settings">
+  <div class="inner">
+    <h2 style="margin-bottom:14px; font-size:16px;">API 설정</h2>
+    <label>Anthropic API 키 (<a href="https://console.anthropic.com" target="_blank" style="color:var(--accent);">console.anthropic.com</a>에서 발급)</label>
+    <input type="password" id="apiKey" placeholder="sk-ant-...">
+    <label>모델</label>
+    <select id="model">
+      <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 — 빠르고 저렴 (권장)</option>
+      <option value="claude-sonnet-5">Claude Sonnet 5 — 더 좋은 카피, 약간 비쌈</option>
+    </select>
+    <div class="notice">키는 이 브라우저의 localStorage에만 저장됩니다 (Anthropic API 호출 외 외부 전송 없음).</div>
+
+    <h2 style="margin:20px 0 4px; font-size:15px;">인스타그램 게시 연동 (선택)</h2>
+    <label>API 방식</label>
+    <select id="igApiMode">
+      <option value="iglogin">Instagram 로그인 (신형 — 앱 대시보드에서 토큰 생성, 권장)</option>
+      <option value="fblogin">Facebook 로그인 (구형 — 그래프 탐색기 토큰)</option>
+    </select>
+    <label>인스타그램 사용자 ID (IG 계정 ID — 숫자)</label>
+    <input type="text" id="igUserId" placeholder="17841400000000000">
+    <label>액세스 토큰</label>
+    <input type="password" id="igToken" placeholder="IGAAR... 또는 EAAG...">
+    <label>이미지 호스트 (게시용 공개 URL 생성)</label>
+    <select id="imgHost">
+      <option value="imgbb">ImgBB — 간단 (API 키 하나면 끝, 권장)</option>
+      <option value="cloudinary">Cloudinary — preset 설정 필요</option>
+    </select>
+    <label>ImgBB API 키</label>
+    <input type="password" id="imgbbKey" placeholder="imgbb API key">
+    <div class="notice">ImgBB: <b>imgbb.com</b> 가입 → <b>api.imgbb.com</b> 접속 → "Get API key" → 키 복사해서 위에 붙여넣기. 이게 전부입니다.</div>
+    <label>카드 이미지 소스</label>
+    <select id="imgSource">
+      <option value="ai">AI 생성 (Pollinations — 무료, 키 불필요, 권장)</option>
+      <option value="pexels">Pexels 스톡 사진 (API 키 필요)</option>
+    </select>
+    <label>Pexels API 키 (Pexels 선택 시)</label>
+    <input type="password" id="pexelsKey" placeholder="Pexels API key">
+    <div class="notice">Pexels: <b>pexels.com/api</b> 접속 → 가입 → "Your API Key" 복사. 무료·무제한에 가깝고, 모든 사진이 상업적 사용 가능 라이선스라 수익화에 안전합니다.</div>
+    <label>Cloudinary Cloud Name (Cloudinary 선택 시)</label>
+    <input type="text" id="cldName" placeholder="mycloud">
+    <label>Cloudinary Upload Preset (unsigned)</label>
+    <input type="text" id="cldPreset" placeholder="card_factory">
+    <div class="notice">Cloudinary: Settings → Upload → "Add upload preset" → Signing Mode를 <b>Unsigned</b>로 저장 → preset 이름 입력.</div>
+    <div class="row" style="margin-top:16px; justify-content:flex-end;">
+      <button class="btn-ghost btn-sm" onclick="document.getElementById('settings').classList.remove('open')">닫기</button>
+      <button class="btn-primary btn-sm" style="width:auto; margin:0;" onclick="saveSettings()">저장</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// 스크립트 오류를 화면에 표시 (기기별 디버깅용)
+window.addEventListener("error", function(e){
+  var el = document.getElementById("crawlStatus");
+  if(el){ el.textContent = "스크립트 오류: " + e.message; el.className = "status err"; }
+});
+
+const LANG_NAMES = {ko:"한국어", en:"English", ja:"日本語", es:"Español", pt:"Português", vi:"Tiếng Việt", id:"Bahasa", ar:"العربية"};
+const RTL_LANGS = ["ar"];
+const state = { image:null, results:{}, activeLang:null, cardPhotos:[] };
+
+/* ---------- settings ---------- */
+function saveSettings(){
+  localStorage.setItem("icf_key", document.getElementById("apiKey").value.trim());
+  localStorage.setItem("icf_model", document.getElementById("model").value);
+  ["igUserId","igToken","cldName","cldPreset","imgbbKey","imgHost","igApiMode","pexelsKey","imgSource"].forEach(id=>
+    localStorage.setItem("icf_"+id, document.getElementById(id).value.trim()));
+  document.getElementById("settings").classList.remove("open");
+  toast("설정 저장됨");
+}
+(function loadSettings(){
+  document.getElementById("apiKey").value = localStorage.getItem("icf_key") || "";
+  const m = localStorage.getItem("icf_model");
+  if(m) document.getElementById("model").value = m;
+  ["igUserId","igToken","cldName","cldPreset","imgbbKey","imgHost","igApiMode","pexelsKey","imgSource"].forEach(id=>{
+    const v = localStorage.getItem("icf_"+id);
+    if(v) document.getElementById(id).value = v;
+  });
+  // 자동 저장: 입력하는 즉시 저장 (저장 버튼이 안 눌리는 환경 대비)
+  const KEYMAP = {apiKey:"icf_key", model:"icf_model"};
+  ["apiKey","model","igApiMode","igUserId","igToken","imgHost","imgbbKey","cldName","cldPreset","pexelsKey","imgSource"].forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    const ev = el.tagName === "SELECT" ? "change" : "input";
+    el.addEventListener(ev, ()=>{
+      localStorage.setItem(KEYMAP[id] || ("icf_"+id), el.value.trim());
+    });
+  });
+})();
+
+/* ---------- toast ---------- */
+let toastTimer;
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove("show"), 1800);
+}
+
+/* ---------- article fetch (URL crawling) ---------- */
+async function fetchArticle(){
+  const url = document.getElementById("articleUrl").value.trim();
+  if(!/^https?:\/\//.test(url)){ setStatus("올바른 URL을 입력하세요 (https:// 포함).", "err"); return; }
+  const btn = document.getElementById("fetchBtn");
+  btn.disabled = true; setStatus("기사 본문 추출 중...", "busy");
+  try{
+    let text = await tryJina(url);
+    if(!text) text = await tryAllOrigins(url);
+    if(!text && window._pendingMeta && window._pendingMeta.desc){
+      // 최후 수단: RSS에 포함된 제목+요약문을 소재로 사용
+      const m = window._pendingMeta;
+      text = "[기사 제목] " + m.title + "\n\n[기사 요약] " + m.desc + "\n\n(출처: " + url + ")";
+      document.getElementById("source").value = text;
+      setStatus("본문 추출은 실패했지만 RSS 요약문을 소재로 불러왔습니다. 이대로 생성 가능합니다.", "ok");
+    }else if(!text){
+      throw new Error("본문을 추출하지 못했습니다. 본문을 직접 붙여넣어 주세요.");
+    }else{
+      text = text.replace(/\n{3,}/g, "\n\n").trim().slice(0, 6000);
+      document.getElementById("source").value = text;
+      setStatus("본문 추출 완료 (" + text.length + "자). 필요하면 편집 후 생성하세요.", "ok");
+    }
+    window._pendingMeta = null;
+    // 기사 이미지 자동 적용: RSS 썸네일이 있으면 그것을, 없으면 og:image 추출
+    if(window._pendingThumb){ setCoverFromUrl(window._pendingThumb); window._pendingThumb = null; }
+    else{ extractOgImage(url); }
+  }catch(e){
+    setStatus("추출 실패: " + e.message, "err");
+  }finally{
+    btn.disabled = false;
+  }
+}
+async function tryJina(url){
+  try{
+    const res = await fetchWithTimeout("https://r.jina.ai/" + url, 25000);
+    if(!res.ok) return null;
+    const t = await res.text();
+    return t.length > 200 ? t : null;
+  }catch(e){ return null; }
+}
+function extractTextFromHtml(html){
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  doc.querySelectorAll("script,style,nav,header,footer,aside,form").forEach(n=>n.remove());
+  const ps = [...doc.querySelectorAll("article p, main p, p")].map(p=>p.textContent.trim()).filter(t=>t.length>40);
+  const text = ps.join("\n\n");
+  return text.length > 200 ? text : null;
+}
+async function tryAllOrigins(url){
+  const enc = encodeURIComponent(url);
+  const proxies = [
+    "https://api.allorigins.win/raw?url=" + enc,
+    "https://corsproxy.io/?url=" + enc,
+    "https://api.codetabs.com/v1/proxy?quest=" + url,
+  ];
+  for(const p of proxies){
+    try{
+      const res = await fetchWithTimeout(p, 20000);
+      if(!res.ok) continue;
+      const text = extractTextFromHtml(await res.text());
+      if(text) return text;
+    }catch(e){ /* next */ }
+  }
+  return null;
+}
+
+/* ---------- image upload ---------- */
+const dz = document.getElementById("dropzone");
+const fi = document.getElementById("fileInput");
+dz.addEventListener("click", ()=>fi.click());
+dz.addEventListener("dragover", e=>{e.preventDefault(); dz.classList.add("drag");});
+dz.addEventListener("dragleave", ()=>dz.classList.remove("drag"));
+dz.addEventListener("drop", e=>{
+  e.preventDefault(); dz.classList.remove("drag");
+  if(e.dataTransfer.files[0]) loadImage(e.dataTransfer.files[0]);
+});
+fi.addEventListener("change", ()=>{ if(fi.files[0]) loadImage(fi.files[0]); });
+function applyImage(img){
+  state.image = img;
+  document.getElementById("thumbWrap").innerHTML = "";
+  const t = new Image(); t.src = img.src;
+  document.getElementById("thumbWrap").appendChild(t);
+  rerender();
+}
+function loadImage(file){
+  const img = new Image();
+  img.onload = ()=>applyImage(img);
+  img.src = URL.createObjectURL(file);
+}
+/* 기사 이미지 자동 적용 — CORS 허용 이미지 프록시 경유 (캔버스 오염 방지) */
+function setCoverFromUrl(url){
+  if(!url) return;
+  const candidates = [
+    "https://images.weserv.nl/?url=" + encodeURIComponent(url.replace(/^https?:\/\//, "")),
+    "https://corsproxy.io/?url=" + encodeURIComponent(url),
+    "https://api.allorigins.win/raw?url=" + encodeURIComponent(url),
+  ];
+  let i = 0;
+  const tryNext = ()=>{
+    if(i >= candidates.length){ toast("기사 이미지를 불러오지 못했습니다 — 직접 업로드해주세요"); return; }
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = ()=>{ applyImage(img); toast("기사 이미지가 표지에 적용되었습니다"); };
+    img.onerror = ()=>{ i++; tryNext(); };
+    img.src = candidates[i];
+  };
+  tryNext();
+}
+/* 기사 HTML에서 대표 이미지(og:image) URL 찾기 */
+async function findArticleImage(url){
+  const enc = encodeURIComponent(url);
+  const candidates = ["https://api.allorigins.win/raw?url=" + enc, "https://corsproxy.io/?url=" + enc, "https://api.codetabs.com/v1/proxy?quest=" + url];
+  for(const u of candidates){
+    try{
+      const res = await fetchWithTimeout(u, 15000);
+      if(!res.ok) continue;
+      const html = await res.text();
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      const m = doc.querySelector('meta[property="og:image"], meta[name="og:image"], meta[name="twitter:image"], meta[property="twitter:image"]');
+      const im = m && m.getAttribute("content");
+      if(im) return im;
+    }catch(e){ /* try next */ }
+  }
+  return null;
+}
+async function extractOgImage(url){
+  const im = await findArticleImage(url);
+  if(im) setCoverFromUrl(im);
+}
+
+/* ---------- lang checkboxes ---------- */
+document.querySelectorAll(".chk input").forEach(cb=>{
+  cb.addEventListener("change", ()=>cb.parentElement.classList.toggle("on", cb.checked));
+});
+
+/* ---------- status ---------- */
+function setStatus(msg, cls){
+  const el = document.getElementById("status");
+  el.textContent = msg; el.className = "status " + (cls||"");
+}
+
+/* ---------- AI call ---------- */
+async function callClaude(prompt){
+  const key = localStorage.getItem("icf_key");
+  const model = localStorage.getItem("icf_model") || "claude-haiku-4-5-20251001";
+  if(!key) throw new Error("API 키가 없습니다. 우측 상단 [API 설정]에서 입력하세요.");
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method:"POST",
+    headers:{
+      "x-api-key": key,
+      "anthropic-version":"2023-06-01",
+      "content-type":"application/json",
+      "anthropic-dangerous-direct-browser-access":"true"
+    },
+    body: JSON.stringify({ model, max_tokens: 8000, messages:[{role:"user", content: prompt}] })
+  });
+  if(!res.ok){
+    const t = await res.text();
+    throw new Error("API 오류 " + res.status + ": " + t.slice(0,200));
+  }
+  const data = await res.json();
+  if(data.error) throw new Error("API 오류: " + (data.error.message || JSON.stringify(data.error)).slice(0,200));
+  const text = (data.content || []).filter(b=>b.type==="text").map(b=>b.text).join("");
+  if(!text){
+    throw new Error("AI 응답이 비어 있습니다 (stop_reason: " + (data.stop_reason||"불명") + "). 다시 시도하거나, 언어 수/카드 수를 줄여보세요.");
+  }
+  if(data.stop_reason === "max_tokens"){
+    throw new Error("응답이 길이 제한에 잘렸습니다. 언어 수 또는 카드 수를 줄이고 다시 생성하세요.");
+  }
+  return text;
+}
+
+/* ---------- generate ---------- */
+async function generate(){
+  const source = document.getElementById("source").value.trim();
+  if(!source){ setStatus("원문 소재를 입력하거나 기사 링크에서 가져오세요.", "err"); return; }
+  const langs = [...document.querySelectorAll("#langRow input:checked")].map(c=>c.value);
+  if(!langs.length){ setStatus("언어를 하나 이상 선택하세요.", "err"); return; }
+  const n = document.getElementById("cardCount").value;
+  const style = document.getElementById("styleGuide").value.trim();
+
+  const btn = document.getElementById("genBtn");
+  btn.disabled = true; setStatus("AI가 각색·번역 중... (10~30초)", "busy");
+  state.cardPhotos = [];
+
+  const prompt = `You are a viral social media card-news writer. Based ONLY on the facts in the source below, write ORIGINAL card-news content (do not copy source sentences verbatim — rewrite in your own words).
+
+SOURCE:
+"""${source}"""
+
+STYLE GUIDE: ${style || "curiosity-driven, easy to understand"}
+
+For EACH of these languages: ${langs.join(", ")} produce:
+- "line1": headline first line, max 20 chars, sets up the situation (plain context line)
+- "line2": headline second line, max 20 chars, the curiosity punch / twist (this line gets color-highlighted)
+- "cards": array of ${n === "auto" ? "3 to 6 body texts — YOU choose the count that fits the story best" : "exactly " + n + " body texts"} forming a COMPLETE story arc:
+  * Card 1: WHO + WHERE + WHAT happened, with real names/places from the source
+  * Middle cards: HOW/WHY with specific facts — numbers, dates, quotes, background context from the source
+  * LAST card: the payoff/resolution — the reader must finish feeling "오... 신기하다 / 아~ 그렇구나", not left hanging
+  * EVERY card must contain at least one concrete fact (name, number, place, or date). NO vague filler like "특별한 선물" or "놀라운 일" without specifics.
+  * HARD LENGTH LIMIT per card: max 2 short sentences, max 100 characters for Korean/Japanese, max 160 for Latin languages. If the story needs more, ADD MORE CARDS instead of cramming. Whitespace is design.
+  * In each card AND in "cta", wrap the single most important word/phrase in **double asterisks** — it will be color-highlighted. Exactly one **highlight** per card.
+  * LINE BREAKS: in cards and cta, insert \\n at natural semantic phrase boundaries. CRITICAL: keep line lengths BALANCED — every line should be 12-18 characters (Korean/Japanese) or 4-6 words (Latin), and no line shorter than 60% of the longest line in that card. A 4-character orphan line looks broken. Never split a **highlight** across lines.
+- "badge": a cover badge word (2-4 characters) matching the story's tone, in that language. Korean examples: 화제, 감동, 충격, 신기 / English: WOW, WILD, OMG / Japanese: 話題, 感動, 衝撃
+- "cta": a final comment-bait card: a question to readers tied to the story (if money is involved, convert to the reader's local currency, e.g. "$20,000 = 약 2,700만원"). End with an emoji like 👇 or 💬. Max 80 chars.
+- "caption": an Instagram caption (3-6 sentences, engaging, ends with a question to drive comments)
+- "hashtags": one line of 8-12 relevant hashtags for that language/market
+- "image_queries": array with ONE query for the cover FIRST, then one per body card (total = cards.length + 1) — SHORT ENGLISH stock-photo search queries (2-4 concrete words each) for Pexels: the FIRST is for the cover (the most eye-catching, scroll-stopping visual for this story), then one per body card, each matched to that card's content. Use concrete photographable nouns. IMPORTANT: AVOID direct close-up human faces (they look AI-generated) — prefer objects, hands, environments, back/side views of people, and wide scenes. e.g. "hands holding lottery ticket", "supermarket aisle from behind", "man from behind looking at ticket".
+
+Example line1/line2 style (Korean): line1="키가 작고 뚱뚱해서", line2="따돌림 당하는 아기 코끼리"
+
+STRICT JSON RULES:
+- Respond with ONLY valid JSON. No markdown fences, no commentary.
+- All strings on a single line — escape line breaks as \\n.
+- Never use unescaped double quotes inside strings (use ' instead).
+- No trailing commas.
+
+Exact shape:
+{"results":[{"lang":"ko","line1":"...","line2":"...","badge":"...","cards":["..."],"cta":"...","caption":"...","hashtags":"...","image_queries":["..."]}]}`;
+
+  try{
+    let text = await callClaude(prompt);
+    let parsed = tryParseJson(text);
+    if(!parsed){
+      setStatus("응답 형식 오류 — 자동 재시도 중...", "busy");
+      text = await callClaude(prompt + "\n\nIMPORTANT: Your previous response was invalid JSON. Output ONLY strict, valid JSON this time.");
+      parsed = tryParseJson(text);
+    }
+    if(!parsed) throw new Error("AI가 유효한 JSON을 반환하지 않았습니다. 다시 시도해주세요.");
+    state.results = {};
+    parsed.results.forEach(r=>state.results[r.lang] = r);
+    buildTabs(langs);
+    setActiveLang(langs[0]);
+    setStatus("생성 완료. 카드 클릭 = 복사, ⬇ = 저장.", "ok");
+    prepareCardImages();
+  }catch(e){
+    setStatus("실패: " + e.message, "err");
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+/* ---------- JSON 자동 복구 파서 ---------- */
+function tryParseJson(raw){
+  if(!raw) return null;
+  let t = raw.replace(/```json|```/g, "").trim();
+  // 본문에서 JSON 블록만 추출
+  const s = t.indexOf("{"), e = t.lastIndexOf("}");
+  if(s === -1 || e === -1) return null;
+  t = t.slice(s, e+1);
+  const attempts = [
+    x => x,
+    x => x.replace(/[“”]/g, '\\"').replace(/[‘’]/g, "'"),   // 스마트 따옴표
+    x => x.replace(/,\s*([\]}])/g, "$1"),                                       // 트레일링 콤마
+    x => x.replace(/("(?:[^"\\]|\\.)*")|\n/g, (m, g1) => g1 ? g1 : " ")        // 문자열 밖 줄바꿈 제거
+          .replace(/,\s*([\]}])/g, "$1"),
+  ];
+  for(const fix of attempts){
+    try{ return JSON.parse(fix(t)); }catch(err){ /* next */ }
+  }
+  // 문자열 내부의 생 줄바꿈을 \n으로 치환하는 최후 시도
+  try{
+    let inStr = false, out = "";
+    for(let i=0; i<t.length; i++){
+      const ch = t[i];
+      if(ch === '"' && t[i-1] !== "\\") inStr = !inStr;
+      if(inStr && (ch === "\n" || ch === "\r")) out += "\\n";
+      else out += ch;
+    }
+    return JSON.parse(out.replace(/,\s*([\]}])/g, "$1"));
+  }catch(err){ return null; }
+}
+
+/* ---------- tabs & render ---------- */
+function buildTabs(langs){
+  const tw = document.getElementById("langTabs");
+  tw.innerHTML = "";
+  langs.forEach(l=>{
+    const b = document.createElement("div");
+    b.className = "tab"; b.textContent = LANG_NAMES[l] || l;
+    b.onclick = ()=>setActiveLang(l);
+    b.dataset.lang = l;
+    tw.appendChild(b);
+  });
+}
+function setActiveLang(l){
+  state.activeLang = l;
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on", t.dataset.lang===l));
+  renderLang(l);
+}
+function rerender(){ if(state.activeLang && state.results[state.activeLang]) renderLang(state.activeLang); }
+
+function renderLang(l){
+  const r = state.results[l];
+  if(!r) return;
+  const area = document.getElementById("previewArea");
+  area.innerHTML = "";
+
+  const coverBox = cardBox("cover_"+l, "표지");
+  // 표지 제목 직접 수정 (1줄/2줄)
+  const ce = document.createElement("div"); ce.className = "cover-edit";
+  const in1 = document.createElement("input"); in1.type="text"; in1.value = r.line1||""; in1.placeholder="제목 1줄 (흰색)";
+  const in2 = document.createElement("input"); in2.type="text"; in2.value = r.line2||""; in2.placeholder="제목 2줄 (강조색)";
+  in1.oninput = ()=>{ r.line1 = in1.value; drawCover(coverBox.canvas, r.line1, r.line2); };
+  in2.oninput = ()=>{ r.line2 = in2.value; drawCover(coverBox.canvas, r.line1, r.line2); };
+  ce.append(in1, in2);
+  coverBox.box.appendChild(ce);
+  area.appendChild(coverBox.box);
+  drawCover(coverBox.canvas, r.line1||"", r.line2||"");
+
+  const total = (r.cards||[]).length;
+  (r.cards||[]).forEach((txt,i)=>{
+    const cb = cardBox("card_"+l+"_"+(i+1), (i+1)+"번 카드");
+    const cp = state.cardPhotos && state.cardPhotos[i];
+    if(cp && cp.urls.length > 1){
+      const rb = document.createElement("button");
+      rb.className = "btn-ghost btn-sm"; rb.textContent = "🔄 이미지";
+      rb.title = "다른 이미지로 교체";
+      rb.onclick = ()=>{
+        cp.idx = (cp.idx + 1) % cp.urls.length;
+        loadImageCors(cp.urls[cp.idx], img=>{ cp.img = img; rerender(); });
+      };
+      cb.box.querySelector(".card-btns").appendChild(rb);
+    }
+    // 본문 직접 수정 (**강조**, 줄바꿈 그대로 반영)
+    const ta = document.createElement("textarea");
+    ta.className = "card-edit";
+    ta.value = txt;
+    ta.title = "**단어** = 강조색, 줄바꿈 = 카드에 그대로 반영";
+    ta.oninput = ()=>{ r.cards[i] = ta.value; drawBodyCard(cb.canvas, ta.value, i+1, total, cp && cp.img); };
+    cb.box.appendChild(ta);
+    area.appendChild(cb.box);
+    drawBodyCard(cb.canvas, txt, i+1, total, cp && cp.img);
+  });
+
+  if(r.cta){
+    const cc = cardBox("cta_"+l, "댓글 유도 카드");
+    const ta = document.createElement("textarea");
+    ta.className = "card-edit";
+    ta.value = r.cta;
+    ta.oninput = ()=>{ r.cta = ta.value; drawCtaCard(cc.canvas, ta.value); };
+    cc.box.appendChild(ta);
+    area.appendChild(cc.box);
+    drawCtaCard(cc.canvas, r.cta);
+  }
+
+  document.getElementById("captionWrap").style.display = "block";
+  document.getElementById("captionBox").textContent = r.caption + "\n\n" + r.hashtags;
+  showReelPanel();
+}
+
+/* ---------- Pexels 카드별 이미지 ---------- */
+async function fetchPexels(query){
+  const key = localStorage.getItem("icf_pexelsKey");
+  if(!key || !query) return [];
+  try{
+    const res = await fetchWithTimeout("https://api.pexels.com/v1/search?query=" + encodeURIComponent(query) + "&per_page=6&orientation=portrait", 12000, {headers:{Authorization:key}});
+    if(!res.ok){
+      console.warn("[Pexels] '" + query + "' HTTP " + res.status + (res.status===401 ? " (API 키가 잘못됨)" : res.status===429 ? " (요청 한도 초과)" : ""));
+      window._pexelsErr = "HTTP " + res.status + (res.status===401 ? " — API 키 확인 필요" : res.status===429 ? " — 요청 한도 초과, 잠시 후 재시도" : "");
+      return [];
+    }
+    const j = await res.json();
+    if(!(j.photos||[]).length) console.warn("[Pexels] '" + query + "' 검색 결과 0건");
+    return (j.photos||[]).map(p=>p.src.large2x || p.src.large || p.src.original);
+  }catch(e){
+    console.warn("[Pexels] '" + query + "' 요청 실패:", e.message);
+    window._pexelsErr = "네트워크 차단 (광고차단 확장 확인)";
+    return [];
+  }
+}
+
+function loadImageCors(url, cb, failCb){
+  const candidates = [url, "https://images.weserv.nl/?url=" + encodeURIComponent(url.replace(/^https?:\/\//, ""))];
+  let i = 0;
+  const tryNext = ()=>{
+    if(i >= candidates.length){ if(failCb) failCb(); return; }
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = ()=>cb(img);
+    img.onerror = ()=>{ i++; tryNext(); };
+    img.src = candidates[i];
+  };
+  tryNext();
+}
+
+function pollinationsUrl(prompt, seed){
+  // 정사각형(1:1) 생성 + "스마트폰 캔디드" 스타일 — AI 티(과하게 매끈한 스튜디오 룩)를 줄임
+  const p = "authentic candid photograph, " + prompt
+    + ", photojournalism, shot on smartphone camera, natural imperfect lighting, realistic everyday scene, subtle film grain, slightly soft focus, no text, no watermark, not illustration, not 3d render, not studio portrait, not posed";
+  return "https://image.pollinations.ai/prompt/" + encodeURIComponent(p)
+       + "?width=1080&height=1080&nologo=true&model=flux&enhance=true&seed=" + seed;
+}
+
+async function prepareCardImages(){
+  const langs = Object.keys(state.results);
+  if(!langs.length) return;
+  const r0 = state.results[langs[0]];
+  const queries = r0.image_queries || [];
+  if(!queries.length) return;
+  const mode = localStorage.getItem("icf_imgSource") || "ai";
+  const coverQ = queries[0];
+  const cardQs = queries.slice(1);
+
+  if(mode === "ai"){
+    // AI 이미지 생성 (Pollinations): 카드마다 시드 4개 = 🔄 교체 후보 4장
+    setStatus("카드 이미지 AI 생성 중... (카드당 5~20초, 완성되는 대로 표시됩니다)", "busy");
+    // 검색어가 카드 수보다 적으면 자동으로 채움 (모든 카드에 이미지 보장)
+    const numCards = (r0.cards || []).length;
+    while(cardQs.length < numCards){
+      cardQs.push((cardQs[cardQs.length-1] || coverQ) + ", different angle, wide scene");
+    }
+    state.cardPhotos = cardQs.slice(0, numCards).map((q,i)=>({
+      q, idx:0, img:null,
+      urls: [0,1,2,3].map(s=>pollinationsUrl(q, i*37 + s*101 + 7))
+    }));
+    // 표지 규칙: 항상 실제 기사 이미지 우선. AI 표지는 기사 이미지를 정말 못 구할 때만.
+    if(!state.image){
+      (async()=>{
+        const artUrl = document.getElementById("articleUrl").value.trim();
+        let found = null;
+        if(artUrl) found = await findArticleImage(artUrl);
+        if(found){ setCoverFromUrl(found); }
+        else{ loadImageCors(pollinationsUrl(coverQ, 999), img=>{ if(!state.image){ state.image = img; rerender(); } }); }
+      })();
+    }
+    // 카드 이미지: 순차 생성 (무료 API 동시 요청 차단 회피) + 실패 시 다음 시드 자동 재시도
+    const loadCard = (cp)=>new Promise(resolve=>{
+      const tryK = (k)=>{
+        if(k >= cp.urls.length){
+          loadImageCors(pollinationsUrl(cp.q.split(",")[0], Math.floor(Math.random()*9999)),
+            img=>{ cp.img = img; rerender(); resolve(); },
+            ()=>resolve());
+          return;
+        }
+        loadImageCors(cp.urls[k],
+          img=>{ cp.img = img; cp.idx = k; rerender(); resolve(); },
+          ()=>tryK(k+1));
+      };
+      tryK(0);
+    });
+    (async()=>{
+      for(let i=0; i<state.cardPhotos.length; i++){
+        setStatus("카드 이미지 생성 중... (" + (i+1) + "/" + state.cardPhotos.length + ")", "busy");
+        await loadCard(state.cardPhotos[i]);
+        await new Promise(r=>setTimeout(r, 1200)); // API 부하 분산
+      }
+      const ok = state.cardPhotos.filter(cp=>cp.img).length;
+      setStatus("카드 이미지 " + ok + "/" + state.cardPhotos.length + "건 생성 완료. 🔄 버튼으로 교체 가능.", ok ? "ok" : "err");
+    })();
+    return;
+  }
+
+  // Pexels 스톡 모드
+  if(!localStorage.getItem("icf_pexelsKey")){
+    setStatus("생성 완료. Pexels 모드에는 API 키가 필요합니다 — 또는 설정에서 'AI 생성'으로 바꾸세요.", "ok");
+    return;
+  }
+  state.cardPhotos = cardQs.map(q=>({q, urls:[], idx:0, img:null}));
+  window._pexelsErr = null;
+  setStatus("카드별 이미지 검색 중... (Pexels)", "busy");
+  await Promise.allSettled([
+    (async()=>{
+      if(!state.image){
+        const urls = await fetchPexels(coverQ);
+        if(urls.length) loadImageCors(urls[0], img=>{ state.image = img; rerender(); });
+      }
+    })(),
+    ...state.cardPhotos.map(async cp=>{
+      cp.urls = await fetchPexels(cp.q);
+      if(cp.urls.length) loadImageCors(cp.urls[0], img=>{ cp.img = img; rerender(); });
+    })
+  ]);
+  const found = state.cardPhotos.filter(cp=>cp.urls.length).length;
+  if(found === state.cardPhotos.length){
+    setStatus("완료 — 카드 이미지 " + found + "/" + state.cardPhotos.length + "건 매칭. 🔄 버튼으로 교체 가능.", "ok");
+  }else if(found > 0){
+    setStatus("카드 이미지 " + found + "/" + state.cardPhotos.length + "건만 매칭됨. 매칭 안 된 카드는 다크 배경 유지.", "ok");
+  }else{
+    setStatus("카드 이미지 매칭 실패: " + (window._pexelsErr || "검색 결과 없음") + ".", "err");
+  }
+}
+
+function cardBox(id, label){
+  const box = document.createElement("div"); box.className = "card-box";
+  const canvas = document.createElement("canvas");
+  canvas.width = 1080; canvas.height = 1350; canvas.id = id;
+  canvas.title = "클릭하면 이미지가 클립보드에 복사됩니다";
+  canvas.onclick = ()=>copyCanvas(canvas);
+  const lb = document.createElement("div"); lb.style.cssText="font-size:12px;color:var(--muted);"; lb.textContent = label;
+  const btns = document.createElement("div"); btns.className = "card-btns";
+  const cp = document.createElement("button"); cp.className="btn-ghost btn-sm"; cp.textContent="📋 복사";
+  cp.onclick = ()=>copyCanvas(canvas);
+  const dl = document.createElement("button"); dl.className="btn-ghost btn-sm"; dl.textContent="⬇ 저장";
+  dl.onclick = ()=>downloadCanvas(canvas, id);
+  btns.append(cp, dl);
+  box.append(canvas, lb, btns);
+  return {box, canvas};
+}
+
+/* ---------- canvas drawing ---------- */
+const FONT = "'CardSans','Pretendard','Malgun Gothic','Apple SD Gothic Neo','Hiragino Sans','Yu Gothic',sans-serif";
+/* 프리텐다드 웹폰트 로드 (이슈 계정 표준 서체) */
+(async function loadFonts(){
+  const base = "https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/woff2/";
+  const defs = [["Pretendard-Black.woff2","900"],["Pretendard-ExtraBold.woff2","800"],["Pretendard-SemiBold.woff2","600"],["Pretendard-Medium.woff2","500"]];
+  try{
+    for(const [file, weight] of defs){
+      const f = new FontFace("CardSans", "url(" + base + file + ") format('woff2')", {weight});
+      await f.load();
+      document.fonts.add(f);
+    }
+    rerender();
+  }catch(e){ console.warn("웹폰트 로드 실패 — 시스템 폰트로 대체", e); }
+})();
+
+function drawCover(cv, line1, line2){
+  const ctx = cv.getContext("2d");
+  const W=cv.width, H=cv.height;
+
+  if(state.image){ coverFit(ctx, state.image, W, H); }
+  else{
+    const g = ctx.createLinearGradient(0,0,W,H);
+    g.addColorStop(0,"#3b1d8f"); g.addColorStop(1,"#12061f");
+    ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+  }
+
+  const pos = document.getElementById("txtPos").value;
+  const g2 = ctx.createLinearGradient(0, pos==="bottom"?H*0.4:0, 0, pos==="bottom"?H:H*0.6);
+  if(pos==="bottom"){ g2.addColorStop(0,"rgba(0,0,0,0)"); g2.addColorStop(1,"rgba(0,0,0,.88)"); }
+  else{ g2.addColorStop(0,"rgba(0,0,0,.88)"); g2.addColorStop(1,"rgba(0,0,0,0)"); }
+  ctx.fillStyle = g2; ctx.fillRect(0,0,W,H);
+
+  const style = document.getElementById("hlStyle").value;
+  const accent = document.getElementById("accentColor").value;
+  const fontSize = 76;
+  ctx.font = "900 " + fontSize + "px " + FONT;
+  ctx.textBaseline = "alphabetic";
+
+  const l1 = wrapText(ctx, line1, W-160);
+  const l2 = wrapText(ctx, line2, W-160);
+  const lh = fontSize*1.35;
+  const totalLines = l1.length + l2.length;
+  const chipH = 52;
+  const bsel = document.getElementById("badge").value;
+  const badge = bsel === "auto" ? (((state.results||{})[state.activeLang]||{}).badge || "") : bsel;
+  let y = pos==="bottom" ? H - 90 - (totalLines-1)*lh : 150 + (badge?70:0) + chipH + fontSize;
+  let topY = (pos==="bottom" ? y - (totalLines-1)*lh : y) - fontSize;
+
+  if(badge){
+    ctx.font = "800 34px " + FONT;
+    const bw = ctx.measureText(badge).width + 44;
+    const by = topY - chipH - 24 - 62;
+    ctx.fillStyle = "#e53935";
+    roundRect(ctx, 80, by, bw, 54, 8); ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.fillText(badge, 102, by+39);
+  }
+
+  const handle = document.getElementById("handle").value.trim();
+  if(handle){
+    ctx.font = "600 32px " + FONT;
+    const hw = ctx.measureText(handle).width + 40;
+    const hy = topY - chipH - 16;
+    ctx.fillStyle = "rgba(0,0,0,.55)";
+    roundRect(ctx, 80, hy, hw, chipH, 26); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,.92)";
+    ctx.fillText(handle, 100, hy+37);
+  }
+
+  ctx.font = "900 " + fontSize + "px " + FONT;
+  const rtl = RTL_LANGS.includes(state.activeLang);
+  ctx.textAlign = rtl ? "right" : "left";
+  const allLines = l1.map(t=>({t, second:false})).concat(l2.map(t=>({t, second:true})));
+  let yy = pos==="bottom" ? H - 90 - (allLines.length-1)*lh : topY + fontSize;
+  allLines.forEach(({t, second})=>{
+    const x = rtl ? W - 80 : 80;
+    const tw = ctx.measureText(t).width;
+    if(style==="youmad"){
+      ctx.shadowColor = "rgba(0,0,0,.9)"; ctx.shadowBlur = 16;
+      ctx.fillStyle = second ? accent : "#ffffff";
+      ctx.fillText(t, x, yy);
+      ctx.shadowBlur = 0;
+    }else if(style==="none"){
+      ctx.fillStyle = "#fff";
+      ctx.shadowColor = "rgba(0,0,0,.85)"; ctx.shadowBlur = 18;
+      ctx.fillText(t, x, yy);
+      ctx.shadowBlur = 0;
+    }else{
+      let barColor, txtColor;
+      if(style==="yellow"){ barColor="rgba(255,212,0,.95)"; txtColor="#111"; }
+      else if(style==="black"){ barColor="rgba(0,0,0,.88)"; txtColor="#fff"; }
+      else{ barColor="rgba(124,92,255,.92)"; txtColor="#fff"; }
+      ctx.fillStyle = barColor;
+      ctx.fillRect(rtl ? x-tw-14 : x-14, yy-fontSize+8, tw+28, fontSize+14);
+      ctx.fillStyle = txtColor;
+      ctx.fillText(t, x, yy);
+    }
+    yy += lh;
+  });
+  ctx.textAlign = "left";
+}
+
+function drawBodyCard(cv, text, idx, total, img){
+  const ctx = cv.getContext("2d");
+  const W=cv.width, H=cv.height;
+  const accent = document.getElementById("accentColor").value;
+
+  if(img){
+    coverFit(ctx, img, W, H);
+    // 하단 자막 가독성용 그라데이션
+    const g = ctx.createLinearGradient(0, H*0.42, 0, H);
+    g.addColorStop(0, "rgba(0,0,0,0)");
+    g.addColorStop(0.45, "rgba(0,0,0,.55)");
+    g.addColorStop(1, "rgba(0,0,0,.94)");
+    ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+  }else{
+    ctx.fillStyle = "#101318"; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle = accent; ctx.fillRect(0,0,W,14);
+  }
+
+  // 글자수에 맞춰 폰트 자동 축소 (최대 5줄 유지)
+  let fontSize = 56, lines;
+  for(const fs of [56, 50, 44]){
+    fontSize = fs;
+    ctx.font = "700 " + fs + "px " + FONT;
+    lines = wrapRich(ctx, text, W-180);
+    if(lines.length <= 5) break;
+  }
+  const lh = fontSize*1.52;
+  ctx.textAlign = "left";
+  ctx.shadowColor = "rgba(0,0,0,.85)"; ctx.shadowBlur = 14;
+  let y = img ? H - 110 - (lines.length-1)*lh : H/2 - (lines.length-1)*lh/2;
+  drawRich(ctx, lines, 90, y, lh, "#ffffff", document.getElementById("accentColor").value, false, W);
+  ctx.shadowBlur = 0;
+
+  // 페이지 표시 칩 (좌상단)
+  ctx.font = "600 34px " + FONT;
+  const ptxt = idx + " / " + total;
+  const pw = ctx.measureText(ptxt).width + 44;
+  ctx.fillStyle = "rgba(0,0,0,.55)";
+  roundRect(ctx, 60, 60, pw, 62, 31); ctx.fill();
+  ctx.fillStyle = accent;
+  ctx.fillText(ptxt, 82, 104);
+
+  const handle = document.getElementById("handle").value.trim();
+  if(handle){
+    ctx.font = "500 32px " + FONT;
+    ctx.fillStyle = "rgba(255,255,255,.5)";
+    const tw = ctx.measureText(handle).width;
+    ctx.fillText(handle, W - tw - 60, H - 56);
+  }
+}
+
+function drawCtaCard(cv, text){
+  // No.way.this 브랜드 고정 디자인 (프로필/커버와 동일한 톤)
+  const ctx = cv.getContext("2d");
+  const W=cv.width, H=cv.height;
+  const NEON = "#8bff4f";
+
+  const PURPLE = "#7c5cff";
+
+  // 배경: 중앙이 살짝 밝은 라디얼 다크 (프리미엄 무광 느낌)
+  const rg = ctx.createRadialGradient(W/2, H*0.42, 80, W/2, H*0.42, H*0.85);
+  rg.addColorStop(0, "#191228");
+  rg.addColorStop(0.6, "#0e0a18");
+  rg.addColorStop(1, "#07050c");
+  ctx.fillStyle = rg; ctx.fillRect(0,0,W,H);
+
+  // 프레임: 이중 보더 (바깥 얇은 회색 + 안쪽 네온→퍼플 그라데이션)
+  ctx.strokeStyle = "rgba(255,255,255,.08)"; ctx.lineWidth = 2;
+  roundRect(ctx, 36, 36, W-72, H-72, 28); ctx.stroke();
+  const bg = ctx.createLinearGradient(60, 0, W-60, H);
+  bg.addColorStop(0, "rgba(139,255,79,.65)");
+  bg.addColorStop(1, "rgba(124,92,255,.65)");
+  ctx.strokeStyle = bg; ctx.lineWidth = 3;
+  roundRect(ctx, 56, 56, W-112, H-112, 22); ctx.stroke();
+
+  // 상단 레터스페이싱 라벨
+  ctx.textAlign = "center";
+  ctx.font = "600 34px " + FONT;
+  ctx.fillStyle = "rgba(255,255,255,.45)";
+  ctx.fillText("N O · W A Y · T A L K", W/2, 160);
+
+  // 미니 말풍선 아이콘 (작고 세련되게)
+  const bw = 130, bh = 84, bx = W/2 - bw/2, by = 210;
+  ctx.fillStyle = NEON;
+  roundRect(ctx, bx, by, bw, bh, 26); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(bx + bw*0.3, by + bh - 1);
+  ctx.lineTo(bx + bw*0.24, by + bh + 26);
+  ctx.lineTo(bx + bw*0.44, by + bh - 1);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#0b0716";
+  for(let i=0; i<3; i++){
+    ctx.beginPath(); ctx.arc(bx + bw*0.28 + i*bw*0.22, by + bh/2, 8, 0, Math.PI*2); ctx.fill();
+  }
+
+  // 큰 따옴표 장식
+  ctx.font = "900 130px " + FONT;
+  ctx.fillStyle = "rgba(124,92,255,.35)";
+  ctx.fillText("“", W/2 - 380, H*0.42);
+  ctx.fillText("”", W/2 + 380, H*0.42);
+
+  // 질문 텍스트 (핵심 구절은 형광 그린)
+  let fontSize = 62, lines;
+  for(const fs of [62, 54, 46]){
+    fontSize = fs;
+    ctx.font = "800 " + fs + "px " + FONT;
+    lines = wrapRich(ctx, text, W-260);
+    if(lines.length <= 5) break;
+  }
+  ctx.textAlign = "left";
+  const lh = fontSize*1.55;
+  const blockH = lines.length * lh;
+  let y = H*0.52 - blockH/2 + fontSize;
+  y = drawRich(ctx, lines, 0, y, lh, "#ffffff", NEON, true, W);
+
+  // 구분선 (그라데이션)
+  const dg = ctx.createLinearGradient(W/2-140, 0, W/2+140, 0);
+  dg.addColorStop(0, "rgba(139,255,79,0)");
+  dg.addColorStop(0.5, "rgba(139,255,79,.9)");
+  dg.addColorStop(1, "rgba(139,255,79,0)");
+  ctx.fillStyle = dg;
+  ctx.fillRect(W/2-140, y + 6, 280, 5);
+
+  // 댓글 유도 버튼형 필 (언어별 문구, 그라데이션 + 그림자)
+  const CTA_LABEL = {ko:"댓글로 알려주세요", en:"Drop it in the comments", ja:"コメントで教えてね",
+    es:"Cuéntanos en comentarios", pt:"Conta nos comentários", vi:"Bình luận cho tụi mình biết",
+    id:"Tulis di komentar", ar:"شاركنا في التعليقات"};
+  const label = "💬  " + (CTA_LABEL[state.activeLang] || CTA_LABEL.en);
+  ctx.font = "800 44px " + FONT;
+  const lw = ctx.measureText(label).width + 120;
+  const pillY = y + 60;
+  const pg = ctx.createLinearGradient(W/2-lw/2, pillY, W/2+lw/2, pillY+96);
+  pg.addColorStop(0, NEON); pg.addColorStop(1, "#5fe03a");
+  ctx.shadowColor = "rgba(139,255,79,.45)"; ctx.shadowBlur = 40;
+  ctx.fillStyle = pg;
+  roundRect(ctx, W/2 - lw/2, pillY, lw, 96, 48); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "#0a1506";
+  ctx.textAlign = "center";
+  ctx.fillText(label, W/2, pillY + 64);
+
+  // 하단 핸들
+  const handle = document.getElementById("handle").value.trim() || "@no.way.this";
+  ctx.font = "600 34px " + FONT;
+  ctx.fillStyle = "rgba(255,255,255,.4)";
+  ctx.fillText(handle, W/2, H - 96);
+  ctx.textAlign = "left";
+}
+
+function roundRect(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.arcTo(x+w, y, x+w, y+h, r);
+  ctx.arcTo(x+w, y+h, x, y+h, r);
+  ctx.arcTo(x, y+h, x, y, r);
+  ctx.arcTo(x, y, x+w, y, r);
+  ctx.closePath();
+}
+
+function coverFit(ctx, img, W, H){
+  const s = Math.max(W/img.width, H/img.height);
+  const w = img.width*s, hh = img.height*s;
+  ctx.drawImage(img, (W-w)/2, (H-hh)/2, w, hh);
+}
+
+/* **강조** 마크업을 지원하는 리치 텍스트 줄바꿈/렌더링 */
+function splitKeepSpace(s){
+  // "가나 다라" → ["가나 ", "다라"] — 공백 뒤에서 분리 (구형 사파리 호환)
+  const out = []; let cur = "";
+  for(const ch of s){ cur += ch; if(ch === " "){ out.push(cur); cur = ""; } }
+  if(cur) out.push(cur);
+  return out;
+}
+function tokenizeRich(text){
+  // \n = 의미 단위 줄바꿈(AI가 지정), ** = 강조. 어절(공백) 단위로만 줄이 바뀌도록 토큰화.
+  const tokens = [];
+  String(text||"").replace(/\\n/g, "\n").split(/\*\*/).forEach((seg, si)=>{
+    const hl = si % 2 === 1;
+    seg.split("\n").forEach((part, pi)=>{
+      if(pi > 0) tokens.push({br:true});
+      splitKeepSpace(part).forEach(u=>{ if(u) tokens.push({t:u, hl}); });
+    });
+  });
+  return tokens;
+}
+function wrapRich(ctx, text, maxW){
+  const tokens = tokenizeRich(text);
+  const lines = [[]];
+  let w = 0;
+  tokens.forEach(tok=>{
+    if(tok.br){ lines.push([]); w = 0; return; }  // AI가 지정한 의미 단위 줄바꿈
+    const tw = ctx.measureText(tok.t).width;
+    if(w + tw > maxW && lines[lines.length-1].length){
+      lines.push([]); w = 0;
+      if(tok.t === " ") return;
+    }
+    lines[lines.length-1].push(tok); w += tw;
+  });
+  // 균형 보정: 너무 짧은 꼬리줄은 앞줄에 합쳐서 어색한 빈 공간 제거
+  const width = l => l.reduce((s,t)=>s+ctx.measureText(t.t).width, 0);
+  const merged = [];
+  lines.filter(l=>l.length).forEach(l=>{
+    const prev = merged[merged.length-1];
+    if(prev && width(prev) + width(l) + ctx.measureText(" ").width <= maxW
+       && (width(l) < maxW*0.35 || width(prev) < maxW*0.35)){
+      if(!/\s$/.test(prev[prev.length-1].t)) prev.push({t:" ", hl:false});
+      prev.push(...l);
+    }else{
+      merged.push(l);
+    }
+  });
+  return merged;
+}
+function drawRich(ctx, lines, x, y, lh, baseColor, hlColor, center, W){
+  lines.forEach(line=>{
+    const lineW = line.reduce((s,tok)=>s+ctx.measureText(tok.t).width, 0);
+    let cx = center ? (W - lineW)/2 : x;
+    line.forEach(tok=>{
+      ctx.fillStyle = tok.hl ? hlColor : baseColor;
+      ctx.fillText(tok.t, cx, y);
+      cx += ctx.measureText(tok.t).width;
+    });
+    y += lh;
+  });
+  return y;
+}
+
+function wrapText(ctx, text, maxW){
+  const out = [];
+  String(text||"").split("\n").forEach(para=>{
+    // 공백이 있으면 단어 단위 줄바꿈 (아랍어 등 연결 문자 보호), 없으면(일본어/중국어) 글자 단위
+    const hasSpace = para.includes(" ");
+    const units = hasSpace ? para.split(" ") : [...para];
+    let line = "";
+    units.forEach(u=>{
+      const test = line ? (hasSpace ? line+" "+u : line+u) : u;
+      if(ctx.measureText(test).width > maxW && line){ out.push(line); line = u; }
+      else line = test;
+    });
+    if(line) out.push(line);
+  });
+  return out;
+}
+
+/* ---------- copy / downloads ---------- */
+async function copyCanvas(cv){
+  try{
+    const blob = await new Promise(res=>cv.toBlob(res, "image/png"));
+    await navigator.clipboard.write([new ClipboardItem({"image/png": blob})]);
+    toast("이미지가 클립보드에 복사되었습니다");
+  }catch(e){
+    downloadCanvas(cv, cv.id);
+    toast("복사가 지원되지 않아 파일로 저장했습니다");
+  }
+}
+function downloadCanvas(cv, name){
+  const fmt = document.getElementById("fileFormat").value;
+  const a = document.createElement("a");
+  a.download = name + "." + (fmt==="jpeg"?"jpg":"png");
+  a.href = fmt==="jpeg" ? cv.toDataURL("image/jpeg", 0.92) : cv.toDataURL("image/png");
+  a.click();
+}
+function downloadAll(){
+  document.querySelectorAll("#previewArea canvas").forEach((cv,i)=>{
+    setTimeout(()=>downloadCanvas(cv, cv.id), i*250);
+  });
+}
+function copyCaption(){
+  navigator.clipboard.writeText(document.getElementById("captionBox").textContent);
+  toast("캡션이 클립보드에 복사되었습니다");
+}
+
+/* ================= INSTAGRAM PUBLISH (반자동 게시) ================= */
+function GRAPH(){
+  const mode = localStorage.getItem("icf_igApiMode") || "iglogin";
+  return mode === "iglogin" ? "https://graph.instagram.com/v21.0" : "https://graph.facebook.com/v21.0";
+}
+
+function setPubStatus(msg, cls){
+  const el = document.getElementById("pubStatus");
+  el.textContent = msg; el.className = "status " + (cls||"");
+}
+
+async function uploadImage(cv){
+  const host = localStorage.getItem("icf_imgHost") || "imgbb";
+  const blob = await new Promise(res=>cv.toBlob(res, "image/jpeg", 0.92)); // Graph API는 JPEG만 허용
+  if(host === "imgbb"){
+    const key = localStorage.getItem("icf_imgbbKey");
+    if(!key) throw new Error("ImgBB API 키가 없습니다. ⚙ API 설정에서 입력하세요.");
+    const fd = new FormData();
+    fd.append("image", blob);
+    const res = await fetch("https://api.imgbb.com/1/upload?key=" + encodeURIComponent(key), {method:"POST", body:fd});
+    const j = await res.json();
+    if(!j.success) throw new Error("ImgBB 업로드 실패: " + ((j.error && j.error.message) || "키 확인"));
+    return j.data.url;
+  }else{
+    const name = localStorage.getItem("icf_cldName");
+    const preset = localStorage.getItem("icf_cldPreset");
+    const fd = new FormData();
+    fd.append("file", blob);
+    fd.append("upload_preset", preset);
+    const res = await fetch("https://api.cloudinary.com/v1_1/" + name + "/image/upload", {method:"POST", body:fd});
+    const j = await res.json();
+    if(!j.secure_url) throw new Error("Cloudinary 업로드 실패: " + (j.error && j.error.message || "설정 확인"));
+    return j.secure_url;
+  }
+}
+
+async function graphPost(path, params){
+  const token = localStorage.getItem("icf_igToken");
+  params.access_token = token;
+  const res = await fetch(GRAPH() + path, {
+    method:"POST",
+    headers:{"content-type":"application/x-www-form-urlencoded"},
+    body: new URLSearchParams(params).toString()
+  });
+  const j = await res.json();
+  if(j.error) throw new Error("Graph API: " + j.error.message);
+  return j;
+}
+
+async function waitContainer(id, maxTries, interval){
+  maxTries = maxTries || 10; interval = interval || 2500;
+  const token = localStorage.getItem("icf_igToken");
+  for(let i=0; i<maxTries; i++){
+    const res = await fetch(GRAPH() + "/" + id + "?fields=status_code&access_token=" + encodeURIComponent(token));
+    const j = await res.json();
+    if(j.status_code === "FINISHED") return;
+    if(j.status_code === "ERROR") throw new Error("미디어 처리 실패 (컨테이너 오류)");
+    await new Promise(r=>setTimeout(r, interval));
+  }
+  throw new Error("미디어 처리 대기 시간 초과 — 잠시 후 다시 시도하세요");
+}
+
+async function publishCurrent(){
+  const igId = localStorage.getItem("icf_igUserId");
+  const token = localStorage.getItem("icf_igToken");
+  const host = localStorage.getItem("icf_imgHost") || "imgbb";
+  const hostReady = host === "imgbb" ? !!localStorage.getItem("icf_imgbbKey") : !!localStorage.getItem("icf_cldName");
+  if(!igId || !token || !hostReady){
+    setPubStatus("연동 정보가 없습니다. ⚙ API 설정에서 인스타그램 게시 연동 항목을 채워주세요.", "err");
+    return;
+  }
+  const canvases = [...document.querySelectorAll("#previewArea canvas")];
+  if(!canvases.length){ setPubStatus("게시할 카드가 없습니다. 먼저 생성하세요.", "err"); return; }
+  const caption = document.getElementById("captionBox").textContent.trim();
+  if(!confirm("현재 언어의 카드 " + canvases.length + "장을 캐러셀로 인스타그램에 게시합니다. 진행할까요?")) return;
+
+  const btn = document.getElementById("pubBtn");
+  btn.disabled = true;
+  try{
+    // 1) 이미지 호스팅
+    const urls = [];
+    for(let i=0; i<canvases.length; i++){
+      setPubStatus("이미지 업로드 중... (" + (i+1) + "/" + canvases.length + ")", "busy");
+      urls.push(await uploadImage(canvases[i]));
+    }
+    let creationId;
+    if(urls.length === 1){
+      setPubStatus("미디어 컨테이너 생성 중...", "busy");
+      const c = await graphPost("/" + igId + "/media", {image_url: urls[0], caption});
+      creationId = c.id;
+    }else{
+      // 2) 캐러셀 자식 컨테이너
+      const children = [];
+      for(let i=0; i<urls.length; i++){
+        setPubStatus("캐러셀 항목 등록 중... (" + (i+1) + "/" + urls.length + ")", "busy");
+        const c = await graphPost("/" + igId + "/media", {image_url: urls[i], is_carousel_item:"true"});
+        children.push(c.id);
+      }
+      setPubStatus("캐러셀 컨테이너 생성 중...", "busy");
+      const carousel = await graphPost("/" + igId + "/media", {media_type:"CAROUSEL", children: children.join(","), caption});
+      creationId = carousel.id;
+    }
+    // 3) 처리 대기 후 게시
+    setPubStatus("미디어 처리 대기 중...", "busy");
+    await waitContainer(creationId);
+    setPubStatus("게시 중...", "busy");
+    const pub = await graphPost("/" + igId + "/media_publish", {creation_id: creationId});
+    setPubStatus("✅ 게시 완료! (media id: " + pub.id + ") 인스타그램 앱에서 확인하세요.", "ok");
+    toast("인스타그램에 게시되었습니다");
+  }catch(e){
+    setPubStatus("게시 실패: " + e.message, "err");
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+/* ================= REELS (카드뉴스 → 세로 영상) ================= */
+/* 전략: 캐러셀은 팔로워 리텐션용, 릴스는 비팔로워 유입용.
+   방금 만든 카드들을 9:16 세로 영상으로 이어붙이고(줌+크로스페이드), 선택적으로 음원을 입힌다.
+   1순위: MP4 저장 → 앱에서 인기 음원 얹어 업로드. 2순위: Graph API 릴스 자동 게시(인기 음원 불가). */
+
+function setReelStatus(msg, cls){
+  const el = document.getElementById("reelStatus");
+  if(el){ el.textContent = msg; el.className = "status " + (cls||""); }
+}
+function setReelPubStatus(msg, cls){
+  const el = document.getElementById("reelPubStatus");
+  if(el){ el.textContent = msg; el.className = "status " + (cls||""); }
+}
+
+/* 현재 언어에 결과가 있으면 릴스 패널을 노출하고 예상 길이를 갱신 */
+function showReelPanel(){
+  const p = document.getElementById("reelPanel");
+  if(!p) return;
+  const r = state.results[state.activeLang];
+  if(!r){ p.style.display = "none"; return; }
+  p.style.display = "block";
+  updateReelEstimate();
+}
+function reelSceneCount(r){
+  // 표지 1 + 본문 카드 + (CTA 있으면 1)
+  return 1 + ((r.cards||[]).length) + (r.cta ? 1 : 0);
+}
+function updateReelEstimate(){
+  const r = state.results[state.activeLang];
+  const est = document.getElementById("reelEstimate");
+  if(!r || !est) return;
+  const n = reelSceneCount(r);
+  const D = parseFloat((document.getElementById("reelDur")||{}).value || "2.5");
+  const T = ((document.getElementById("reelTrans")||{}).value === "cut") ? 0 : 0.5;
+  const dur = (n*D - (n-1)*T).toFixed(1);
+  est.textContent = "장면 " + n + "개 · 예상 길이 약 " + dur + "초 (인스타 릴스 권장 15~30초)";
+}
+
+/* offscreen 캔버스에 기존 드로잉 함수를 재사용해 9:16 프레임 렌더 */
+function makeCanvas(w, h){ const c = document.createElement("canvas"); c.width = w; c.height = h; return c; }
+function canvasToPng(cv){
+  return new Promise(res=>cv.toBlob(b=>{
+    const rd = new FileReader();
+    rd.onload = ()=>res(new Uint8Array(rd.result));
+    rd.readAsArrayBuffer(b);
+  }, "image/png"));
+}
+async function buildReelFrames(lang, W, H){
+  const r = state.results[lang];
+  if(!r) return [];
+  const prev = state.activeLang;
+  state.activeLang = lang; // 드로잉 함수가 badge/RTL 등에 현재 언어를 사용하므로 고정
+  try{
+    const frames = [];
+    let c = makeCanvas(W, H);
+    drawCover(c, r.line1 || "", r.line2 || "");
+    frames.push(await canvasToPng(c));
+    const cards = r.cards || [];
+    for(let i=0; i<cards.length; i++){
+      c = makeCanvas(W, H);
+      const cp = state.cardPhotos && state.cardPhotos[i];
+      drawBodyCard(c, cards[i], i+1, cards.length, cp && cp.img);
+      frames.push(await canvasToPng(c));
+    }
+    if(r.cta){
+      c = makeCanvas(W, H);
+      drawCtaCard(c, r.cta);
+      frames.push(await canvasToPng(c));
+    }
+    return frames;
+  } finally {
+    state.activeLang = prev;
+  }
+}
+
+/* FFmpeg.wasm (단일 스레드 코어 — GitHub Pages/파일 열기에서도 동작) 지연 로드 */
+let _ffmpegPromise = null;
+function loadFFmpeg(){
+  if(window._ffmpeg) return Promise.resolve(window._ffmpeg);
+  if(_ffmpegPromise) return _ffmpegPromise;
+  _ffmpegPromise = (async ()=>{
+    if(!window.FFmpeg){
+      await new Promise((res, rej)=>{
+        const s = document.createElement("script");
+        s.src = "https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js";
+        s.onload = res;
+        s.onerror = ()=>rej(new Error("FFmpeg 스크립트 로드 실패 (네트워크/광고차단 확인)"));
+        document.head.appendChild(s);
+      });
+    }
+    const { createFFmpeg } = window.FFmpeg;
+    const ff = createFFmpeg({ log:false, corePath:"https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js" });
+    await ff.load();
+    window._ffmpeg = ff;
+    return ff;
+  })();
+  return _ffmpegPromise;
+}
+
+/* 입력/필터그래프 조립 */
+function buildReelArgs(N, D, F, T, trans, zoom, W, H, hasAudio, totalDur){
+  const args = [];
+  // 각 이미지를 항상 유한한 D초 클립으로 (concat/xfade 모두 안전, zoompan 리셋 방지)
+  for(let i=0; i<N; i++) args.push("-loop", "1", "-t", String(D), "-i", "f" + i + ".png");
+  const audioIdx = N;
+  if(hasAudio) args.push("-stream_loop", "-1", "-i", "audio_in");
+
+  let fc = "";
+  const vlabels = [];
+  const d = Math.round(D * F);
+  for(let i=0; i<N; i++){
+    let ch = "[" + i + ":v]scale=" + W + ":" + H + ":force_original_aspect_ratio=increase,crop=" + W + ":" + H + ",setsar=1";
+    if(zoom){
+      // s=WxH, fps=F, d=총프레임 → 첫 프레임에서 한 번의 매끈한 줌. trim으로 D초에 정확히 컷.
+      ch += ",zoompan=z='min(zoom+0.0012,1.12)':d=" + d + ":x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=" + W + "x" + H + ":fps=" + F +
+            ",trim=duration=" + D + ",setpts=PTS-STARTPTS";
+    }
+    // fps/format 정규화 — xfade는 일정한 프레임레이트(CFR)와 동일 포맷을 요구
+    ch += ",fps=" + F + ",format=yuv420p[v" + i + "]";
+    fc += ch + ";";
+    vlabels.push("[v" + i + "]");
+  }
+
+  if(trans === "cut" || N === 1){
+    fc += vlabels.join("") + "concat=n=" + N + ":v=1:a=0[vpre];";
+  }else{
+    const tName = (trans === "slide") ? "slideleft" : "fade";
+    let prev = vlabels[0];
+    for(let j=1; j<N; j++){
+      const off = (j * (D - T)).toFixed(3);
+      const lbl = "[vx" + j + "]";
+      fc += prev + vlabels[j] + "xfade=transition=" + tName + ":duration=" + T + ":offset=" + off + lbl + ";";
+      prev = lbl;
+    }
+    fc += prev + "null[vpre];";
+  }
+  fc += "[vpre]format=yuv420p[vout]";
+
+  if(hasAudio){
+    const outSt = Math.max(0, totalDur - 1).toFixed(3);
+    fc += ";[" + audioIdx + ":a]atrim=0:" + totalDur.toFixed(3) +
+          ",asetpts=PTS-STARTPTS,afade=t=in:st=0:d=0.4,afade=t=out:st=" + outSt + ":d=1[aout]";
+  }
+
+  const out = args.concat(["-filter_complex", fc, "-map", "[vout]"]);
+  if(hasAudio) out.push("-map", "[aout]", "-c:a", "aac", "-b:a", "128k");
+  else out.push("-an");
+  out.push("-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", String(F),
+           "-t", totalDur.toFixed(3), "-preset", "ultrafast", "-movflags", "+faststart", "out.mp4");
+  return out;
+}
+
+async function generateReel(){
+  const lang = state.activeLang;
+  if(!lang || !state.results[lang]){ setReelStatus("먼저 카드뉴스를 생성하세요.", "err"); return; }
+  const resSel = (document.getElementById("reelRes").value === "720");
+  const W = resSel ? 720 : 1080, H = resSel ? 1280 : 1920;
+  const D = parseFloat(document.getElementById("reelDur").value);
+  const trans = document.getElementById("reelTrans").value;
+  const zoom = document.getElementById("reelZoom").checked;
+  const audioFile = (document.getElementById("reelAudioFile").files || [])[0] || null;
+  const F = 24;
+
+  const btn = document.getElementById("reelBtn");
+  btn.disabled = true;
+  setReelStatus("① 프레임 렌더링 중...", "busy");
+  try{
+    const frames = await buildReelFrames(lang, W, H);
+    if(!frames.length) throw new Error("렌더할 카드가 없습니다.");
+    const N = frames.length;
+    const T = (trans === "cut") ? 0 : 0.5;
+    const totalDur = +(N*D - (N-1)*T).toFixed(3);
+
+    setReelStatus("② FFmpeg 로딩 중... (최초 1회만 20~40초 · 약 25MB 다운로드)", "busy");
+    const ffmpeg = await loadFFmpeg();
+    const fetchFile = window.FFmpeg.fetchFile;
+
+    // 기존 파일 정리 후 프레임 기록
+    for(let i=0; i<N; i++) ffmpeg.FS("writeFile", "f" + i + ".png", frames[i]);
+    const hasAudio = !!audioFile;
+    if(hasAudio) ffmpeg.FS("writeFile", "audio_in", await fetchFile(audioFile));
+
+    const args = buildReelArgs(N, D, F, T, trans, zoom, W, H, hasAudio, totalDur);
+    if(ffmpeg.setProgress){
+      ffmpeg.setProgress(({ ratio })=>{
+        if(ratio >= 0 && ratio <= 1) setReelStatus("③ 인코딩 중... " + Math.round(ratio*100) + "%", "busy");
+      });
+    }
+    setReelStatus("③ 인코딩 중... 0% (" + N + "장 · " + totalDur + "초)", "busy");
+    await ffmpeg.run.apply(ffmpeg, args);
+
+    const data = ffmpeg.FS("readFile", "out.mp4");
+    // 메모리 정리
+    try{
+      for(let i=0; i<N; i++) ffmpeg.FS("unlink", "f" + i + ".png");
+      if(hasAudio) ffmpeg.FS("unlink", "audio_in");
+      ffmpeg.FS("unlink", "out.mp4");
+    }catch(e){ /* ignore */ }
+
+    if(window._reelUrl) URL.revokeObjectURL(window._reelUrl);
+    const blob = new Blob([data.buffer], { type:"video/mp4" });
+    window._reelBlob = blob;
+    window._reelUrl = URL.createObjectURL(blob);
+    const v = document.getElementById("reelVideo");
+    v.src = window._reelUrl; v.style.display = "block";
+    document.getElementById("reelActions").style.display = "flex";
+    setReelStatus("✅ 릴스 완성! " + totalDur + "초 · " + (blob.size/1e6).toFixed(1) + "MB. 아래 [MP4 저장] 권장.", "ok");
+    toast("릴스 영상이 생성되었습니다");
+  }catch(e){
+    console.error(e);
+    setReelStatus("릴스 생성 실패: " + e.message + " (모바일이면 해상도 720 / 컷 전환으로 재시도)", "err");
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+function downloadReel(){
+  if(!window._reelBlob){ setReelPubStatus("먼저 릴스를 생성하세요.", "err"); return; }
+  const a = document.createElement("a");
+  a.download = "reel_" + (state.activeLang || "ko") + "_" + Date.now() + ".mp4";
+  a.href = window._reelUrl || URL.createObjectURL(window._reelBlob);
+  a.click();
+  toast("MP4 저장됨 — 인스타 앱에서 인기 음원 얹어 올리면 도달 최대화");
+}
+
+async function publishReel(){
+  if(!window._reelBlob){ setReelPubStatus("먼저 릴스를 생성하세요.", "err"); return; }
+  const igId = localStorage.getItem("icf_igUserId");
+  const token = localStorage.getItem("icf_igToken");
+  const cldName = localStorage.getItem("icf_cldName");
+  const cldPreset = localStorage.getItem("icf_cldPreset");
+  if(!igId || !token){ setReelPubStatus("인스타 연동 정보가 없습니다 (⚙ API 설정).", "err"); return; }
+  if(!cldName || !cldPreset){
+    setReelPubStatus("릴스 게시엔 동영상 호스팅이 필요합니다 → ⚙ API 설정에서 Cloudinary(Cloud name + unsigned preset)를 채워주세요. ImgBB는 동영상 미지원.", "err");
+    return;
+  }
+  if(!confirm("현재 릴스를 인스타그램에 게시합니다.\n\n※ API로 올린 릴스에는 인스타 인기 음원을 붙일 수 없습니다.\n최대 도달을 원하면 [MP4 저장] 후 앱에서 인기 음원을 얹어 올리는 걸 권장합니다.\n\n계속할까요?")) return;
+
+  const caption = document.getElementById("captionBox").textContent.trim();
+  try{
+    setReelPubStatus("① 동영상 업로드 중 (Cloudinary)...", "busy");
+    const fd = new FormData();
+    fd.append("file", window._reelBlob);
+    fd.append("upload_preset", cldPreset);
+    const up = await fetch("https://api.cloudinary.com/v1_1/" + cldName + "/video/upload", { method:"POST", body:fd });
+    const uj = await up.json();
+    if(!uj.secure_url) throw new Error("Cloudinary 업로드 실패: " + ((uj.error && uj.error.message) || "preset이 동영상 업로드를 허용하는지 확인"));
+
+    setReelPubStatus("② 릴스 컨테이너 생성 중...", "busy");
+    const c = await graphPost("/" + igId + "/media", { media_type:"REELS", video_url:uj.secure_url, caption, share_to_feed:"true" });
+
+    setReelPubStatus("③ 인스타 처리 대기 중 (릴스는 30초~2분 소요)...", "busy");
+    await waitContainer(c.id, 40, 3000);
+
+    setReelPubStatus("④ 게시 중...", "busy");
+    const pub = await graphPost("/" + igId + "/media_publish", { creation_id:c.id });
+    setReelPubStatus("✅ 릴스 게시 완료! (media id: " + pub.id + ")", "ok");
+    toast("릴스가 게시되었습니다");
+  }catch(e){
+    setReelPubStatus("릴스 게시 실패: " + e.message, "err");
+  }
+}
+
+/* ================= DAILY DISCOVERY (자동 소재 발굴) ================= */
+const BONUS = {
+  animal:  {pts:15, words:["dog","cat","puppy","kitten","elephant","whale","octopus","penguin","rescue","shelter","panda","otter","bear","turtle","parrot","gorilla","dolphin","fox","owl","animal","zoo","tortoise","kangaroo","raccoon","beaver"]},
+  science: {pts:12, words:["nasa","space","mars","moon","ocean","deep sea","deep-sea","scientist","discover","study","brain","quantum","fossil","dinosaur","asteroid","telescope","species","dna","galaxy"]},
+  uplift:  {pts:10, words:["reunited","saved","surprise","record","first time","oldest","youngest","returns","donates","adopts","survives","guinness","lottery","found"]},
+};
+const BLACKLIST = ["trump","biden","election","politic","congress","senate","war","gaza","israel","ukraine","russia","missile","shooting","shooter","murder","stabbed","rape","assault","abuse","suicide","overdose","terror","hostage","nazi","genocide"];
+
+const FEEDS = {
+  upi_odd:     {label:"UPI 기상천외",   url:"https://rss.upi.com/news/odd_news.rss",                              base:20},
+  gnn:         {label:"GNN 감동",       url:"https://www.goodnewsnetwork.org/feed/",                              base:16},
+  gnn_animals: {label:"GNN 동물",       url:"https://www.goodnewsnetwork.org/category/news/animals/feed/",        base:20},
+  sciencealert:{label:"ScienceAlert",   url:"https://www.sciencealert.com/feed",                                  base:14},
+  livescience: {label:"LiveScience",    url:"https://www.livescience.com/feeds/all",                              base:12},
+  nasa:        {label:"NASA",           url:"https://www.nasa.gov/feed/",                                         base:10},
+  newatlas:    {label:"New Atlas",      url:"https://newatlas.com/index.rss",                                     base:10},
+  oddity:      {label:"Oddity Central", url:"https://www.odditycentral.com/feed",                                 base:16},
+};
+
+function fetchWithTimeout(url, ms, opts){
+  const ctrl = new AbortController();
+  const t = setTimeout(()=>ctrl.abort(), ms || 9000);
+  return fetch(url, Object.assign({}, opts || {}, {signal: ctrl.signal})).finally(()=>clearTimeout(t));
+}
+
+function scoreItem(it){
+  const t = it.title.toLowerCase();
+  for(const b of BLACKLIST){ if(t.includes(b)) return -1; }
+  let s = it.base || 10;
+  for(const k in BONUS){ if(BONUS[k].words.some(w=>t.includes(w))) s += BONUS[k].pts; }
+  if(/\d/.test(it.title)) s += 8;
+  if(it.title.length < 90) s += 5;
+  const ageH = it.ageHours;
+  if(ageH != null){
+    if(ageH <= 24) s += 12;
+    else if(ageH <= 48) s += 8;
+    else if(ageH <= 96) s += 3;
+    else if(ageH > 240) s -= 10;
+  }
+  return Math.round(s);
+}
+
+function parseXmlItems(xml, f){
+  const doc = new DOMParser().parseFromString(xml, "text/xml");
+  if(doc.querySelector("parsererror")) return null;
+  const nodes = [...doc.querySelectorAll("item")];
+  if(!nodes.length) return null;
+  const now = Date.now();
+  return nodes.slice(0, 25).map(n=>{
+    const get = tag => (n.querySelector(tag)||{}).textContent || "";
+    const pub = get("pubDate");
+    const ageHours = pub ? Math.max(0, (now - new Date(pub).getTime()) / 36e5) : null;
+    const media = n.getElementsByTagName("media:content")[0] || n.getElementsByTagName("media:thumbnail")[0];
+    const encl = n.querySelector("enclosure");
+    const thumb = (media && media.getAttribute("url")) || (encl && encl.getAttribute("url")) || "";
+    const descRaw = get("description") || (n.getElementsByTagName("media:description")[0]||{}).textContent || "";
+    const desc = descRaw.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 600);
+    return { title:get("title").trim(), url:get("link").trim(), permalink:get("link").trim(),
+             sub:f.label, base:f.base, ageHours, thumb, desc };
+  }).filter(it=>it.title && it.url);
+}
+
+async function fetchFeed(key){
+  const f = FEEDS[key];
+  const enc = encodeURIComponent(f.url);
+  const candidates = [
+    { name:"rss2json",  u:"https://api.rss2json.com/v1/api.json?rss_url=" + enc, type:"rss2json" },
+    { name:"직접",      u:f.url, type:"xml" },
+    { name:"corsproxy", u:"https://corsproxy.io/?url=" + enc, type:"xml" },
+    { name:"allorigins",u:"https://api.allorigins.win/raw?url=" + enc, type:"xml" },
+    { name:"codetabs",  u:"https://api.codetabs.com/v1/proxy?quest=" + f.url, type:"xml" },
+  ];
+  const errors = [];
+  for(const c of candidates){
+    try{
+      const res = await fetchWithTimeout(c.u, 9000);
+      if(!res.ok){ errors.push(c.name + ":HTTP" + res.status); continue; }
+      if(c.type === "rss2json"){
+        const j = await res.json();
+        if(j.status !== "ok" || !j.items || !j.items.length){ errors.push(c.name + ":" + (j.message||"empty")); continue; }
+        const now = Date.now();
+        return j.items.slice(0,25).map(it=>{
+          const ageHours = it.pubDate ? Math.max(0,(now - new Date(it.pubDate).getTime())/36e5) : null;
+          const thumb = it.thumbnail || (it.enclosure && it.enclosure.link) || "";
+          const desc = (it.description||"").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 600);
+          return { title:(it.title||"").trim(), url:it.link, permalink:it.link,
+                   sub:f.label, base:f.base, ageHours, thumb, desc };
+        }).filter(it=>it.title && it.url);
+      }else{
+        const xml = await res.text();
+        const items = parseXmlItems(xml, f);
+        if(items) return items;
+        errors.push(c.name + ":파싱실패");
+      }
+    }catch(e){
+      errors.push(c.name + ":" + (e.name==="AbortError" ? "시간초과" : "차단됨"));
+    }
+  }
+  console.warn("[" + f.label + "] 모든 경로 실패 →", errors.join(" / "));
+  throw new Error(f.label + " (" + errors[0] + ")");
+}
+const fetchSub = fetchFeed;
+
+async function crawlDaily(force){
+  const subs = [...document.querySelectorAll("#subRow input:checked")].map(c=>c.value);
+  if(!subs.length){ setCrawlStatus("소스를 하나 이상 선택하세요.", "err"); return; }
+  const btn = document.getElementById("crawlBtn");
+  btn.disabled = true; setCrawlStatus("해외 뉴스 크롤링 중... (" + subs.length + "개 소스, 최대 45초)", "busy");
+  try{
+    const settled = await Promise.allSettled(subs.map(fetchSub));
+    const all = settled.filter(s=>s.status==="fulfilled").map(s=>s.value).flat();
+    const failed = settled.filter(s=>s.status==="rejected").map(s=>s.reason.message);
+    const scored = all.map(it=>({...it, score:scoreItem(it)}))
+                      .filter(it=>it.score > 0)
+                      .sort((a,b)=>b.score-a.score)
+                      .slice(0, 20);
+    renderDiscovery(scored);
+    if(scored.length){
+      localStorage.setItem("icf_lastCrawl", new Date().toDateString());
+      localStorage.setItem("icf_lastResults", JSON.stringify(scored));
+    }
+    let msg = scored.length + "건 발굴 완료.";
+    if(failed.length) msg += " 실패한 소스: " + failed.join(", ");
+    if(!scored.length && failed.length === subs.length)
+      msg = "모든 소스 접근 실패. F12 → Console 탭에 원인이 기록되어 있습니다. 광고차단 확장(uBlock 등)이 프록시를 막는 경우도 있으니 잠시 꺼보세요.";
+    setCrawlStatus(msg, scored.length ? "ok" : "err");
+  }catch(e){
+    setCrawlStatus("크롤링 실패: " + e.message, "err");
+  }finally{
+    btn.disabled = false;
+  }
+}
+function setCrawlStatus(msg, cls){
+  const el = document.getElementById("crawlStatus");
+  el.textContent = msg; el.className = "status " + (cls||"");
+}
+
+function renderDiscovery(items){
+  const box = document.getElementById("discoveryList");
+  if(!items.length){ box.innerHTML = "<div class='hint'>결과가 없습니다. 소스를 바꾸거나 다시 시도하세요.</div>"; return; }
+  box.innerHTML = "";
+  const table = document.createElement("div");
+  items.forEach((it,i)=>{
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex; gap:10px; align-items:center; padding:9px 6px; border-bottom:1px solid var(--line); font-size:13.5px;";
+    const scoreColor = it.score>=60 ? "var(--ok)" : it.score>=40 ? "var(--accent2)" : "var(--muted)";
+    const age = it.ageHours == null ? "" : it.ageHours < 24 ? " · " + Math.round(it.ageHours) + "시간 전" : " · " + Math.round(it.ageHours/24) + "일 전";
+    row.innerHTML =
+      "<div style='min-width:44px; text-align:center; font-weight:800; color:"+scoreColor+";'>"+it.score+"</div>" +
+      "<div style='flex:1;'><a href='"+it.permalink+"' target='_blank' style='color:var(--text); text-decoration:none;'>"+escapeHtml(it.title)+"</a>" +
+      "<div class='hint'>"+it.sub+age+"</div></div>";
+    const btn = document.createElement("button");
+    btn.className = "btn-ghost btn-sm";
+    btn.style.whiteSpace = "nowrap";
+    btn.textContent = "📥 기사 가져오기";
+    btn.onclick = ()=>{
+      document.getElementById("articleUrl").value = it.url;
+      window._pendingMeta = {title: it.title, desc: it.desc || "", thumb: it.thumb, url: it.url};
+      // 표지는 즉시 기사 이미지로 적용 (기다리지 않음)
+      if(it.thumb){ setCoverFromUrl(it.thumb); window._pendingThumb = null; }
+      else{ window._pendingThumb = null; extractOgImage(it.url); }
+      fetchArticle();
+      window.scrollTo({top: document.getElementById("source").offsetTop - 80, behavior:"smooth"});
+    };
+    row.appendChild(btn);
+    table.appendChild(row);
+  });
+  box.appendChild(table);
+}
+function escapeHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+/* auto-crawl once per day on open */
+(function autoCrawl(){
+  const last = localStorage.getItem("icf_lastCrawl");
+  const today = new Date().toDateString();
+  const cached = localStorage.getItem("icf_lastResults");
+  if(last === today && cached){
+    try{ renderDiscovery(JSON.parse(cached)); setCrawlStatus("오늘 크롤링 결과 (캐시). [지금 크롤링]으로 갱신 가능.", "ok"); return; }catch(e){}
+  }
+  setTimeout(()=>crawlDaily(false), 800);
+})();
+</script>
+</body>
+</html>
+<!-- v3.0 — 릴스(Reel) 생성·게시 추가 -->
+
