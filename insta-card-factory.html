@@ -174,9 +174,11 @@
       <span class="hint" id="srcCount" style="align-self:center;"></span>
     </div>
     <div id="subRow"></div>
-    <div class="row" style="margin-top:12px; align-items:center;">
-      <button class="btn-ghost btn-sm" id="crawlBtn" onclick="crawlDaily(true)">🔎 지금 크롤링</button>
-      <span class="hint" id="crawlInfo">이 페이지를 열면 하루 1회 자동으로 크롤링합니다. 소스가 많을수록 시간이 걸립니다.</span>
+    <div class="row" style="margin-top:12px; align-items:center; gap:8px;">
+      <button class="btn-ghost btn-sm" id="crawlBtn" onclick="crawlDaily(true)">🔎 새 소재 크롤링</button>
+      <label class="chk on" style="padding:6px 10px;"><input type="checkbox" id="hideSeen" checked onchange="rerenderDiscovery()">본 소재 숨기기</label>
+      <button class="btn-ghost btn-sm" onclick="resetSeen()">🗑 본 기록 초기화</button>
+      <span class="hint" id="crawlInfo">[새 소재 크롤링]을 누를 때마다 순서를 섞고 <b>새 기사</b> 위주로 보여줍니다.</span>
     </div>
     <div class="status" id="crawlStatus"></div>
     <div id="discoveryList" style="margin-top:10px;"></div>
@@ -2165,7 +2167,7 @@ function parseXmlItems(xml, f){
   const nodes = [...doc.querySelectorAll("item")];
   if(!nodes.length) return null;
   const now = Date.now();
-  return nodes.slice(0, 25).map(n=>{
+  return nodes.slice(0, 40).map(n=>{
     const get = tag => (n.querySelector(tag)||{}).textContent || "";
     const pub = get("pubDate");
     const ageHours = pub ? Math.max(0, (now - new Date(pub).getTime()) / 36e5) : null;
@@ -2198,7 +2200,7 @@ async function fetchFeed(key){
         const j = await res.json();
         if(j.status !== "ok" || !j.items || !j.items.length){ errors.push(c.name + ":" + (j.message||"empty")); continue; }
         const now = Date.now();
-        return j.items.slice(0,25).map(it=>{
+        return j.items.slice(0,40).map(it=>{
           const ageHours = it.pubDate ? Math.max(0,(now - new Date(it.pubDate).getTime())/36e5) : null;
           const thumb = it.thumbnail || (it.enclosure && it.enclosure.link) || "";
           const desc = (it.description||"").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 600);
@@ -2229,16 +2231,20 @@ async function crawlDaily(force){
     const settled = await Promise.allSettled(subs.map(fetchSub));
     const all = settled.filter(s=>s.status==="fulfilled").map(s=>s.value).flat();
     const failed = settled.filter(s=>s.status==="rejected").map(s=>s.reason.message);
-    const scored = all.map(it=>({...it, score:scoreItem(it)}))
+    // 중복 URL 제거 → 점수 + 랜덤 지터로 정렬(매번 순서가 섞임) → 상위 30건
+    const uniq = {}; all.forEach(it=>{ if(it.url && !uniq[it.url]) uniq[it.url] = it; });
+    const scored = Object.values(uniq).map(it=>({...it, score:scoreItem(it)}))
                       .filter(it=>it.score > 0)
-                      .sort((a,b)=>b.score-a.score)
-                      .slice(0, 20);
-    renderDiscovery(scored);
+                      .sort((a,b)=>(b.score + Math.random()*9) - (a.score + Math.random()*9))
+                      .slice(0, 30);
+    window._discovery = scored;
+    rerenderDiscovery();
     if(scored.length){
       localStorage.setItem("icf_lastCrawl", new Date().toDateString());
       localStorage.setItem("icf_lastResults", JSON.stringify(scored));
     }
-    let msg = scored.length + "건 발굴 완료.";
+    const shown = filterSeen(scored).length;
+    let msg = scored.length + "건 발굴 (표시 " + shown + "건).";
     if(failed.length) msg += " 실패한 소스: " + failed.join(", ");
     if(!scored.length && failed.length === subs.length)
       msg = "모든 소스 접근 실패. F12 → Console 탭에 원인이 기록되어 있습니다. 광고차단 확장(uBlock 등)이 프록시를 막는 경우도 있으니 잠시 꺼보세요.";
@@ -2254,9 +2260,20 @@ function setCrawlStatus(msg, cls){
   el.textContent = msg; el.className = "status " + (cls||"");
 }
 
+/* ---------- 본 소재(seen) 추적: 중복 노출 방지 ---------- */
+function loadSeen(){ try{ return new Set(JSON.parse(localStorage.getItem("icf_seen")||"[]")); }catch(e){ return new Set(); } }
+function markSeen(url){ if(!url) return; const s = loadSeen(); s.add(url); localStorage.setItem("icf_seen", JSON.stringify([...s].slice(-1000))); }
+function isHideSeen(){ const el = document.getElementById("hideSeen"); return el ? el.checked : true; }
+function filterSeen(items){ if(!isHideSeen()) return items || []; const s = loadSeen(); return (items||[]).filter(it=>!s.has(it.url)); }
+function resetSeen(){ localStorage.removeItem("icf_seen"); toast("본 기록을 초기화했습니다"); rerenderDiscovery(); }
+function rerenderDiscovery(){ renderDiscovery(filterSeen(window._discovery || [])); }
+
 function renderDiscovery(items){
   const box = document.getElementById("discoveryList");
-  if(!items.length){ box.innerHTML = "<div class='hint'>결과가 없습니다. 소스를 바꾸거나 다시 시도하세요.</div>"; return; }
+  if(!items.length){
+    box.innerHTML = "<div class='hint'>표시할 새 소재가 없습니다. [🔎 새 소재 크롤링]을 누르거나, [본 기록 초기화] 후 다시 시도하세요.</div>";
+    return;
+  }
   box.innerHTML = "";
   const table = document.createElement("div");
   items.forEach((it,i)=>{
@@ -2271,17 +2288,24 @@ function renderDiscovery(items){
     const btn = document.createElement("button");
     btn.className = "btn-ghost btn-sm";
     btn.style.whiteSpace = "nowrap";
-    btn.textContent = "📥 기사 가져오기";
+    btn.textContent = "📥 가져오기";
     btn.onclick = ()=>{
+      markSeen(it.url);   // 가져온 기사는 '본 것'으로 표시 → 다음부터 안 뜸
       document.getElementById("articleUrl").value = it.url;
       window._pendingMeta = {title: it.title, desc: it.desc || "", thumb: it.thumb, url: it.url};
-      // 표지는 즉시 기사 이미지로 적용 (기다리지 않음)
       if(it.thumb){ setCoverFromUrl(it.thumb); window._pendingThumb = null; }
       else{ window._pendingThumb = null; extractOgImage(it.url); }
       fetchArticle();
       window.scrollTo({top: document.getElementById("source").offsetTop - 80, behavior:"smooth"});
     };
+    const hide = document.createElement("button");
+    hide.className = "btn-ghost btn-sm";
+    hide.textContent = "✕";
+    hide.title = "관심 없음 (숨기기)";
+    hide.style.cssText = "color:var(--muted); white-space:nowrap;";
+    hide.onclick = ()=>{ markSeen(it.url); rerenderDiscovery(); };
     row.appendChild(btn);
+    row.appendChild(hide);
     table.appendChild(row);
   });
   box.appendChild(table);
@@ -2297,12 +2321,20 @@ function escapeHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").repl
   const today = new Date().toDateString();
   const cached = localStorage.getItem("icf_lastResults");
   if(last === today && cached){
-    try{ renderDiscovery(JSON.parse(cached)); setCrawlStatus("오늘 크롤링 결과 (캐시). [지금 크롤링]으로 갱신 가능.", "ok"); return; }catch(e){}
+    try{
+      window._discovery = JSON.parse(cached);
+      rerenderDiscovery();
+      const shown = filterSeen(window._discovery).length;
+      // 안 본 소재가 얼마 안 남았으면 자동으로 새로 크롤링
+      if(shown < 8){ setTimeout(()=>crawlDaily(false), 500); }
+      else{ setCrawlStatus("캐시 " + shown + "건 표시. [🔎 새 소재 크롤링]으로 갱신.", "ok"); }
+      return;
+    }catch(e){}
   }
   setTimeout(()=>crawlDaily(false), 800);
 })();
 </script>
 </body>
 </html>
-<!-- v3.6 — 후킹 대폭 강화(바이럴 공식+후킹 후보 4개) + 충격 소스 -->
+<!-- v3.7 — 중복 제거(본 소재 숨김)+셔플+풀 확대로 매번 새 소재 -->
 
