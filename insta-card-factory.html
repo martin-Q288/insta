@@ -225,6 +225,7 @@
       <select id="contentNiche" onchange="onNicheChange()">
         <option value="general" selected>일반 바이럴 (충격·신기·미스터리 등)</option>
         <option value="medical">의학·건강 충격 실화 (medical_newsroom 스타일)</option>
+        <option value="mindset">마인드셋·자기계발 (인스타 게시물 보너스 최적화)</option>
       </select>
       <div class="hint" id="nicheHint">캡션 구조: 훅 → 구체적 실화 사례 → 의학 배경 설명 → 전문가 권고 → 권위 출처 인용(예: The Sun, ○○학회) → 팔로우 CTA. 니치 선택 시 발굴 소스도 의학 전용으로 전환됩니다.</div>
 
@@ -434,6 +435,15 @@
       <option value="claude-sonnet-5">Claude Sonnet 5 — 더 좋은 카피, 약간 비쌈</option>
     </select>
     <div class="notice">키는 이 브라우저의 localStorage에만 저장됩니다 (Anthropic API 호출 외 외부 전송 없음).</div>
+
+    <h2 style="margin:20px 0 4px; font-size:15px;">인스타그램 게시물 보너스 자격 조건</h2>
+    <div class="notice" style="margin-top:6px;">
+      계정별로 아래 조건을 모두 충족하면 인스타그램 앱 내 계정 설정에 <b>"보너스 신청"</b> 탭이 자동으로 뜹니다 (이 도구에서 신청하는 게 아니라 안내용 체크리스트입니다).<br><br>
+      · 만 18세 이상, 한국 등 지원 국가 거주<br>
+      · 프로페셔널(크리에이터/비즈니스) 계정<br>
+      · <b>최근 3개월 누적 조회수 100만 회</b> — 화면에 노출만 돼도 조회로 인정되어 유튜브보다 달성이 쉬움<br><br>
+      단일 사진과 카드뉴스(캐러셀) 모두 대상이지만, 알고리즘은 <b>체류 시간</b>을 봅니다 — 옆으로 넘겨야 하는 카드뉴스가 유리해서, 위 "마인드셋·자기계발" 니치는 자동으로 카드뉴스 포맷을 씁니다. 번역·불펌은 노출 감소 대상이니 이 도구처럼 AI로 재작성된 콘텐츠만 발행하세요.
+    </div>
 
     <h2 style="margin:20px 0 4px; font-size:15px;">인스타그램 계정 (언어별 발행)</h2>
     <div class="notice" style="margin-top:6px;">각 <b>언어</b>는 여기서 매핑한 <b>계정</b>으로 발행됩니다 (한국어 → 한국 계정, 영어 → 영어 계정 …). 계정마다 <b>비즈니스/크리에이터 전환 + 액세스 토큰</b>이 필요해요. 아래 이미지 호스트·소스 설정은 모든 계정 공용입니다.</div>
@@ -697,6 +707,8 @@ async function callClaude(prompt){
 function onNicheChange(){
   const niche = (document.getElementById("contentNiche")||{}).value || "general";
   const styleEl = document.getElementById("styleGuide");
+  const hintEl = document.getElementById("nicheHint");
+  const fmtEl = document.getElementById("pubFormat");
   if(niche === "medical"){
     // 의학 니치: 발굴 소스를 의학 카테고리로 자동 전환 + 각색 지침 프리셋
     document.querySelectorAll('#subRow input').forEach(cb=>{
@@ -705,9 +717,22 @@ function onNicheChange(){
     });
     updateSrcCount();
     if(styleEl) styleEl.value = "실제 사례 기반 의학·건강 충격 실화. 진단·경고 신호 중심, 과장 없이 신뢰감 있게.";
+    if(hintEl) hintEl.textContent = "캡션 구조: 훅 → 구체적 실화 사례 → 의학 배경 설명 → 전문가 권고 → 권위 출처 인용(예: The Sun, ○○학회) → 팔로우 CTA. 니치 선택 시 발굴 소스도 의학 전용으로 전환됩니다.";
+  }else if(niche === "mindset"){
+    // 마인드셋 니치: 인스타 게시물 보너스는 '체류 시간'이 핵심 지표 — 옆으로 넘겨 읽는
+    // 카드뉴스(캐러셀)가 단일 사진보다 체류 시간이 길어 알고리즘상 유리하므로 카드뉴스 포맷으로 자동 전환.
+    document.querySelectorAll('#subRow input').forEach(cb=>{
+      const on = FEEDS[cb.value] && FEEDS[cb.value].cat === "mindset";
+      cb.checked = on; cb.parentElement.classList.toggle("on", on);
+    });
+    updateSrcCount();
+    if(styleEl) styleEl.value = "책 문장·통찰을 개인 에세이처럼 따뜻하게. 저장하고 싶은 문장 하나는 꼭 담기.";
+    if(fmtEl && fmtEl.value !== "cards"){ fmtEl.value = "cards"; onFormatChange(); }
+    if(hintEl) hintEl.textContent = "캡션 구조: 인용/통찰 → 개인 에세이 톤 해설 → 긍정 확언으로 마무리. 카드뉴스(캐러셀)는 옆으로 넘겨야 해서 체류 시간이 길어 '인스타 게시물 보너스' 조건에 유리합니다 — 자동으로 카드뉴스 포맷으로 전환됩니다.";
   }else{
     selectDefaultSources();
     if(styleEl) styleEl.value = "스크롤을 멈추게 하는 충격·반전 후킹. 궁금해서 캡션을 안 볼 수 없게. 자극적이되 사실 기반.";
+    if(hintEl) hintEl.textContent = "사진 1장에 강한 후킹 헤드라인을 얹고, 본문은 캡션에 넣는 방식. 릴스(음원)로 그대로 활용하기 좋습니다.";
   }
 }
 
@@ -854,6 +879,48 @@ Exact shape:
 {"results":[{"lang":"ko","line1":"...","line2":"...","badge":"...","cards":["..."],"cta":"...","caption":"...","hashtags":"...","image_queries":["..."]}]}`;
 }
 
+/* ---------- 프롬프트: 마인드셋·자기계발 카드뉴스 (인스타 게시물 보너스 최적화) ---------- */
+/* 인스타 '게시물 보너스'는 체류 시간이 핵심 지표라, 옆으로 넘겨 읽는 카드뉴스가 유리하다는
+   실제 수익화 사례(유튜브 "온돈남" 채널 분석)를 반영. 구조: 인용/통찰 → 개인 에세이 해설 → 긍정 확언. */
+function buildMindsetCardsPrompt(source, style, langs, n, handle){
+  const brand = handle ? ("The account handle is \"" + handle + "\" — use it in the follow-CTA line.") : "Use a generic 'follow us' style follow-CTA line.";
+  return `You are writing a save-worthy Instagram mindset/self-improvement carousel, in the style of top personal-growth accounts (quote + personal essay + affirmation). Based ONLY on the ideas in the source below, write ORIGINAL content — rewrite in your own words, never copy sentences verbatim, never invent a quote or attribution that isn't grounded in the source.
+
+SOURCE:
+"""${source}"""
+
+STYLE GUIDE: ${style || "warm, personal-essay tone, like a wiser friend talking to you"}
+
+GOAL: readers should feel "이 문장 저장해야겠다" (I need to save this) — this genre performs well specifically because swiping through multiple cards increases dwell time, which is what Instagram's Bonuses program rewards.
+
+For EACH of these languages: ${langs.join(", ")} produce:
+- "line1": cover line 1, max 20 chars — the core quote/insight fragment, or a question that sets up the theme
+- "line2": cover line 2, max 20 chars — the punch/twist that makes it feel personal and specific (not generic "행복해지는 법" filler)
+- "cards": array of ${n === "auto" ? "4 to 6 body texts — YOU choose the count that fits the idea best" : "exactly " + n + " body texts"} forming this EXACT arc:
+  * Card 1: the CORE QUOTE or INSIGHT itself, stated plainly and memorably (grounded in the source — a real idea/quote/finding, not fabricated)
+  * Middle cards: PERSONAL-ESSAY explanation — unpack WHY this matters, using relatable everyday scenarios (work stress, relationships, self-doubt) that make the reader think "이거 내 얘기잖아". Concrete, not abstract platitudes.
+  * LAST card: a POSITIVE AFFIRMATION or reframe the reader can adopt right now — first person or direct address, short and quotable enough to screenshot.
+  * NO generic filler like "긍정적으로 생각하세요" without specifics — every card needs one concrete image, scenario, or actionable detail.
+  * HARD LENGTH LIMIT per card: max 2 short sentences, max 90 characters for Korean/Japanese, max 150 for Latin languages. Whitespace is design — ADD MORE CARDS instead of cramming.
+  * In each card AND in "cta", wrap the single most important word/phrase in **double asterisks** — it will be color-highlighted. Exactly one **highlight** per card.
+  * LINE BREAKS: insert \\n at natural semantic phrase boundaries. Keep line lengths BALANCED (12-18 chars Korean/Japanese, 4-6 words Latin), no orphan lines under 60% of the longest line. Never split a **highlight** across lines.
+- "badge": a short warm tone word (2-4 characters) in that language (통찰, 위로, 성장, 마인드 / INSIGHT, GROWTH / 洞察, 成長).
+- "cta": a final save-and-share prompt tied to the theme — inviting readers to save this card or tag someone who needs it. Max 80 chars. Do NOT use any emoji.
+- "caption": an Instagram caption (3-6 sentences) in personal-essay voice expanding on the idea, ending with a gentle question or save/share prompt. ${brand} Do NOT use any emoji.
+- "hashtags": one line of 8-12 relevant mindset/self-improvement hashtags for that language/market.
+- "image_queries": array with ONE query for the cover FIRST, then one per body card (total = cards.length + 1) — SHORT ENGLISH stock-photo search queries (2-4 concrete words each): calm, aesthetic, editorial-style scenes (soft light, nature, quiet interiors, hands, journals, coffee, walking) — NEVER close-up human faces. e.g. "sunlight through window", "hands writing journal", "empty park bench morning".
+
+STRICT JSON RULES:
+- Respond with ONLY valid JSON. No markdown fences, no commentary.
+- All strings on a single line — escape line breaks as \\n.
+- Never use unescaped double quotes inside strings (use ' instead).
+- No trailing commas.
+- Do NOT use any emoji anywhere (headlines, cards, cta, caption, hashtags). Plain text only.
+
+Exact shape:
+{"results":[{"lang":"ko","line1":"...","line2":"...","badge":"...","cards":["..."],"cta":"...","caption":"...","hashtags":"...","image_queries":["..."]}]}`;
+}
+
 /* ---------- generate ---------- */
 async function generate(){
   const source = document.getElementById("source").value.trim();
@@ -872,7 +939,7 @@ async function generate(){
 
   const prompt = (fmt === "thumb")
     ? (niche === "medical" ? buildMedicalThumbPrompt(source, style, langs, handle) : buildThumbPrompt(source, style, langs, handle))
-    : buildCardsPrompt(source, style, langs, n);
+    : (niche === "mindset" ? buildMindsetCardsPrompt(source, style, langs, n, handle) : buildCardsPrompt(source, style, langs, n));
 
   try{
     let text = await callClaude(prompt);
@@ -2090,6 +2157,8 @@ async function publishReel(){
 
 /* ================= DAILY DISCOVERY (자동 소재 발굴) ================= */
 const BONUS = {
+  // 마인드셋·자기계발 신호 (습관·성장·회복탄력성류)
+  mindset: {pts:14, words:["habit","habits","mindset","self-improvement","discipline","purpose","resilience","gratitude","mindfulness","productivity","growth","motivation","confidence","boundaries","burnout","anxiety","overthinking","self-worth","stoic","stoicism","letting go","toxic","comfort zone","procrastination"]},
   // 의학·건강 충격 실화 신호 (진단·증상·경고류) — 최고 가중치
   medical: {pts:20, words:["diagnosed","diagnosis","symptom","symptoms","warning sign","warning signs","mistook","mistaken for","cancer","tumor","tumour","terminal","turned out to be","doctors found","doctors say","rushed to hospital","went viral","exhausted","surgeon","surgery","brain scan","undiagnosed","misdiagnosed","stage 4","he thought","she thought","just a","she had no idea","he had no idea"]},
   // 후킹 강한 '충격·신기·반전' 신호에 가장 높은 가중치
@@ -2103,8 +2172,15 @@ const BLACKLIST = ["trump","biden","harris","election","politic","congress","sen
 /* 카테고리(cat)별로 정리된 광범위 소스 — 전부 실제 응답 검증 완료. def:true = 기본 선택
    tier: 1=세계적 메이저 매체(신문사·방송사·통신사·공식기관) 2=신뢰할 만한 전문 매체 3=콘텐츠 큐레이션·바이럴 블로그(신뢰도 낮음, 기본 해제) */
 const TIER_LABEL = {1:"메이저 매체", 2:"전문 매체", 3:"큐레이션(주의)"};
-const FEED_CATS = {medical:"의학·건강 충격 실화", shock:"충격·미스터리·반전", odd:"기상천외·화제", uplift:"감동·굿뉴스", animal:"동물", science:"과학", space:"우주", tech:"기술·미래", culture:"문화·호기심"};
+const FEED_CATS = {mindset:"마인드셋·자기계발", medical:"의학·건강 충격 실화", shock:"충격·미스터리·반전", odd:"기상천외·화제", uplift:"감동·굿뉴스", animal:"동물", science:"과학", space:"우주", tech:"기술·미래", culture:"문화·호기심"};
 const FEEDS = {
+  // 마인드셋·자기계발 (인스타 게시물 보너스 대응 — 저장·공유 유도형 콘텐츠)
+  jamesclear:   {cat:"mindset",  tier:1, label:"James Clear (아토믹 해빗)", url:"https://jamesclear.com/feed",              base:16, def:true},
+  markmanson:   {cat:"mindset",  tier:1, label:"Mark Manson",              url:"https://markmanson.net/feed",              base:15, def:true},
+  tinybuddha:   {cat:"mindset",  tier:2, label:"Tiny Buddha",              url:"https://tinybuddha.com/feed/",             base:14, def:true},
+  mindful:      {cat:"mindset",  tier:2, label:"Mindful.org",              url:"https://www.mindful.org/feed/",            base:13, def:true},
+  pickthebrain: {cat:"mindset",  tier:3, label:"Pick the Brain (블로그)",  url:"https://www.pickthebrain.com/blog/feed/",  base:11},
+  positivityblog:{cat:"mindset", tier:3, label:"Positivity Blog (블로그)", url:"https://www.positivityblog.com/feed/",     base:10},
   // 의학·건강 충격 실화 (medical_newsroom 스타일: 증상→진단→전문가 권고) — 전부 메이저/전문 매체
   thesun_health:  {cat:"medical", tier:1, label:"The Sun Health",     url:"https://www.thesun.co.uk/health/feed/",       base:20, def:true},
   dailymail_health:{cat:"medical",tier:1, label:"Daily Mail Health",  url:"https://www.dailymail.co.uk/health/index.rss",base:19, def:true},
@@ -2434,5 +2510,5 @@ function escapeHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").repl
 </script>
 </body>
 </html>
-<!-- v3.11 — 전체 UI 텍스트 한글화 + 이모지 전면 제거 -->
+<!-- v3.12 — 마인드셋·자기계발 니치 + 인스타 게시물 보너스 자격 안내 -->
 
