@@ -205,8 +205,9 @@
 
       <label>출력 언어 <small style="color:var(--muted);">— 언어별로 카드+캡션+해시태그가 각각 생성됩니다</small></label>
       <div class="row" style="margin-bottom:8px; gap:6px;">
-        <button class="btn-ghost btn-sm" style="border-color:var(--accent2); color:var(--accent2);" onclick="selectRevenueLangs()">인스타 수익 최적화 6개국</button>
-        <span class="hint" style="align-self:center;">한국 · 미국 · 독일 · 일본 · 브라질 · 스페인어권</span>
+        <button class="btn-ghost btn-sm" style="border-color:var(--accent2); color:var(--accent2);" onclick="selectCoreLangs()">핵심 3개국 (한국·일본·미국)</button>
+        <button class="btn-ghost btn-sm" onclick="selectRevenueLangs()">수익 최적화 6개국</button>
+        <span class="hint" style="align-self:center;">기본값 = 한국·일본·미국 3개국 집중</span>
       </div>
       <div class="row" id="langRow">
         <label class="chk on"><input type="checkbox" value="ko" checked>한국어</label>
@@ -654,9 +655,18 @@ async function extractOgImage(url){
 document.querySelectorAll(".chk input").forEach(cb=>{
   cb.addEventListener("change", ()=>cb.parentElement.classList.toggle("on", cb.checked));
 });
-/* 인스타 수익 최적화 6개국 프리셋:
-   한국(필수) + 미국(최고 CPM·영어권 광역) + 독일(유럽 최고 CPM대) + 일본(고CPM 대형시장)
-   + 브라질/포르투갈어(릴스 도달·참여 세계 최상위) + 스페인어권(LATAM+스페인 초대형 도달) */
+/* 핵심 3개국 프리셋 (기본 전략): 한국(모국) + 일본(고CPM 대형시장) + 미국(최고 CPM·영어권 광역).
+   화력 집중 — 한 나라에서 공식을 검증한 뒤 OSMU로 확장하는 순서에 맞춘 기본값. */
+function selectCoreLangs(){
+  const want = ["ko","ja","en"];
+  document.querySelectorAll('#langRow input').forEach(cb=>{
+    cb.checked = want.includes(cb.value);
+    cb.parentElement.classList.toggle("on", cb.checked);
+  });
+  toast("핵심 3개국 선택됨 — 한국어·일본어·영어로 생성됩니다");
+}
+/* 수익 최적화 6개국 프리셋 (확장용):
+   한국 + 미국 + 독일 + 일본 + 브라질/포르투갈어 + 스페인어권 */
 function selectRevenueLangs(){
   const want = ["ko","en","de","ja","pt","es"];
   document.querySelectorAll('#langRow input').forEach(cb=>{
@@ -2510,5 +2520,5 @@ function escapeHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").repl
 </script>
 </body>
 </html>
-<!-- v3.12 — 마인드셋·자기계발 니치 + 인스타 게시물 보너스 자격 안내 -->
+<!-- v3.13 — 핵심 3개국(한국·일본·미국) 프리셋 기본화 -->
 
