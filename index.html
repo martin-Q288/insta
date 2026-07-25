@@ -182,38 +182,42 @@
     <button class="ctab" data-c="us" onclick="selectCountry('us')">미국 콘텐츠<small>보편 소재 · 영어</small></button>
   </div>
 
-  <!-- DISCOVERY -->
+  <!-- DISCOVERY (보조 기능 · 기본 접힘) -->
   <div class="panel" id="sec-discovery" style="margin-bottom:20px;">
-    <h2>0. 오늘의 소재 자동 발굴 <small style="text-transform:none; color:var(--muted);">— 50여 개 해외 매체 RSS를 신뢰도·점수로 랭킹 (정치·사건사고 자동 제외)</small></h2>
-    <div class="hint" style="margin-bottom:8px;">메이저 매체 = The Sun·Daily Mail·NY Post·CNN·BBC·Guardian·NY Times·Fox News·UPI·NASA 등 세계적 신문사·방송사·통신사·공식기관. 표시 없는 건 전문 매체, "(블로그)"·"(큐레이션)" 표기는 콘텐츠 큐레이션 사이트로 랭킹에서 가중치가 낮고 기본 선택에서 빠져 있습니다.</div>
-    <div class="row" style="margin-bottom:8px; gap:6px;">
-      <button class="btn-ghost btn-sm" style="border-color:var(--ok); color:var(--ok);" onclick="selectMajorOnly()">메이저 매체만</button>
-      <button class="btn-ghost btn-sm" onclick="selectDefaultSources()">추천 소스만</button>
-      <button class="btn-ghost btn-sm" onclick="toggleAllSources(true)">전체 선택</button>
-      <button class="btn-ghost btn-sm" onclick="toggleAllSources(false)">전체 해제</button>
-      <span class="hint" id="srcCount" style="align-self:center;"></span>
+    <h2 style="cursor:pointer; margin-bottom:0;" onclick="toggleDiscovery()">
+      <span id="discoveryCaret">▸</span> 소재 자동 발굴 <small style="text-transform:none; color:var(--muted);">(보조 기능 — 소재가 없을 때만. 누르면 펼치기)</small>
+    </h2>
+    <div id="discoveryBody" style="display:none; margin-top:12px;">
+      <div class="hint" style="margin-bottom:8px;">권장 워크플로우는 <b>아래 ‘기사 링크’에 직접 URL을 붙여넣는 것</b>입니다. 이 자동 발굴은 소재가 마를 때 보조로만 쓰세요. 메이저 매체 = The Sun·Daily Mail·CNN·BBC·Guardian·NY Times·UPI·NASA 등. "(블로그)"·"(큐레이션)"은 신뢰도가 낮아 기본 선택에서 빠져 있습니다.</div>
+      <div class="row" style="margin-bottom:8px; gap:6px;">
+        <button class="btn-ghost btn-sm" style="border-color:var(--ok); color:var(--ok);" onclick="selectMajorOnly()">메이저 매체만</button>
+        <button class="btn-ghost btn-sm" onclick="selectDefaultSources()">추천 소스만</button>
+        <button class="btn-ghost btn-sm" onclick="toggleAllSources(true)">전체 선택</button>
+        <button class="btn-ghost btn-sm" onclick="toggleAllSources(false)">전체 해제</button>
+        <span class="hint" id="srcCount" style="align-self:center;"></span>
+      </div>
+      <div id="subRow"></div>
+      <div class="row" style="margin-top:12px; align-items:center; gap:8px;">
+        <button class="btn-ghost btn-sm" id="crawlBtn" onclick="crawlDaily(true)">새 소재 크롤링</button>
+        <label class="chk on" style="padding:6px 10px;"><input type="checkbox" id="hideSeen" checked onchange="rerenderDiscovery()">본 소재 숨기기</label>
+        <button class="btn-ghost btn-sm" onclick="resetSeen()">본 기록 초기화</button>
+        <span class="hint" id="crawlInfo">[새 소재 크롤링]을 누를 때마다 순서를 섞고 <b>새 기사</b> 위주로 보여줍니다.</span>
+      </div>
+      <div class="status" id="crawlStatus"></div>
+      <div id="discoveryList" style="margin-top:10px;"></div>
     </div>
-    <div id="subRow"></div>
-    <div class="row" style="margin-top:12px; align-items:center; gap:8px;">
-      <button class="btn-ghost btn-sm" id="crawlBtn" onclick="crawlDaily(true)">새 소재 크롤링</button>
-      <label class="chk on" style="padding:6px 10px;"><input type="checkbox" id="hideSeen" checked onchange="rerenderDiscovery()">본 소재 숨기기</label>
-      <button class="btn-ghost btn-sm" onclick="resetSeen()">본 기록 초기화</button>
-      <span class="hint" id="crawlInfo">[새 소재 크롤링]을 누를 때마다 순서를 섞고 <b>새 기사</b> 위주로 보여줍니다.</span>
-    </div>
-    <div class="status" id="crawlStatus"></div>
-    <div id="discoveryList" style="margin-top:10px;"></div>
   </div>
 
   <div class="grid">
     <!-- LEFT: INPUT -->
     <div class="panel" id="sec-input">
-      <h2>1. 소재 입력</h2>
-      <label>기사 링크 (붙여넣고 [가져오기] — 본문을 자동 추출합니다)</label>
+      <h2>1. 소재 입력 <small style="text-transform:none; color:var(--accent2);">— 메인: 기사 링크를 붙여넣으세요</small></h2>
+      <label style="color:var(--text); font-weight:700;">기사 링크 (여기에 URL을 붙여넣고 [가져오기])</label>
       <div class="url-row">
-        <input type="text" id="articleUrl" placeholder="https://example.com/news/article...">
-        <button class="btn-ghost" id="fetchBtn" onclick="fetchArticle()">가져오기</button>
+        <input type="text" id="articleUrl" placeholder="https://example.com/news/article..." style="border-color:var(--accent);">
+        <button class="btn-primary" id="fetchBtn" onclick="fetchArticle()" style="width:auto; margin:0;">가져오기</button>
       </div>
-      <div class="hint">※ 공개 리더 프록시(r.jina.ai)를 경유합니다. 일부 사이트는 차단될 수 있으며, 그 경우 아래에 본문을 직접 붙여넣으세요.</div>
+      <div class="hint">직접 고른 기사 링크를 넣는 게 가장 정확합니다. 본문을 자동 추출해 아래에 채웁니다. 일부 사이트는 차단될 수 있으니, 그 경우 본문을 직접 붙여넣으세요. (소재가 없으면 위 ‘소재 자동 발굴’을 펼쳐 쓰세요.)</div>
 
       <label>원문 소재 (자동 추출 결과 또는 직접 붙여넣기)</label>
       <textarea id="source" placeholder="기사 본문, 흥미로운 사실, 연구 내용 등"></textarea>
@@ -368,6 +372,7 @@
       <div class="preview-area" id="previewArea">
         <div class="lang-empty">소재를 입력하고 [카드뉴스 생성]을 누르면 미리보기가 나타납니다.<br><small>카드 이미지를 클릭하면 클립보드에 복사됩니다.</small></div>
       </div>
+      <div id="celebPicker" style="display:none; margin-top:12px; padding:12px; background:var(--panel2); border:1px solid var(--line); border-radius:10px;"></div>
       <div id="captionWrap" style="display:none;">
         <label style="margin-top:18px;">캡션 + 해시태그 <small style="color:var(--muted);">(직접 수정 가능)</small></label>
         <div class="caption-box" id="captionBox" contenteditable="true" style="cursor:text;"></div>
@@ -732,6 +737,19 @@ async function callClaude(prompt){
   return text;
 }
 
+/* ---------- 발굴 패널 접기/펼치기 (보조 기능) ---------- */
+function discoveryOpen(){ const el = document.getElementById("discoveryBody"); return el && el.style.display !== "none"; }
+function toggleDiscovery(){
+  const body = document.getElementById("discoveryBody");
+  const caret = document.getElementById("discoveryCaret");
+  if(!body) return;
+  const open = body.style.display === "none";
+  body.style.display = open ? "block" : "none";
+  if(caret) caret.textContent = open ? "▾" : "▸";
+  // 처음 펼칠 때 아직 발굴 결과가 없으면 그때 크롤링 (불필요한 자동 크롤 방지)
+  if(open && !(window._discovery && window._discovery.length)) crawlDaily(false);
+}
+
 /* ---------- 국가별 콘텐츠 탭 ---------- */
 /* 한 나라 = {타깃 언어 + 기본 니치 + 소스}를 한 번에 세팅. 나라별 워크플로우로 정리. */
 let currentCountry = "kr";
@@ -751,7 +769,8 @@ function selectCountry(c, skipCrawl){
   document.querySelectorAll("#langRow input").forEach(cb=>{
     const on = cb.value === cfg.lang; cb.checked = on; cb.parentElement.classList.toggle("on", on);
   });
-  if(!skipCrawl && typeof crawlDaily === "function") crawlDaily(true);  // 바뀐 소스로 새 소재 발굴
+  // 발굴 패널이 펼쳐져 있을 때만 바뀐 소스로 재크롤 (보조 기능이므로 접혀 있으면 크롤 안 함)
+  if(!skipCrawl && discoveryOpen() && typeof crawlDaily === "function") crawlDaily(true);
 }
 
 /* ---------- 콘텐츠 니치 토글 ---------- */
@@ -1044,6 +1063,7 @@ async function generate(){
   const btn = document.getElementById("genBtn");
   btn.disabled = true; setStatus("AI가 각색·번역 중... (10~30초)", "busy");
   state.cardPhotos = [];
+  const cpk = document.getElementById("celebPicker"); if(cpk){ cpk.style.display = "none"; cpk.innerHTML = ""; }
 
   const prompt = (fmt === "thumb")
     ? (niche === "medical" ? buildMedicalThumbPrompt(source, style, langs, handle)
@@ -1261,60 +1281,108 @@ function loadImageCors(url, cb, failCb){
   tryNext();
 }
 
-/* ---------- 위키미디어 커먼즈: 합법(CC/퍼블릭도메인) 연예인 사진 ---------- */
-async function fetchCommonsImage(name){
-  if(!name) return null;
-  const q = encodeURIComponent(name + " portrait");
+/* ---------- 위키미디어 커먼즈: 합법(CC/퍼블릭도메인) 연예인 사진 후보 목록 ---------- */
+async function fetchCommonsCandidates(name){
+  if(!name) return [];
+  const q = encodeURIComponent(name);
   const url = "https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=" + q +
-              "&gsrlimit=8&gsrnamespace=6&prop=imageinfo&iiprop=url%7Cextmetadata&format=json&origin=*";
+              "&gsrlimit=20&gsrnamespace=6&prop=imageinfo&iiprop=url%7Cextmetadata&format=json&origin=*";
   try{
     const res = await fetchWithTimeout(url, 12000);
-    if(!res.ok) return null;
+    if(!res.ok) return [];
     const j = await res.json();
     const pages = ((j.query || {}).pages) || {};
-    // 검색 순위(index) 순으로 정렬
     const list = Object.values(pages).sort((a,b)=>(a.index||99)-(b.index||99));
+    const out = [];
     for(const pg of list){
       const ii = (pg.imageinfo || [])[0]; if(!ii || !ii.url) continue;
       if(!/\.(jpe?g|png)$/i.test(ii.url)) continue;               // 사진 파일만 (svg/gif 제외)
       const em = ii.extmetadata || {};
       const lic = ((em.LicenseShortName || {}).value || "").trim();
-      // 저작권 있는(non-free) 이미지 제외 — CC 또는 퍼블릭 도메인만 합법 사용
-      if(!/cc|public domain|pd-|no restrictions/i.test(lic)) continue;
+      if(!/cc|public domain|pd-|no restrictions/i.test(lic)) continue;   // CC/PD만
       const artist = ((em.Artist || {}).value || "위키미디어 커먼즈")
         .replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 50);
-      return { url: ii.url, license: lic || "CC", credit: "사진: " + artist + " / " + (lic || "CC") + " (위키미디어 커먼즈)" };
+      const title = (pg.title || "").replace(/^File:/, "").replace(/\.[a-z]+$/i, "");
+      // 썸네일 (weserv로 가볍게)
+      const thumb = "https://images.weserv.nl/?w=200&h=250&fit=cover&url=" + encodeURIComponent(ii.url.replace(/^https?:\/\//, ""));
+      out.push({ url: ii.url, thumb, title, license: lic || "CC",
+                 credit: "사진: " + artist + " / " + (lic || "CC") + " (위키미디어 커먼즈)" });
+      if(out.length >= 8) break;
     }
-  }catch(e){ console.warn("커먼즈 검색 실패:", e.message); }
-  return null;
+    return out;
+  }catch(e){ console.warn("커먼즈 검색 실패:", e.message); return []; }
 }
-/* 생성된 연예인 미담에 합법 표지 사진을 자동 적용 + 캡션에 출처 표기 */
+
+/* 연예인 미담: 자동 적용하지 않고 '후보'를 보여주고 사용자가 직접 고르게 한다 (오적용 방지) */
 async function applyCelebCover(lang){
   const r = state.results[lang];
-  if(!r) return;
-  if(!r.person){
-    setStatus("생성 완료. 표지 인물이 특정되지 않아 이미지를 직접 업로드하세요.", "ok");
+  const box = document.getElementById("celebPicker");
+  if(!box) return;
+  if(!r || !r.person){
+    box.style.display = "block";
+    box.innerHTML = "<div class='hint'>표지 인물이 특정되지 않았습니다. <b>합법 이미지(기획사 보도자료 등)를 왼쪽 ‘표지 이미지’에서 직접 업로드</b>하세요.</div>";
+    setStatus("생성 완료. 표지 사진을 직접 골라주세요.", "ok");
     return;
   }
-  setStatus("합법 표지 사진 검색 중 (위키미디어 커먼즈): " + r.person + " ...", "busy");
-  const found = await fetchCommonsImage(r.person);
-  if(!found){
-    setStatus("커먼즈에서 '" + r.person + "' CC 사진을 못 찾았습니다 — 합법 이미지(기획사 보도자료 등)를 직접 업로드하세요.", "err");
-    return;
-  }
-  loadImageCors(found.url, img=>{
+  box.style.display = "block";
+  box.innerHTML = "<div class='hint'>‘" + escapeHtml(r.person) + "’ 합법(CC) 사진 검색 중...</div>";
+  const cands = await fetchCommonsCandidates(r.person);
+  renderCelebPicker(cands, r.person);
+  setStatus("생성 완료 — 아래에서 인물 사진을 직접 확인하고 골라주세요 (자동 적용 안 함).", "ok");
+}
+
+function renderCelebPicker(cands, person){
+  const box = document.getElementById("celebPicker");
+  if(!box) return;
+  box.style.display = "block";
+  box.innerHTML = "";
+  const head = document.createElement("div");
+  head.className = "hint";
+  head.style.marginBottom = "6px";
+  head.innerHTML = cands.length
+    ? "<b>표지 사진을 직접 선택하세요</b> — ‘" + escapeHtml(person) + "’ 위키미디어 커먼즈 합법(CC) 후보입니다. <u>인물이 맞는지 꼭 확인</u>하고 클릭하세요. 맞는 게 없으면 왼쪽 ‘표지 이미지’에서 직접 업로드하세요."
+    : "‘" + escapeHtml(person) + "’ 합법 사진을 못 찾았습니다. 왼쪽 ‘표지 이미지’에서 <b>합법 이미지를 직접 업로드</b>하세요 (기획사 보도자료 등).";
+  box.appendChild(head);
+  if(!cands.length) return;
+  const strip = document.createElement("div");
+  strip.style.cssText = "display:flex; gap:8px; overflow-x:auto; padding-bottom:4px;";
+  cands.forEach(c=>{
+    const cell = document.createElement("div");
+    cell.style.cssText = "flex:0 0 auto; width:110px; cursor:pointer; text-align:center;";
+    const im = document.createElement("img");
+    im.src = c.thumb; im.loading = "lazy";
+    im.style.cssText = "width:110px; height:140px; object-fit:cover; border-radius:8px; border:2px solid var(--line); background:#000;";
+    im.onmouseover = ()=>im.style.borderColor = "var(--accent)";
+    im.onmouseout = ()=>im.style.borderColor = "var(--line)";
+    const cap = document.createElement("div");
+    cap.className = "hint"; cap.style.cssText = "font-size:10px; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;";
+    cap.textContent = c.license;
+    cell.append(im, cap);
+    cell.onclick = ()=>selectCelebPhoto(c, cell);
+    strip.appendChild(cell);
+  });
+  box.appendChild(strip);
+}
+
+function selectCelebPhoto(c, cell){
+  setStatus("표지 사진 불러오는 중...", "busy");
+  loadImageCors(c.url, img=>{
     state.image = img;
-    // 모든 언어 결과 캡션에 사진 출처 1회 추가 (CC 저작자 표시 의무)
+    // 이전 출처표기 제거 후 새 출처로 갱신 (사진 바꿔도 중복/오표기 방지)
     Object.values(state.results).forEach(rr=>{
-      if(rr && !rr._credited){ rr.caption = (rr.caption || "").trim() + "\n\n" + found.credit; rr._credited = true; }
+      if(!rr) return;
+      rr.caption = (rr.caption || "").replace(/\n*사진: .*(위키미디어 커먼즈\)|보도자료)\s*$/,"").trimEnd();
+      rr.caption = (rr.caption || "").trimEnd() + "\n\n" + c.credit;
     });
     rerender();
     const cur = state.results[state.activeLang] || {};
     document.getElementById("captionBox").textContent = (cur.caption || "") + "\n\n" + (cur.hashtags || "");
-    setStatus("표지 사진 적용 완료 (" + found.license + "). 출처를 캡션에 자동 표기했습니다.", "ok");
-  }, ()=>{
-    setStatus("사진을 불러오지 못했습니다 — 합법 이미지를 직접 업로드하세요.", "err");
-  });
+    // 선택 표시
+    const strip = cell.parentElement;
+    [...strip.children].forEach(ch=>ch.querySelector("img").style.borderColor = "var(--line)");
+    cell.querySelector("img").style.borderColor = "var(--ok)";
+    setStatus("표지 사진 적용 완료 (" + c.license + "). 출처를 캡션에 표기했습니다.", "ok");
+  }, ()=>setStatus("사진을 불러오지 못했습니다 — 직접 업로드하세요.", "err"));
 }
 
 function pollinationsUrl(prompt, seed){
@@ -2696,30 +2764,17 @@ function renderDiscovery(items){
 }
 function escapeHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
-/* auto-crawl once per day on open */
-(function autoCrawl(){
+/* 초기화 — 발굴은 보조 기능이라 로드 시 자동 크롤하지 않음. 캐시가 있으면 준비만 해둠. */
+(function init(){
   renderSubSources();
   onFormatChange();
   renderAccounts();
-  selectCountry("kr", true);   // 기본: 한국 콘텐츠 탭 (소스/언어/니치 세팅, 크롤은 아래에서)
-  const last = localStorage.getItem("icf_lastCrawl");
-  const today = new Date().toDateString();
+  selectCountry("kr", true);   // 기본: 한국 콘텐츠 탭 (소스/언어/니치 세팅)
   const cached = localStorage.getItem("icf_lastResults");
-  if(last === today && cached){
-    try{
-      window._discovery = JSON.parse(cached);
-      rerenderDiscovery();
-      const shown = filterSeen(window._discovery).length;
-      // 안 본 소재가 얼마 안 남았으면 자동으로 새로 크롤링
-      if(shown < 8){ setTimeout(()=>crawlDaily(false), 500); }
-      else{ setCrawlStatus("캐시 " + shown + "건 표시. [새 소재 크롤링]으로 갱신.", "ok"); }
-      return;
-    }catch(e){}
-  }
-  setTimeout(()=>crawlDaily(false), 800);
+  if(cached){ try{ window._discovery = JSON.parse(cached); rerenderDiscovery(); }catch(e){} }
 })();
 </script>
 </body>
 </html>
-<!-- v3.15 — 국가별 콘텐츠 탭(한/일/미) + 발굴 제목 한국어 의역 + 현지화 강화 -->
+<!-- v3.16 — 연예인 사진 자동적용 폐지(직접 선택 픽커) + URL입력 메인/발굴 보조 -->
 
