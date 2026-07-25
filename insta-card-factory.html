@@ -227,6 +227,7 @@
         <option value="general" selected>일반 바이럴 (충격·신기·미스터리 등)</option>
         <option value="medical">의학·건강 충격 실화 (medical_newsroom 스타일)</option>
         <option value="mindset">마인드셋·자기계발 (인스타 게시물 보너스 최적화)</option>
+        <option value="celeb">연예인 미담·성공스토리 (한국 계정 · 합법 이미지)</option>
       </select>
       <div class="hint" id="nicheHint">캡션 구조: 훅 → 구체적 실화 사례 → 의학 배경 설명 → 전문가 권고 → 권위 출처 인용(예: The Sun, ○○학회) → 팔로우 CTA. 니치 선택 시 발굴 소스도 의학 전용으로 전환됩니다.</div>
 
@@ -739,6 +740,20 @@ function onNicheChange(){
     if(styleEl) styleEl.value = "책 문장·통찰을 개인 에세이처럼 따뜻하게. 저장하고 싶은 문장 하나는 꼭 담기.";
     if(fmtEl && fmtEl.value !== "cards"){ fmtEl.value = "cards"; onFormatChange(); }
     if(hintEl) hintEl.textContent = "캡션 구조: 인용/통찰 → 개인 에세이 톤 해설 → 긍정 확언으로 마무리. 카드뉴스(캐러셀)는 옆으로 넘겨야 해서 체류 시간이 길어 '인스타 게시물 보너스' 조건에 유리합니다 — 자동으로 카드뉴스 포맷으로 전환됩니다.";
+  }else if(niche === "celeb"){
+    // 연예인 미담 니치: 한국 계정 전용 — 선행·성공만, 합법 이미지(위키미디어 커먼즈) 자동 연동.
+    document.querySelectorAll('#subRow input').forEach(cb=>{
+      const on = FEEDS[cb.value] && FEEDS[cb.value].cat === "celeb";
+      cb.checked = on; cb.parentElement.classList.toggle("on", on);
+    });
+    updateSrcCount();
+    // 연예인 미담은 한국 계정 전용 → 한국어만
+    document.querySelectorAll('#langRow input').forEach(cb=>{
+      const on = cb.value === "ko"; cb.checked = on; cb.parentElement.classList.toggle("on", on);
+    });
+    if(styleEl) styleEl.value = "연예인의 선행·기부·성공·감동만. 루머·사생활·논란·연애는 절대 금지. 따뜻하고 진정성 있게.";
+    if(fmtEl && fmtEl.value !== "thumb"){ fmtEl.value = "thumb"; onFormatChange(); }
+    if(hintEl) hintEl.textContent = "선행·기부·성공·감동 실화만 다룹니다(비방·루머 원천 차단 → 명예훼손 위험 없음). 표지 사진은 위키미디어 커먼즈의 CC 라이선스 사진을 자동으로 찾아 넣고 출처를 캡션에 표기합니다 — 못 찾으면 합법 이미지를 직접 업로드하세요. 한국 계정 전용이라 한국어로만 생성됩니다.";
   }else{
     selectDefaultSources();
     if(styleEl) styleEl.value = "스크롤을 멈추게 하는 충격·반전 후킹. 궁금해서 캡션을 안 볼 수 없게. 자극적이되 사실 기반.";
@@ -850,6 +865,45 @@ Exact shape:
 {"results":[{"lang":"ko","hooks":[{"line1":"...","line2":"...","line3":"..."},{"line1":"...","line2":"...","line3":"..."},{"line1":"...","line2":"...","line3":"..."},{"line1":"...","line2":"...","line3":"..."}],"line1":"...","line2":"...","line3":"...","badge":"...","caption":"...","hashtags":"...","image_queries":["..."]}]}`;
 }
 
+/* ---------- 프롬프트: 연예인 미담·성공스토리 (한국 계정, 긍정 프레이밍만) ---------- */
+function buildCelebThumbPrompt(source, style, langs, handle){
+  const brand = handle ? ("The account handle is \"" + handle + "\" — use it in the follow-CTA line.") : "Use a generic 'follow us' style follow-CTA line.";
+  return `You write HEARTWARMING Korean celebrity feel-good content (미담) — good deeds, quiet charity, comeback/success stories, touching moments. Based ONLY on facts in the source. This is a POSITIVE, wholesome account: it celebrates people, never criticizes.
+
+HARD SAFETY RULES (a lawsuit/defamation firewall — follow strictly):
+- Cover ONLY genuinely positive, flattering facts grounded in the source: donations, volunteering, kindness, awards, records, overcoming hardship, inspiring career milestones.
+- NEVER include or imply anything negative, private, or unverified: no dating/breakup/marriage rumors, no scandals, no controversies, no health/mental-health speculation, no legal issues, no gossip. If the source is mainly negative, DO NOT write about it — respond with an empty results array.
+- Do not fabricate any fact, quote, or number. If unsure, leave it out.
+
+SOURCE:
+"""${source}"""
+
+EXTRA STYLE GUIDE: ${style || "warm, sincere, moving — like sharing good news about someone you admire"}
+
+For EACH of these languages: ${langs.join(", ")} produce a JSON object with:
+- "person": the celebrity's name for a photo lookup — give the INTERNATIONALLY-KNOWN English/romanized name (e.g. "IU", "Son Heung-min", "BTS Jin"). If the story isn't about one identifiable person, use "".
+- "hooks": array of EXACTLY 4 DISTINCT warm headline options {"line1","line2","line3"} (line3 "" if 2 lines suffice), each emphasizing a different heartwarming angle (the scale of the good deed, the quiet/humble way it was done, the backstory, the impact). Order STRONGEST FIRST. Each line ~8-16 chars Korean, no ** markup. Hooks should feel touching/impressive, not clickbait-negative.
+- "line1","line2","line3": copy hooks[0] here.
+- "badge": short warm word (2-4 chars) in that language (미담/감동/선행/훈훈).
+- "caption": the COMPLETE Instagram caption, real line breaks (\\n):
+  (1) HOOK line stating the heartwarming fact.
+  (2) blank line, then 2-3 short paragraphs telling the story concretely (who, what they did, the specific number/scale, the backstory) — all POSITIVE and grounded in the source.
+  (3) blank line, then a warm closing line (the impact, or what it says about them).
+  (4) blank line, then a FOLLOW-CTA inviting readers to follow for more good news. ${brand}
+  (5) blank line, then a source line starting with "출처:" citing the actual outlet from the source.
+  Do NOT use any emoji anywhere in the caption. (A photo-credit line will be appended automatically — do not add one yourself.)
+- "hashtags": one line of 6-10 warm/celebrity hashtags for the Korean market.
+- "image_queries": array with EXACTLY ONE short English stock-photo query (2-4 concrete words) as a FALLBACK only (used if no licensed portrait is found) — a warm generic scene (e.g. "charity donation box", "stage spotlight award", "helping hands community"). Never describe a specific real person.
+
+STRICT JSON RULES:
+- Respond with ONLY valid JSON. No markdown fences, no commentary.
+- All strings on a single line — escape line breaks as \\n. No unescaped double quotes inside strings (use '). No trailing commas.
+- Do NOT use any emoji anywhere. Plain text only.
+
+Exact shape:
+{"results":[{"lang":"ko","person":"...","hooks":[{"line1":"...","line2":"...","line3":"..."},{"line1":"...","line2":"...","line3":"..."},{"line1":"...","line2":"...","line3":"..."},{"line1":"...","line2":"...","line3":"..."}],"line1":"...","line2":"...","line3":"...","badge":"...","caption":"...","hashtags":"...","image_queries":["..."]}]}`;
+}
+
 /* ---------- 프롬프트: 멀티 카드뉴스 (기존 포맷) ---------- */
 function buildCardsPrompt(source, style, langs, n){
   return `You are a viral social media card-news writer. Based ONLY on the facts in the source below, write ORIGINAL card-news content (do not copy source sentences verbatim — rewrite in your own words).
@@ -948,7 +1002,9 @@ async function generate(){
   state.cardPhotos = [];
 
   const prompt = (fmt === "thumb")
-    ? (niche === "medical" ? buildMedicalThumbPrompt(source, style, langs, handle) : buildThumbPrompt(source, style, langs, handle))
+    ? (niche === "medical" ? buildMedicalThumbPrompt(source, style, langs, handle)
+       : niche === "celeb" ? buildCelebThumbPrompt(source, style, langs, handle)
+       : buildThumbPrompt(source, style, langs, handle))
     : (niche === "mindset" ? buildMindsetCardsPrompt(source, style, langs, n, handle) : buildCardsPrompt(source, style, langs, n));
 
   try{
@@ -960,6 +1016,10 @@ async function generate(){
       parsed = tryParseJson(text);
     }
     if(!parsed) throw new Error("AI가 유효한 JSON을 반환하지 않았습니다. 다시 시도해주세요.");
+    if(niche === "celeb" && (!parsed.results || !parsed.results.length)){
+      setStatus("이 소재는 미담·선행 내용이 아니어서 생성하지 않았습니다 (안전장치). 다른 소재를 골라주세요.", "err");
+      return;
+    }
     state.results = {};
     parsed.results.forEach(r=>{
       if(fmt === "thumb"){ r.cards = []; r.cta = ""; }   // 썸네일 1장 포맷: 본문/CTA 카드 없음
@@ -968,7 +1028,8 @@ async function generate(){
     buildTabs(langs);
     setActiveLang(langs[0]);
     setStatus("생성 완료. 카드 클릭 = 복사, 다운로드 버튼 = 저장.", "ok");
-    prepareCardImages();
+    if(niche === "celeb"){ applyCelebCover(langs[0]); }   // 합법 이미지(위키미디어 커먼즈) 자동 적용
+    else { prepareCardImages(); }
   }catch(e){
     setStatus("실패: " + e.message, "err");
   }finally{
@@ -1154,6 +1215,62 @@ function loadImageCors(url, cb, failCb){
     img.src = candidates[i];
   };
   tryNext();
+}
+
+/* ---------- 위키미디어 커먼즈: 합법(CC/퍼블릭도메인) 연예인 사진 ---------- */
+async function fetchCommonsImage(name){
+  if(!name) return null;
+  const q = encodeURIComponent(name + " portrait");
+  const url = "https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=" + q +
+              "&gsrlimit=8&gsrnamespace=6&prop=imageinfo&iiprop=url%7Cextmetadata&format=json&origin=*";
+  try{
+    const res = await fetchWithTimeout(url, 12000);
+    if(!res.ok) return null;
+    const j = await res.json();
+    const pages = ((j.query || {}).pages) || {};
+    // 검색 순위(index) 순으로 정렬
+    const list = Object.values(pages).sort((a,b)=>(a.index||99)-(b.index||99));
+    for(const pg of list){
+      const ii = (pg.imageinfo || [])[0]; if(!ii || !ii.url) continue;
+      if(!/\.(jpe?g|png)$/i.test(ii.url)) continue;               // 사진 파일만 (svg/gif 제외)
+      const em = ii.extmetadata || {};
+      const lic = ((em.LicenseShortName || {}).value || "").trim();
+      // 저작권 있는(non-free) 이미지 제외 — CC 또는 퍼블릭 도메인만 합법 사용
+      if(!/cc|public domain|pd-|no restrictions/i.test(lic)) continue;
+      const artist = ((em.Artist || {}).value || "위키미디어 커먼즈")
+        .replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 50);
+      return { url: ii.url, license: lic || "CC", credit: "사진: " + artist + " / " + (lic || "CC") + " (위키미디어 커먼즈)" };
+    }
+  }catch(e){ console.warn("커먼즈 검색 실패:", e.message); }
+  return null;
+}
+/* 생성된 연예인 미담에 합법 표지 사진을 자동 적용 + 캡션에 출처 표기 */
+async function applyCelebCover(lang){
+  const r = state.results[lang];
+  if(!r) return;
+  if(!r.person){
+    setStatus("생성 완료. 표지 인물이 특정되지 않아 이미지를 직접 업로드하세요.", "ok");
+    return;
+  }
+  setStatus("합법 표지 사진 검색 중 (위키미디어 커먼즈): " + r.person + " ...", "busy");
+  const found = await fetchCommonsImage(r.person);
+  if(!found){
+    setStatus("커먼즈에서 '" + r.person + "' CC 사진을 못 찾았습니다 — 합법 이미지(기획사 보도자료 등)를 직접 업로드하세요.", "err");
+    return;
+  }
+  loadImageCors(found.url, img=>{
+    state.image = img;
+    // 모든 언어 결과 캡션에 사진 출처 1회 추가 (CC 저작자 표시 의무)
+    Object.values(state.results).forEach(rr=>{
+      if(rr && !rr._credited){ rr.caption = (rr.caption || "").trim() + "\n\n" + found.credit; rr._credited = true; }
+    });
+    rerender();
+    const cur = state.results[state.activeLang] || {};
+    document.getElementById("captionBox").textContent = (cur.caption || "") + "\n\n" + (cur.hashtags || "");
+    setStatus("표지 사진 적용 완료 (" + found.license + "). 출처를 캡션에 자동 표기했습니다.", "ok");
+  }, ()=>{
+    setStatus("사진을 불러오지 못했습니다 — 합법 이미지를 직접 업로드하세요.", "err");
+  });
 }
 
 function pollinationsUrl(prompt, seed){
@@ -2167,6 +2284,8 @@ async function publishReel(){
 
 /* ================= DAILY DISCOVERY (자동 소재 발굴) ================= */
 const BONUS = {
+  // 연예인 미담·선행·성공 신호 (한국어 제목 대응)
+  celeb:   {pts:22, words:["기부","선행","미담","훈훈","나눔","봉사","성금","기증","후원","전액","기부금","선한 영향력","깜짝","조용히","몰래","감동","응원","도움","화제","극복","희망","선물"]},
   // 마인드셋·자기계발 신호 (습관·성장·회복탄력성류)
   mindset: {pts:14, words:["habit","habits","mindset","self-improvement","discipline","purpose","resilience","gratitude","mindfulness","productivity","growth","motivation","confidence","boundaries","burnout","anxiety","overthinking","self-worth","stoic","stoicism","letting go","toxic","comfort zone","procrastination"]},
   // 의학·건강 충격 실화 신호 (진단·증상·경고류) — 최고 가중치
@@ -2177,13 +2296,22 @@ const BONUS = {
   science: {pts:12, words:["nasa","space","mars","moon","ocean","deep sea","deep-sea","scientist","discover","study","brain","quantum","fossil","dinosaur","asteroid","telescope","species","dna","galaxy"]},
   uplift:  {pts:10, words:["reunited","saved","surprise","record","first time","oldest","youngest","returns","donates","adopts","survives","guinness","lottery","found"]},
 };
-const BLACKLIST = ["trump","biden","harris","election","politic","congress","senate","parliament","war","gaza","israel","palestin","ukraine","russia","putin","missile","nuclear","shooting","shooter","gunman","murder","killed","stabbed","rape","assault","abuse","molest","suicide","overdose","terror","hostage","nazi","genocide","protest","riot","lawsuit","indict","court","tariff","layoff","recession","covid","pandemic","outbreak","crash","dead body","death toll","porn","onlyfans","gamble","casino","crypto scam"];
+const BLACKLIST = ["trump","biden","harris","election","politic","congress","senate","parliament","war","gaza","israel","palestin","ukraine","russia","putin","missile","nuclear","shooting","shooter","gunman","murder","killed","stabbed","rape","assault","abuse","molest","suicide","overdose","terror","hostage","nazi","genocide","protest","riot","lawsuit","indict","court","tariff","layoff","recession","covid","pandemic","outbreak","crash","dead body","death toll","porn","onlyfans","gamble","casino","crypto scam",
+  // 연예 스캔들·부정 소재 차단 (미담 니치 청정 유지)
+  "열애","결별","이혼","재혼","논란","루머","마약","음주운전","폭행","성추행","성폭행","성희롱","사망","별세","빈소","부고","고소","고발","학폭","도박","탈세","불륜","임신설","저격","해명","사과","징계","은퇴","군입대","열애설","결혼설","이혼설","갈등","비난","악플","우울증","공황"];
 
 /* 카테고리(cat)별로 정리된 광범위 소스 — 전부 실제 응답 검증 완료. def:true = 기본 선택
    tier: 1=세계적 메이저 매체(신문사·방송사·통신사·공식기관) 2=신뢰할 만한 전문 매체 3=콘텐츠 큐레이션·바이럴 블로그(신뢰도 낮음, 기본 해제) */
 const TIER_LABEL = {1:"메이저 매체", 2:"전문 매체", 3:"큐레이션(주의)"};
-const FEED_CATS = {mindset:"마인드셋·자기계발", medical:"의학·건강 충격 실화", shock:"충격·미스터리·반전", odd:"기상천외·화제", uplift:"감동·굿뉴스", animal:"동물", science:"과학", space:"우주", tech:"기술·미래", culture:"문화·호기심"};
+const FEED_CATS = {celeb:"연예인 미담 (한국)", mindset:"마인드셋·자기계발", medical:"의학·건강 충격 실화", shock:"충격·미스터리·반전", odd:"기상천외·화제", uplift:"감동·굿뉴스", animal:"동물", science:"과학", space:"우주", tech:"기술·미래", culture:"문화·호기심"};
 const FEEDS = {
+  // 연예인 미담 (한국 계정 전용 — 선행·성공·감동만, 명예훼손 위험 없는 긍정 소재)
+  yna_ent:      {cat:"celeb",   tier:1, label:"연합뉴스 연예",     url:"https://www.yna.co.kr/rss/entertainment.xml",                 base:16},
+  sbs_ent:      {cat:"celeb",   tier:1, label:"SBS 연예",          url:"https://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=07",   base:15},
+  donga_ent:    {cat:"celeb",   tier:1, label:"동아 문화·연예",    url:"https://rss.donga.com/culture.xml",                           base:14},
+  hankyung_ent: {cat:"celeb",   tier:1, label:"한경 연예",         url:"https://www.hankyung.com/feed/entertainment",                 base:13},
+  mk_star:      {cat:"celeb",   tier:2, label:"매경 스타투데이",   url:"https://www.mk.co.kr/rss/50700001/",                          base:13},
+  soompi:       {cat:"celeb",   tier:2, label:"Soompi (K-pop 영문)",url:"https://www.soompi.com/feed",                                base:11},
   // 마인드셋·자기계발 (인스타 게시물 보너스 대응 — 저장·공유 유도형 콘텐츠)
   jamesclear:   {cat:"mindset",  tier:1, label:"James Clear (아토믹 해빗)", url:"https://jamesclear.com/feed",              base:16, def:true},
   markmanson:   {cat:"mindset",  tier:1, label:"Mark Manson",              url:"https://markmanson.net/feed",              base:15, def:true},
@@ -2520,5 +2648,5 @@ function escapeHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").repl
 </script>
 </body>
 </html>
-<!-- v3.13 — 핵심 3개국(한국·일본·미국) 프리셋 기본화 -->
+<!-- v3.14 — 연예인 미담 니치(합법 CC 이미지 자동연동 · 명예훼손 안전장치) -->
 
