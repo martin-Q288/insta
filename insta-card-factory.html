@@ -85,6 +85,17 @@
   .toast{position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:var(--ok); color:#08130d;
     padding:10px 20px; border-radius:10px; font-size:14px; font-weight:700; z-index:99; opacity:0; transition:.25s; pointer-events:none;}
   .toast.show{opacity:1;}
+  /* 국가별 콘텐츠 탭 */
+  .country-tabs{display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap;}
+  .country-tabs .ctab{display:flex; flex-direction:column; align-items:flex-start; gap:2px;
+    flex:1; min-width:150px; padding:14px 18px; border-radius:14px; cursor:pointer;
+    background:var(--panel2); border:1px solid var(--line); color:var(--muted);
+    font-size:16px; font-weight:800; transition:.15s; text-align:left;}
+  .country-tabs .ctab small{font-size:11.5px; font-weight:500; color:var(--muted); text-transform:none;}
+  .country-tabs .ctab:hover{border-color:var(--accent);}
+  .country-tabs .ctab.on{background:linear-gradient(135deg,var(--accent),#9a7bff); color:#fff; border-color:var(--accent);
+    box-shadow:0 10px 26px -12px rgba(124,92,255,.8);}
+  .country-tabs .ctab.on small{color:rgba(255,255,255,.85);}
 
   /* ============ STUDIO UI (v3.1) ============ */
   html{scroll-behavior:smooth;}
@@ -163,6 +174,13 @@
     </div>
     <button class="btn-ghost btn-sm" onclick="document.getElementById('settings').classList.add('open')">API 설정</button>
   </header>
+
+  <!-- COUNTRY TABS (나라별 콘텐츠) -->
+  <div class="country-tabs" id="countryTabs">
+    <button class="ctab on" data-c="kr" onclick="selectCountry('kr')">한국 콘텐츠<small>연예인 미담 · 한국어</small></button>
+    <button class="ctab" data-c="jp" onclick="selectCountry('jp')">일본 콘텐츠<small>보편 소재 · 일본어</small></button>
+    <button class="ctab" data-c="us" onclick="selectCountry('us')">미국 콘텐츠<small>보편 소재 · 영어</small></button>
+  </div>
 
   <!-- DISCOVERY -->
   <div class="panel" id="sec-discovery" style="margin-bottom:20px;">
@@ -714,6 +732,28 @@ async function callClaude(prompt){
   return text;
 }
 
+/* ---------- 국가별 콘텐츠 탭 ---------- */
+/* 한 나라 = {타깃 언어 + 기본 니치 + 소스}를 한 번에 세팅. 나라별 워크플로우로 정리. */
+let currentCountry = "kr";
+const COUNTRY_CFG = {
+  kr: { lang:"ko", niche:"celeb"   },   // 한국: 연예인 미담, 한국어
+  jp: { lang:"ja", niche:"general" },   // 일본: 보편 소재, 일본어
+  us: { lang:"en", niche:"general" },   // 미국: 보편 소재, 영어
+};
+function selectCountry(c, skipCrawl){
+  const cfg = COUNTRY_CFG[c] || COUNTRY_CFG.kr;
+  currentCountry = c;
+  document.querySelectorAll("#countryTabs .ctab").forEach(b=>b.classList.toggle("on", b.dataset.c === c));
+  // 니치 세팅 → onNicheChange가 소스/포맷/각색지침(celeb면 언어까지) 처리
+  const nicheEl = document.getElementById("contentNiche");
+  if(nicheEl){ nicheEl.value = cfg.niche; onNicheChange(); }
+  // 이 나라의 타깃 언어 단일 선택으로 강제 (나라별 개별 운영)
+  document.querySelectorAll("#langRow input").forEach(cb=>{
+    const on = cb.value === cfg.lang; cb.checked = on; cb.parentElement.classList.toggle("on", on);
+  });
+  if(!skipCrawl && typeof crawlDaily === "function") crawlDaily(true);  // 바뀐 소스로 새 소재 발굴
+}
+
 /* ---------- 콘텐츠 니치 토글 ---------- */
 function onNicheChange(){
   const niche = (document.getElementById("contentNiche")||{}).value || "general";
@@ -799,6 +839,8 @@ RULES for headlines:
 - Provocative but TRUE — the caption must be able to deliver on the promise. No fake clickbait.
 - Use 이슈-계정 tone: 구어체, 자극적, 말줄임표(…)·따옴표('' "") 적극 활용. Numbers and superlatives hit hard — keep them.
 - Each line ~8-16 chars for Korean/Japanese, ~3-6 words for Latin. 2-3 BALANCED lines. No ** markup.
+
+LOCALIZE, DON'T TRANSLATE: write each language as a NATIVE of that market would — adapt idioms, humor, cultural references, honorifics/tone, units and currency to that country. It must read like it was originally written by a local, not translated from another language. A literal translation is a failure.
 
 For EACH of these languages: ${langs.join(", ")} produce a JSON object with:
 - "hooks": an array of EXACTLY 4 DISTINCT headline options, each {"line1","line2","line3"} (line3 "" if 2 lines suffice). Use 4 DIFFERENT hook patterns from the list. Order them STRONGEST FIRST (hooks[0] = the single most scroll-stopping one).
@@ -912,6 +954,8 @@ SOURCE:
 """${source}"""
 
 STYLE GUIDE: ${style || "curiosity-driven, easy to understand"}
+
+LOCALIZE, DON'T TRANSLATE: write each language as a NATIVE of that market would — adapt idioms, cultural references, tone, units and currency. It must read like it was originally written by a local, not translated. A literal translation is a failure.
 
 For EACH of these languages: ${langs.join(", ")} produce:
 - "line1": headline first line, max 20 chars, sets up the situation (plain context line)
@@ -2561,11 +2605,36 @@ async function crawlDaily(force){
     if(!scored.length && failed.length === subs.length)
       msg = "모든 소스 접근 실패. F12 → Console 탭에 원인이 기록되어 있습니다. 광고차단 확장(uBlock 등)이 프록시를 막는 경우도 있으니 잠시 꺼보세요.";
     setCrawlStatus(msg, scored.length ? "ok" : "err");
+    translateDiscoveryTitles();   // 제목을 한국어로 의역해서 다시 표시(백그라운드)
   }catch(e){
     setCrawlStatus("크롤링 실패: " + e.message, "err");
   }finally{
     btn.disabled = false;
   }
+}
+/* 발굴 제목을 한국어로 의역(직역 X)해서 표시 — 한 번의 AI 호출로 배치 처리 */
+async function translateDiscoveryTitles(){
+  const items = (window._discovery || []).filter(it => !it.titleKo && !/[가-힣]/.test(it.title));
+  if(!items.length) return;                      // 번역할 게 없음(이미 한국어이거나 번역됨)
+  if(!localStorage.getItem("icf_key")) return;   // API 키 없으면 원문 유지(조용히 패스)
+  const batch = items.slice(0, 30);
+  const list = batch.map((it,i)=> i + ". " + it.title.replace(/\s+/g," ").slice(0,160)).join("\n");
+  const prompt = `다음 해외 뉴스 헤드라인들을 한국어로 옮겨줘. 직역하지 말고, 문장·단어의 의미를 살려 한국 이슈 계정 톤으로 자연스럽게 '한국화'해줘 (과장·낚시는 금지, 사실은 유지).
+각 줄 앞의 번호를 그대로 유지하고, "번호. 한국어제목" 형식으로만 출력. 다른 말 없이.
+
+${list}`;
+  try{
+    const out = await callClaude(prompt);
+    out.split("\n").forEach(line=>{
+      const m = line.match(/^\s*(\d+)\.\s*(.+)$/);
+      if(!m) return;
+      const idx = parseInt(m[1], 10);
+      if(batch[idx] && m[2].trim()) batch[idx].titleKo = m[2].trim();
+    });
+    // 캐시에도 반영(재접속 시 재번역 방지)
+    try{ localStorage.setItem("icf_lastResults", JSON.stringify(window._discovery)); }catch(e){}
+    rerenderDiscovery();
+  }catch(e){ /* 실패 시 원문 유지 */ }
 }
 function setCrawlStatus(msg, cls){
   const el = document.getElementById("crawlStatus");
@@ -2593,9 +2662,12 @@ function renderDiscovery(items){
     row.style.cssText = "display:flex; gap:10px; align-items:center; padding:9px 6px; border-bottom:1px solid var(--line); font-size:13.5px;";
     const scoreColor = it.score>=60 ? "var(--ok)" : it.score>=40 ? "var(--accent2)" : "var(--muted)";
     const age = it.ageHours == null ? "" : it.ageHours < 24 ? " · " + Math.round(it.ageHours) + "시간 전" : " · " + Math.round(it.ageHours/24) + "일 전";
+    const mainTitle = it.titleKo || it.title;
+    const origLine = (it.titleKo && it.titleKo !== it.title) ? ("<div class='hint' style='opacity:.6;'>"+escapeHtml(it.title)+"</div>") : "";
     row.innerHTML =
       "<div style='min-width:44px; text-align:center; font-weight:800; color:"+scoreColor+";'>"+it.score+"</div>" +
-      "<div style='flex:1;'><a href='"+it.permalink+"' target='_blank' style='color:var(--text); text-decoration:none;'>"+escapeHtml(it.title)+"</a>" +
+      "<div style='flex:1;'><a href='"+it.permalink+"' target='_blank' style='color:var(--text); text-decoration:none;'>"+escapeHtml(mainTitle)+"</a>" +
+      origLine +
       "<div class='hint'>"+(it.tier===1?"[메이저] ":"")+it.sub+age+"</div></div>";
     const btn = document.createElement("button");
     btn.className = "btn-ghost btn-sm";
@@ -2629,6 +2701,7 @@ function escapeHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").repl
   renderSubSources();
   onFormatChange();
   renderAccounts();
+  selectCountry("kr", true);   // 기본: 한국 콘텐츠 탭 (소스/언어/니치 세팅, 크롤은 아래에서)
   const last = localStorage.getItem("icf_lastCrawl");
   const today = new Date().toDateString();
   const cached = localStorage.getItem("icf_lastResults");
@@ -2648,5 +2721,5 @@ function escapeHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").repl
 </script>
 </body>
 </html>
-<!-- v3.14 — 연예인 미담 니치(합법 CC 이미지 자동연동 · 명예훼손 안전장치) -->
+<!-- v3.15 — 국가별 콘텐츠 탭(한/일/미) + 발굴 제목 한국어 의역 + 현지화 강화 -->
 
