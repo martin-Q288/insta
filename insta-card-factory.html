@@ -249,7 +249,7 @@
         <option value="general" selected>일반 바이럴 (충격·신기·미스터리 등)</option>
         <option value="medical">의학·건강 충격 실화 (medical_newsroom 스타일)</option>
         <option value="mindset">마인드셋·자기계발 (인스타 게시물 보너스 최적화)</option>
-        <option value="celeb">연예인 미담·성공스토리 (한국 계정 · 합법 이미지)</option>
+        <option value="celeb">연예인 소식·미담 (한국 계정 · 합법 이미지)</option>
       </select>
       <div class="hint" id="nicheHint">캡션 구조: 훅 → 구체적 실화 사례 → 의학 배경 설명 → 전문가 권고 → 권위 출처 인용(예: The Sun, ○○학회) → 팔로우 CTA. 니치 선택 시 발굴 소스도 의학 전용으로 전환됩니다.</div>
 
@@ -810,9 +810,9 @@ function onNicheChange(){
     document.querySelectorAll('#langRow input').forEach(cb=>{
       const on = cb.value === "ko"; cb.checked = on; cb.parentElement.classList.toggle("on", on);
     });
-    if(styleEl) styleEl.value = "연예인의 선행·기부·성공·감동만. 루머·사생활·논란·연애는 절대 금지. 따뜻하고 진정성 있게.";
+    if(styleEl) styleEl.value = "연예인 소식을 따뜻하고 화제성 있게. 사실 기반(허위·과장 금지).";
     if(fmtEl && fmtEl.value !== "thumb"){ fmtEl.value = "thumb"; onFormatChange(); }
-    if(hintEl) hintEl.textContent = "선행·기부·성공·감동 실화만 다룹니다(비방·루머 원천 차단 → 명예훼손 위험 없음). 표지 사진은 위키미디어 커먼즈의 CC 라이선스 사진을 자동으로 찾아 넣고 출처를 캡션에 표기합니다 — 못 찾으면 합법 이미지를 직접 업로드하세요. 한국 계정 전용이라 한국어로만 생성됩니다.";
+    if(hintEl) hintEl.textContent = "연예인 소식 전반(미담·성공·컴백·활동·화제)을 다룹니다. 생성 후 아래에서 위키미디어 커먼즈의 CC 사진을 직접 골라 표지에 넣거나(자동 적용 안 함), 합법 이미지를 직접 업로드하세요. 한국 계정 전용이라 한국어로만 생성됩니다. ※ 허위·비방은 명예훼손 위험이 있으니 사실 기반으로 쓰세요.";
   }else{
     selectDefaultSources();
     if(styleEl) styleEl.value = "스크롤을 멈추게 하는 충격·반전 후킹. 궁금해서 캡션을 안 볼 수 없게. 자극적이되 사실 기반.";
@@ -929,12 +929,11 @@ Exact shape:
 /* ---------- 프롬프트: 연예인 미담·성공스토리 (한국 계정, 긍정 프레이밍만) ---------- */
 function buildCelebThumbPrompt(source, style, langs, handle){
   const brand = handle ? ("The account handle is \"" + handle + "\" — use it in the follow-CTA line.") : "Use a generic 'follow us' style follow-CTA line.";
-  return `You write HEARTWARMING Korean celebrity feel-good content (미담) — good deeds, quiet charity, comeback/success stories, touching moments. Based ONLY on facts in the source. This is a POSITIVE, wholesome account: it celebrates people, never criticizes.
+  return `You write engaging Korean celebrity news content — good deeds, charity, comeback/success stories, new projects, career milestones, activities, awards, touching moments. Based ONLY on facts in the source. Keep a warm, positive-leaning tone that celebrates the person.
 
-HARD SAFETY RULES (a lawsuit/defamation firewall — follow strictly):
-- Cover ONLY genuinely positive, flattering facts grounded in the source: donations, volunteering, kindness, awards, records, overcoming hardship, inspiring career milestones.
-- NEVER include or imply anything negative, private, or unverified: no dating/breakup/marriage rumors, no scandals, no controversies, no health/mental-health speculation, no legal issues, no gossip. If the source is mainly negative, DO NOT write about it — respond with an empty results array.
-- Do not fabricate any fact, quote, or number. If unsure, leave it out.
+RULES:
+- Do NOT fabricate any fact, quote, or number. Stay grounded in the source. (Accuracy — not censorship.)
+- Cover the actual story in the source, whatever it is. Lead with the most interesting angle.
 
 SOURCE:
 """${source}"""
@@ -943,14 +942,14 @@ EXTRA STYLE GUIDE: ${style || "warm, sincere, moving — like sharing good news 
 
 For EACH of these languages: ${langs.join(", ")} produce a JSON object with:
 - "person": the celebrity's name for a photo lookup — give the INTERNATIONALLY-KNOWN English/romanized name (e.g. "IU", "Son Heung-min", "BTS Jin"). If the story isn't about one identifiable person, use "".
-- "hooks": array of EXACTLY 4 DISTINCT warm headline options {"line1","line2","line3"} (line3 "" if 2 lines suffice), each emphasizing a different heartwarming angle (the scale of the good deed, the quiet/humble way it was done, the backstory, the impact). Order STRONGEST FIRST. Each line ~8-16 chars Korean, no ** markup. Hooks should feel touching/impressive, not clickbait-negative.
+- "hooks": array of EXACTLY 4 DISTINCT headline options {"line1","line2","line3"} (line3 "" if 2 lines suffice), each emphasizing a different angle (the scale/number, the backstory, the surprise, the impact). Order STRONGEST FIRST. Each line ~8-16 chars Korean, no ** markup. Make them scroll-stopping but true.
 - "line1","line2","line3": copy hooks[0] here.
-- "badge": short warm word (2-4 chars) in that language (미담/감동/선행/훈훈).
+- "badge": short word (2-4 chars) fitting the story's tone in that language (미담/감동/화제/컴백/데뷔).
 - "caption": the COMPLETE Instagram caption, real line breaks (\\n):
-  (1) HOOK line stating the heartwarming fact.
-  (2) blank line, then 2-3 short paragraphs telling the story concretely (who, what they did, the specific number/scale, the backstory) — all POSITIVE and grounded in the source.
-  (3) blank line, then a warm closing line (the impact, or what it says about them).
-  (4) blank line, then a FOLLOW-CTA inviting readers to follow for more good news. ${brand}
+  (1) HOOK line stating the core fact.
+  (2) blank line, then 2-3 short paragraphs telling the story concretely (who, what, the specific number/scale, the backstory) — grounded in the source.
+  (3) blank line, then a closing line (the impact, or what it means).
+  (4) blank line, then a FOLLOW-CTA inviting readers to follow for more. ${brand}
   (5) blank line, then a source line starting with "출처:" citing the actual outlet from the source.
   Do NOT use any emoji anywhere in the caption. (A photo-credit line will be appended automatically — do not add one yourself.)
 - "hashtags": one line of 6-10 warm/celebrity hashtags for the Korean market.
@@ -1080,8 +1079,8 @@ async function generate(){
       parsed = tryParseJson(text);
     }
     if(!parsed) throw new Error("AI가 유효한 JSON을 반환하지 않았습니다. 다시 시도해주세요.");
-    if(niche === "celeb" && (!parsed.results || !parsed.results.length)){
-      setStatus("이 소재는 미담·선행 내용이 아니어서 생성하지 않았습니다 (안전장치). 다른 소재를 골라주세요.", "err");
+    if(!parsed.results || !parsed.results.length){
+      setStatus("결과가 비어 있습니다. 소재를 조금 더 자세히 넣고 다시 시도해주세요.", "err");
       return;
     }
     state.results = {};
@@ -2776,5 +2775,5 @@ function escapeHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").repl
 </script>
 </body>
 </html>
-<!-- v3.16 — 연예인 사진 자동적용 폐지(직접 선택 픽커) + URL입력 메인/발굴 보조 -->
+<!-- v3.17 — 연예인 니치 하드 차단(안전장치) 제거, 소식 전반으로 범위 확대 -->
 
