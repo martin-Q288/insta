@@ -562,6 +562,42 @@
       </div>
     </div>
   </div>
+
+  <div class="panel" id="aiReelPanel" style="margin-top:20px;">
+    <h2>6. 기사 URL만으로 AI 영상 만들기 <small style="text-transform:none; color:var(--muted);">— 기사→장면별 <b style="color:var(--accent2)">AI 이미지</b> 슬라이드쇼 릴스(줌·전환·자막·제목)</small></h2>
+    <div class="notice" style="margin-top:0;">
+      기사 URL이나 본문만 넣으면 내용을 파악해 <b>장면별 AI 이미지</b>를 생성하고, 켄번즈 줌·전환·<b>자막</b>·<b>상단 제목</b>을 얹은 9:16 릴스를 자동으로 만듭니다.<br>
+      <b style="color:var(--accent2)">실존 인물 얼굴은 AI로 만들지 않고</b> 상징·장면 위주로 연출하며, 저작권 이미지는 사용하지 않습니다. 음원은 저장 후 인스타 앱에서 <b>인기 음원</b>을 얹으세요.
+    </div>
+    <label>기사 URL 또는 본문</label>
+    <textarea id="aiArticle" class="card-edit" style="width:100%;" rows="3" placeholder="기사 링크(https://...) 또는 기사 본문을 붙여넣으세요."></textarea>
+    <div class="style-row" style="margin-top:10px;">
+      <div>
+        <label>장면 수</label>
+        <select id="aiScenes"><option value="5">5장</option><option value="6" selected>6장</option><option value="7">7장</option><option value="8">8장</option></select>
+      </div>
+      <div>
+        <label>장면당 시간</label>
+        <select id="aiDur"><option value="2.4">2.4초 (빠름)</option><option value="2.8" selected>2.8초 (권장)</option><option value="3.2">3.2초 (여유)</option></select>
+      </div>
+    </div>
+    <button class="btn-primary" id="aiBtn" onclick="aiGenerateReel()">AI 영상 만들기</button>
+    <div class="status" id="aiStatus"></div>
+    <div id="aiOutWrap" style="display:none; margin-top:14px; padding-top:12px; border-top:1px dashed var(--line);">
+      <label>최종 확인 <small style="text-transform:none; color:var(--muted);">— 저장 전에 완성 영상을 재생해 확인하세요</small></label>
+      <div style="margin-top:8px; display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start;">
+        <video id="aiOut" controls playsinline style="width:270px; border-radius:12px; border:1px solid var(--line); background:#000;"></video>
+        <div style="flex-direction:column; gap:8px; min-width:230px; display:flex;">
+          <button class="btn-primary" style="margin-top:0;" onclick="aiPlayOutput()">▶ 재생하여 확인</button>
+          <button class="btn-primary" style="border-color:var(--ok); background:var(--ok);" onclick="vrSave()">확인 완료 · 저장 (앨범)</button>
+          <div class="hint" style="margin-top:-2px;">저장 후 인스타 앱에서 릴스로 올리며 <b>인기 음원</b> 선택 = 도달 최대화</div>
+        </div>
+      </div>
+      <label style="margin-top:12px;">게시물 본문 (캡션)</label>
+      <textarea id="aiCaption" class="card-edit" style="width:100%;" rows="6"></textarea>
+      <button class="btn-ghost btn-sm" style="margin-top:6px;" onclick="aiCopyCaption()">본문 복사</button>
+    </div>
+  </div>
 </div>
 
 <!-- SETTINGS MODAL -->
@@ -2988,6 +3024,170 @@ function vrApplyIdea(i){
   vrPreview();
   vrSetStatus((i+1) + "번 안을 적용했습니다. 미리보기를 확인하고 [영상 릴스 만들기]를 누르세요.", "ok");
   const el = document.getElementById("vrHook"); if(el) el.scrollIntoView({ behavior:"smooth", block:"center" });
+}
+
+/* ===== 기사 URL만으로 AI 이미지 슬라이드쇼 릴스 자동 제작 ===== */
+function aiSetStatus(msg, cls){ const el = document.getElementById("aiStatus"); if(el){ el.textContent = msg; el.className = "status" + (cls ? (" " + cls) : ""); } }
+function aiPlayOutput(){ const o = document.getElementById("aiOut"); if(o && o.src){ o.muted = false; try{ o.currentTime = 0; }catch(e){} const pr=o.play(); if(pr&&pr.catch) pr.catch(()=>{}); } }
+function aiCopyCaption(){
+  const el = document.getElementById("aiCaption"); const txt = (el.value||"").trim();
+  if(!txt){ aiSetStatus("본문이 비어 있습니다.", "err"); return; }
+  const done = ()=> toast("본문(캡션)이 복사되었습니다");
+  if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(done).catch(()=>{ el.select(); document.execCommand("copy"); done(); }); }
+  else { el.select(); document.execCommand("copy"); done(); }
+}
+
+function aiImageUrl(prompt, seed){
+  const p = "cinematic photograph, " + (prompt||"atmospheric scene") + ", dramatic lighting, realistic, highly detailed, moody, no text, no watermark, no caption";
+  return "https://image.pollinations.ai/prompt/" + encodeURIComponent(p) + "?width=1080&height=1920&nologo=true&model=flux&enhance=true&seed=" + seed;
+}
+function aiLoadImg(url){ return new Promise(res=>{ loadImageCors(url, img=>res(img), ()=>res(null)); }); }
+
+function aiParseTitle(label, titleText, mctx, W){
+  const rawLines = (titleText||"").split("\n").map(s=>s.trim()).filter(Boolean);
+  const anyHl = rawLines.some(l=>/\*\*/.test(l));
+  const size = Math.round(W*0.066); mctx.font = "900 " + size + "px " + TITLE_FONT; const maxW = W - 90;
+  const lines = [];
+  rawLines.forEach((l, idx)=>{ const hl = /\*\*/.test(l) || (!anyHl && idx===0); wrapText(mctx, l.replace(/\*\*/g,"").trim(), maxW).forEach(t=> lines.push({ text:t, hl })); });
+  return { label:(label||"").trim(), lines };
+}
+function aiWrapSub(mctx, text, W){
+  const size = Math.round(W*0.052); mctx.font = "700 " + size + "px " + TITLE_FONT; const maxW = W - 150; const out = [];
+  String(text||"").replace(/\\n/g,"\n").split("\n").forEach(part=> wrapText(mctx, part, maxW).forEach(l=> out.push(l)));
+  return out;
+}
+function aiDrawTitle(ctx, W, title){
+  if(!title || (!title.label && !title.lines.length)) return;
+  ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  const marginTop = Math.round(W*0.05), labelSize = Math.round(W*0.039), titleSize = Math.round(W*0.066), titleLH = Math.round(titleSize*1.2), gap = Math.round(W*0.02);
+  let y = marginTop;
+  if(title.label){
+    ctx.font = "800 " + labelSize + "px " + TITLE_FONT;
+    const lw = ctx.measureText(title.label).width, pw = Math.min(W-40, lw+48), ph = labelSize+26, px = (W-pw)/2;
+    ctx.fillStyle = "#fff"; roundRect(ctx, px, y, pw, ph, 10); ctx.fill();
+    ctx.fillStyle = "#111"; ctx.fillText(title.label, W/2, y + ph - Math.round(labelSize*0.42));
+    y += ph + gap;
+  }
+  ctx.font = "900 " + titleSize + "px " + TITLE_FONT; y += titleSize;
+  title.lines.forEach(ln=>{
+    ctx.shadowColor = "rgba(0,0,0,.85)"; ctx.shadowBlur = 12; ctx.shadowOffsetY = 2;
+    ctx.fillStyle = ln.hl ? VR_YELLOW : "#fff"; ctx.fillText(ln.text, W/2, y);
+    ctx.shadowBlur = 0; ctx.shadowOffsetY = 0; y += titleLH;
+  });
+  ctx.textAlign = "left";
+}
+function aiDrawSub(ctx, W, H, lines){
+  if(!lines || !lines.length) return;
+  const size = Math.round(W*0.052); ctx.font = "700 " + size + "px " + TITLE_FONT;
+  ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  const lh = size*1.28, blockH = lines.length*lh, centerY = H*0.8; let y = centerY - blockH/2 + size;
+  const padX = 26, padY = 12;
+  lines.forEach(ln=>{ const tw = ctx.measureText(ln).width; ctx.fillStyle = "rgba(0,0,0,.62)"; roundRect(ctx, W/2-tw/2-padX, y-size-padY+6, tw+padX*2, size+padY*2, 12); ctx.fill(); y += lh; });
+  y = centerY - blockH/2 + size;
+  lines.forEach(ln=>{ ctx.fillStyle = "#fff"; ctx.fillText(ln, W/2, y); y += lh; });
+  ctx.textAlign = "left";
+}
+function drawAiFrame(ctx, scenes, imgs, t, o){
+  const { N, D, T, step, W, H, title } = o;
+  ctx.clearRect(0,0,W,H); ctx.fillStyle = "#000"; ctx.fillRect(0,0,W,H);
+  let i = Math.floor(t/step); if(i>N-1) i=N-1; if(i<0) i=0;
+  const drawScene = (idx, alpha)=>{
+    if(idx<0 || idx>=N || alpha<=0 || !imgs[idx]) return;
+    const tau = Math.max(0, Math.min(D, t - idx*step)); const scale = 1 + 0.08*(tau/D);
+    const im = imgs[idx]; const s = Math.max(W/im.width, H/im.height)*scale; const dw = im.width*s, dh = im.height*s;
+    ctx.globalAlpha = Math.max(0, Math.min(1, alpha)); ctx.drawImage(im, (W-dw)/2, (H-dh)/2, dw, dh); ctx.globalAlpha = 1;
+  };
+  const overlapStart = i*step + step; let curSub = i;
+  if(T>0 && i<N-1 && t>=overlapStart){ const f = (t-overlapStart)/T; drawScene(i, 1-f); drawScene(i+1, f); if(f>0.5) curSub = i+1; }
+  else drawScene(i, 1);
+  const g = ctx.createLinearGradient(0, H*0.58, 0, H); g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(0,0,0,.65)");
+  ctx.fillStyle = g; ctx.fillRect(0, H*0.58, W, H*0.42);
+  aiDrawSub(ctx, W, H, scenes[curSub] && scenes[curSub]._lines);
+  aiDrawTitle(ctx, W, title);
+}
+
+function buildAiReelPrompt(source, n){
+  return `You create an AI-image SLIDESHOW reel (9:16) for the Korean "nowaythis" account from an article. Output a top title + exactly ${n} scene beats, each with an English image prompt and a Korean subtitle.
+${NOWAYTHIS_VOICE}
+SOURCE:
+"""${source}"""
+
+규칙:
+- "label": 상단 흰 박스 설정 문구(짧게). "title": 큰 제목 2~3줄(줄바꿈 \\n), 핵심 한 줄만 **별표**로 감싸 강조.
+- "scenes": 정확히 ${n}개. 스토리 몰입 곡선 순서(도입 훅 → 전개 → 반전/절정 → 마무리). 각 scene:
+    "img": ONE short ENGLISH image-generation prompt (5~10 words) — cinematic, photographic, atmospheric scene that visually represents this beat.
+      ※ 실존 인물의 얼굴/식별 가능한 특정 인물 금지. 상징·환경·사물·실루엣·뒷모습·와이드샷·손 등으로 표현. no text, no watermark.
+    "sub": 그 장면 자막 한 줄(한국어 '합니다체', 8~18자, 의미 단위, 사실 정확).
+- "caption": 게시물 본문(합니다체): 후킹 → 설명 → 여운 통찰 → 팔로우/공유 CTA(@no.way.this) → '출처:' 한 줄 → 해시태그 8~12개. 이모지 절제.
+- 사실 정확(숫자·이름 원문 기반, 외화는 원화 병기), 원문 문장 복사 금지. label·title·sub에는 이모지 금지.
+
+Return ONLY valid JSON (no fences): {"label":"...","title":"...","caption":"...","scenes":[{"img":"...","sub":"..."}, ...정확히 ${n}개]}`;
+}
+
+async function aiGenerateReel(){
+  let src = (document.getElementById("aiArticle").value || "").trim();
+  if(!src){ aiSetStatus("기사 URL 또는 본문을 입력하세요.", "err"); return; }
+  if(typeof MediaRecorder === "undefined"){ aiSetStatus("이 브라우저는 영상 녹화를 지원하지 않습니다.", "err"); return; }
+  const n = parseInt((document.getElementById("aiScenes")||{}).value) || 6;
+  const D = parseFloat((document.getElementById("aiDur")||{}).value) || 2.8;
+  const btn = document.getElementById("aiBtn"); btn.disabled = true;
+  try{
+    if(/^https?:\/\//.test(src)){
+      aiSetStatus("기사 본문 추출 중...", "busy");
+      let found = null; try{ found = await raceExtract(src); }catch(e){}
+      if(found && found.text){ src = found.text.replace(/\n{3,}/g, "\n\n").trim().slice(0, 6000); }
+      else { aiSetStatus("본문 추출이 어려워 입력한 텍스트로 진행합니다.", "busy"); }
+    }
+    aiSetStatus("AI가 기사를 분석해 장면을 구성하는 중...", "busy");
+    const raw = await callClaude(buildAiReelPrompt(src, n));
+    const j = tryParseJson(raw);
+    if(!j || !Array.isArray(j.scenes) || !j.scenes.length) throw new Error("장면 구성 응답을 해석하지 못했습니다. 다시 시도하세요.");
+    const scenes = j.scenes.slice(0, n);
+    if(j.caption) document.getElementById("aiCaption").value = String(j.caption).replace(/\\n/g,"\n").trim();
+
+    aiSetStatus("장면 이미지 생성 중... (0/" + scenes.length + ")  ※ 20~60초 걸릴 수 있어요", "busy");
+    const imgs = new Array(scenes.length).fill(null); let done = 0;
+    await Promise.all(scenes.map((sc, i)=> aiLoadImg(aiImageUrl(sc.img || "", 100 + i*97)).then(im=>{
+      imgs[i] = im; done++; aiSetStatus("장면 이미지 생성 중... (" + done + "/" + scenes.length + ")", "busy");
+    })));
+    if(!imgs.some(Boolean)) throw new Error("이미지 생성에 실패했습니다. 잠시 후 다시 시도하세요.");
+
+    const W = 1080, H = 1920;
+    const mctx = makeCanvas(W, 140).getContext("2d");
+    const title = aiParseTitle(j.label || "", String(j.title||"").replace(/\\n/g,"\n"), mctx, W);
+    scenes.forEach(sc=> sc._lines = aiWrapSub(mctx, sc.sub || "", W));
+
+    const T = 0.6, step = D - T, total = +(scenes.length*D - (scenes.length-1)*T).toFixed(3);
+    const rec = makeCanvas(W, H), rctx = rec.getContext("2d");
+    drawAiFrame(rctx, scenes, imgs, 0, { N:scenes.length, D, T, step, W, H, title });
+    const stream = rec.captureStream(30);
+    const { mime, ext } = pickReelMime();
+    const recOpts = { videoBitsPerSecond: 12e6 }; if(mime) recOpts.mimeType = mime;
+    const recorder = new MediaRecorder(stream, recOpts); const chunks = [];
+    recorder.ondataavailable = e=>{ if(e.data && e.data.size) chunks.push(e.data); };
+    const stopped = new Promise(res=>{ recorder.onstop = res; });
+    recorder.start();
+    const startT = performance.now();
+    await new Promise(resolve=>{
+      (function frame(){
+        const t = (performance.now() - startT)/1000;
+        drawAiFrame(rctx, scenes, imgs, Math.min(t, total), { N:scenes.length, D, T, step, W, H, title });
+        if(t < total){ aiSetStatus("영상 녹화 중... " + Math.min(100, Math.round(t/total*100)) + "%", "busy"); requestAnimationFrame(frame); }
+        else resolve();
+      })();
+    });
+    recorder.stop(); await stopped;
+
+    const blob = new Blob(chunks, { type: mime || "video/webm" });
+    if(window._reelUrl) URL.revokeObjectURL(window._reelUrl);
+    window._reelBlob = blob; window._reelExt = ext; window._reelUrl = URL.createObjectURL(blob);
+    const out = document.getElementById("aiOut"); out.src = window._reelUrl; out.load();
+    document.getElementById("aiOutWrap").style.display = "block";
+    document.getElementById("aiOutWrap").scrollIntoView({ behavior:"smooth", block:"nearest" });
+    aiSetStatus("완성! " + total.toFixed(1) + "초 · " + (blob.size/1e6).toFixed(1) + "MB. 재생해 확인 후 저장하세요.", "ok");
+    toast("AI 영상이 생성되었습니다");
+  }catch(e){ console.error(e); aiSetStatus("생성 실패: " + e.message, "err"); }
+  finally{ btn.disabled = false; }
 }
 
 /* 원본 영상 오디오를 녹화 스트림에 연결.
