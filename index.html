@@ -511,11 +511,18 @@
     </div>
     <button class="btn-primary" id="vrBtn" onclick="vrGenerate()">영상 릴스 만들기</button>
     <div class="status" id="vrStatus"></div>
-    <div style="margin-top:14px; display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start;">
-      <video id="vrOut" controls playsinline style="display:none; width:250px; border-radius:12px; border:1px solid var(--line); background:#000;"></video>
-      <div id="vrActions" style="display:none; flex-direction:column; gap:8px; min-width:230px;">
-        <button class="btn-primary" style="margin-top:0;" onclick="vrSave()">저장 (앨범)</button>
-        <div class="hint" style="margin-top:-2px;">저장 후 인스타 앱에서 릴스로 올리며 <b>인기 음원</b> 선택 = 도달 최대화</div>
+    <div id="vrOutWrap" style="display:none; margin-top:14px; padding-top:12px; border-top:1px dashed var(--line);">
+      <label>최종 확인 <small style="text-transform:none; color:var(--muted);">— 저장 전에 완성 영상을 재생해 소리·제목을 확인하세요</small></label>
+      <div style="margin-top:8px; display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start;">
+        <video id="vrOut" controls playsinline style="width:270px; border-radius:12px; border:1px solid var(--line); background:#000;"></video>
+        <div id="vrActions" style="flex-direction:column; gap:8px; min-width:230px; display:flex;">
+          <button class="btn-primary" style="margin-top:0;" onclick="vrPlayOutput()">▶ 재생하여 확인 (소리 포함)</button>
+          <div class="hint" style="margin-top:-2px;">완성 영상을 처음부터 재생합니다. 위 영상에서 직접 정지·탐색도 됩니다.</div>
+          <button class="btn-ghost btn-sm" onclick="vrEditAgain()">✎ 편집 계속하기 (제목·자르기·영상 위치)</button>
+          <div class="hint" style="margin-top:-2px;">수정 후 <b>[영상 릴스 만들기]</b>를 다시 누르면 새로 만들어집니다.</div>
+          <button class="btn-primary" style="margin-top:4px; border-color:var(--ok); background:var(--ok);" onclick="vrSave()">확인 완료 · 저장 (앨범)</button>
+          <div class="hint" style="margin-top:-2px;">저장 후 인스타 앱에서 릴스로 올리며 <b>인기 음원</b> 선택 = 도달 최대화</div>
+        </div>
       </div>
     </div>
   </div>
@@ -2915,14 +2922,31 @@ async function vrGenerate(){
     window._reelBlob = blob; window._reelExt = ext;
     window._reelUrl = URL.createObjectURL(blob);
     const out = document.getElementById("vrOut");
-    out.src = window._reelUrl; out.style.display = "block";
-    document.getElementById("vrActions").style.display = "flex";
-    const note = ext === "mp4" ? " [저장]으로 앨범에 담아 인스타 릴스로 올리세요." : " (WebM — 아이폰에서 열면 MP4로 저장됩니다.)";
+    out.src = window._reelUrl; out.muted = false; out.load();
+    document.getElementById("vrOutWrap").style.display = "block";
+    document.getElementById("vrOutWrap").scrollIntoView({ behavior:"smooth", block:"nearest" });
+    const note = ext === "mp4" ? " 아래에서 [재생하여 확인] 후 저장하세요." : " (WebM — 아이폰에서 열면 MP4로 저장됩니다.)";
     vrSetStatus("완성! " + (end - start).toFixed(1) + "초 · " + (blob.size/1e6).toFixed(1) + "MB." + note, "ok");
     toast("영상 릴스가 생성되었습니다");
   }catch(e){
     console.error(e); vrSetStatus("생성 실패: " + e.message, "err");
   }finally{ v.muted = true; btn.disabled = false; }
+}
+
+function vrPlayOutput(){
+  const out = document.getElementById("vrOut");
+  if(!out || !out.src){ vrSetStatus("먼저 영상 릴스를 만드세요.", "err"); return; }
+  out.muted = false;
+  try{ out.currentTime = 0; }catch(e){}
+  const pr = out.play();
+  if(pr && pr.catch) pr.catch(()=>{ /* 자동재생 차단 시 사용자가 영상의 재생 버튼을 누르면 됨 */ });
+}
+
+function vrEditAgain(){
+  const panel = document.getElementById("videoReelPanel");
+  if(panel) panel.scrollIntoView({ behavior:"smooth", block:"start" });
+  const el = document.getElementById("vrHook"); if(el) el.focus();
+  vrSetStatus("제목·라벨·자르기·영상 위치를 수정한 뒤 [영상 릴스 만들기]를 다시 누르면 새로 만들어집니다.", "busy");
 }
 
 async function vrSave(){
