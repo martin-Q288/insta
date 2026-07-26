@@ -896,7 +896,7 @@ RULES for headlines:
 LOCALIZE, DON'T TRANSLATE: write each language as a NATIVE of that market would — adapt idioms, humor, cultural references, honorifics/tone, units and currency to that country. It must read like it was originally written by a local, not translated from another language. A literal translation is a failure.
 
 For EACH of these languages: ${langs.join(", ")} produce a JSON object with:
-- "hooks": an array of EXACTLY 4 DISTINCT headline options, each {"line1","line2","line3"} (line3 "" if 2 lines suffice). Use 4 DIFFERENT hook patterns from the list. Order them STRONGEST FIRST (hooks[0] = the single most scroll-stopping one).
+- "hooks": an array of EXACTLY 10 DISTINCT headline options, each {"line1","line2","line3"} (line3 "" if 2 lines suffice). Draw on a VARIETY of the hook patterns from the list — you may revisit a pattern with a genuinely fresh angle to reach 10, but no two hooks may be near-duplicates. Order them STRONGEST FIRST (hooks[0] = the single most scroll-stopping one). The array MUST contain 10 items.
 - "line1","line2","line3": copy hooks[0] here (the strongest headline).
 - "badge": a short punchy tone word (2-4 chars) in that language (충격/경악/소름/반전/신기 · SHOCK/INSANE/WOW · 衝撃/驚愕).
 - "caption": the COMPLETE Instagram caption in that language, real line breaks (\\n):
@@ -937,7 +937,7 @@ B) "놀라운 장면/사실 공개" (striking fact/scene reveal): "[숫자/스�
 Pick whichever template fits the source better. The headline must name a concrete detail (age, duration, number, body part, condition) — never vague ("건강 이상" 금지, "전립선암 4기" 등 구체적으로).
 
 For EACH of these languages: ${langs.join(", ")} produce a JSON object with:
-- "hooks": array of EXACTLY 4 DISTINCT headline options {"line1","line2","line3"} (line3 "" if 2 lines suffice), each using template A or B with a different angle/detail emphasized. Order STRONGEST FIRST. Each line ~8-16 chars Korean/Japanese, ~3-6 words Latin. No ** markup.
+- "hooks": array of EXACTLY 10 DISTINCT headline options {"line1","line2","line3"} (line3 "" if 2 lines suffice), each using template A or B with a different angle/detail emphasized — no two may be near-duplicates. Order STRONGEST FIRST. Each line ~8-16 chars Korean/Japanese, ~3-6 words Latin. No ** markup. The array MUST contain 10 items.
 - "line1","line2","line3": copy hooks[0] here.
 - "badge": short tone word (2-4 chars) fitting a medical-shock tone in that language (충격/경고/주의 · WARNING/ALERT · 警告).
 - "caption": the COMPLETE Instagram caption, real line breaks (\\n), structured EXACTLY like this:
@@ -976,7 +976,7 @@ EXTRA STYLE GUIDE: ${style || "warm, sincere, moving — like sharing good news 
 ${NOWAYTHIS_VOICE}
 For EACH of these languages: ${langs.join(", ")} produce a JSON object with:
 - "person": the celebrity's name for a photo lookup — give the INTERNATIONALLY-KNOWN English/romanized name (e.g. "IU", "Son Heung-min", "BTS Jin"). If the story isn't about one identifiable person, use "".
-- "hooks": array of EXACTLY 4 DISTINCT headline options {"line1","line2","line3"} (line3 "" if 2 lines suffice), each emphasizing a different angle (the scale/number, the backstory, the surprise, the impact). Order STRONGEST FIRST. Each line ~8-16 chars Korean, no ** markup. Make them scroll-stopping but true.
+- "hooks": array of EXACTLY 10 DISTINCT headline options {"line1","line2","line3"} (line3 "" if 2 lines suffice), each emphasizing a different angle (the scale/number, the backstory, the surprise, the impact, the reaction, the before/after, etc.) — no two may be near-duplicates. Order STRONGEST FIRST. Each line ~8-16 chars Korean, no ** markup. Make them scroll-stopping but true. The array MUST contain 10 items.
 - "line1","line2","line3": copy hooks[0] here.
 - "badge": short word (2-4 chars) fitting the story's tone in that language (미담/감동/화제/컴백/데뷔).
 - "caption": the COMPLETE Instagram caption, real line breaks (\\n):
@@ -2065,16 +2065,33 @@ async function copyCanvas(cv){
     toast("복사가 지원되지 않아 파일로 저장했습니다");
   }
 }
-function downloadCanvas(cv, name){
+async function downloadCanvas(cv, name, allowShare){
   const fmt = document.getElementById("fileFormat").value;
-  const a = document.createElement("a");
-  a.download = name + "." + (fmt==="jpeg"?"jpg":"png");
-  a.href = fmt==="jpeg" ? cv.toDataURL("image/jpeg", 0.92) : cv.toDataURL("image/png");
-  a.click();
+  const mime = fmt==="jpeg" ? "image/jpeg" : "image/png";
+  const filename = name + "." + (fmt==="jpeg"?"jpg":"png");
+  const plainDownload = (blob)=>{
+    const url = blob ? URL.createObjectURL(blob)
+                     : (fmt==="jpeg" ? cv.toDataURL("image/jpeg", 0.92) : cv.toDataURL("image/png"));
+    const a = document.createElement("a"); a.download = filename; a.href = url; a.click();
+    if(blob) setTimeout(()=>URL.revokeObjectURL(url), 4000);
+  };
+  try{
+    const blob = await new Promise((res,rej)=>cv.toBlob(b=>b?res(b):rej(new Error("toBlob")), mime, 0.92));
+    // 모바일: 공유 시트로 '사진에 저장'을 눌러 바로 앨범에 저장 (파일 앱 경유 불필요)
+    if(allowShare !== false && navigator.canShare){
+      const file = new File([blob], filename, {type:mime});
+      if(navigator.canShare({files:[file]})){
+        try{ await navigator.share({files:[file]}); return; }
+        catch(err){ if(err && err.name === "AbortError") return; /* 취소 시 종료, 그 외엔 다운로드로 폴백 */ }
+      }
+    }
+    plainDownload(blob);
+  }catch(e){ plainDownload(null); }
 }
 function downloadAll(){
+  // 여러 장을 한꺼번에 저장할 땐 공유 시트가 여러 번 뜨지 않도록 파일 다운로드로 처리
   document.querySelectorAll("#previewArea canvas").forEach((cv,i)=>{
-    setTimeout(()=>downloadCanvas(cv, cv.id), i*250);
+    setTimeout(()=>downloadCanvas(cv, cv.id, false), i*250);
   });
 }
 function copyCaption(){
