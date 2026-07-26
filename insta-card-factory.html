@@ -74,6 +74,13 @@
   .img-edit-row input[type=range]{flex:1; accent-color:var(--accent2); margin:0;}
   .img-edit .btn-sm{margin-top:2px;}
   .img-edit-hint{font-size:11px; color:var(--muted); line-height:1.4;}
+  /* 사진 편집 중인 표지는 드래그가 쉽도록 크게 (4:5 비율 유지, 모바일 대응) */
+  .card-box.editing-cover canvas{width:min(460px,calc(100vw - 88px)); height:auto; aspect-ratio:4/5;}
+  .card-box.editing-cover .cover-edit,
+  .card-box.editing-cover .img-edit{width:min(460px,calc(100vw - 88px));}
+  .card-box.editing-cover .img-edit{padding:12px 14px; gap:9px;}
+  .card-box.editing-cover .img-edit-row input[type=range]{height:22px;}
+  .card-box.editing-cover .img-edit-lab{font-size:13px;}
   .caption-box{background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:12px;
     font-size:13px; white-space:pre-wrap; margin-top:14px; max-height:220px; overflow:auto; cursor:pointer;}
   .caption-box:hover{border-color:var(--accent);}
@@ -1895,6 +1902,7 @@ function coverFit(ctx, img, W, H, tf){
 /* 표지 사진 편집기 — 크기(확대/축소) + 좌우/상하 이동. 슬라이더 + 캔버스 드래그 + 휠 확대. */
 function attachCoverImageEditor(box, canvas, redraw){
   const t = state.imgTransform;
+  box.classList.add("editing-cover"); // 표지 미리보기를 크게 — 드래그 편집 편의
   const wrap = document.createElement("div");
   wrap.className = "img-edit";
   const clamp = (v,a,b)=>Math.max(a, Math.min(b, v));
