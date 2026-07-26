@@ -177,9 +177,9 @@
 
   <!-- COUNTRY TABS (나라별 콘텐츠) -->
   <div class="country-tabs" id="countryTabs">
-    <button class="ctab on" data-c="kr" onclick="selectCountry('kr')">한국 콘텐츠<small>연예인 미담 · 한국어</small></button>
-    <button class="ctab" data-c="jp" onclick="selectCountry('jp')">일본 콘텐츠<small>보편 소재 · 일본어</small></button>
-    <button class="ctab" data-c="us" onclick="selectCountry('us')">미국 콘텐츠<small>보편 소재 · 영어</small></button>
+    <button class="ctab on" data-c="kr" onclick="selectCountry('kr')">한국 콘텐츠<small>모든 기사 · 한국어</small></button>
+    <button class="ctab" data-c="jp" onclick="selectCountry('jp')">일본 콘텐츠<small>모든 기사 · 일본어</small></button>
+    <button class="ctab" data-c="us" onclick="selectCountry('us')">미국 콘텐츠<small>모든 기사 · 영어</small></button>
   </div>
 
   <!-- DISCOVERY (보조 기능 · 기본 접힘) -->
@@ -754,9 +754,9 @@ function toggleDiscovery(){
 /* 한 나라 = {타깃 언어 + 기본 니치 + 소스}를 한 번에 세팅. 나라별 워크플로우로 정리. */
 let currentCountry = "kr";
 const COUNTRY_CFG = {
-  kr: { lang:"ko", niche:"celeb"   },   // 한국: 연예인 미담, 한국어
-  jp: { lang:"ja", niche:"general" },   // 일본: 보편 소재, 일본어
-  us: { lang:"en", niche:"general" },   // 미국: 보편 소재, 영어
+  kr: { lang:"ko", niche:"general" },   // 한국: 모든 기사, 한국어 (연예인은 니치에서 선택)
+  jp: { lang:"ja", niche:"general" },   // 일본: 모든 기사, 일본어
+  us: { lang:"en", niche:"general" },   // 미국: 모든 기사, 영어
 };
 function selectCountry(c, skipCrawl){
   const cfg = COUNTRY_CFG[c] || COUNTRY_CFG.kr;
@@ -2775,5 +2775,5 @@ function escapeHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").repl
 </script>
 </body>
 </html>
-<!-- v3.17 — 연예인 니치 하드 차단(안전장치) 제거, 소식 전반으로 범위 확대 -->
+<!-- v3.18 — 국가 탭 기본을 일반 니치(모든 기사)로. 연예인은 선택형 -->
 
