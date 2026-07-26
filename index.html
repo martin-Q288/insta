@@ -471,7 +471,11 @@
     <div style="margin-top:14px; padding-top:12px; border-top:1px dashed var(--line);">
       <label>기사 URL 또는 본문 <small style="text-transform:none; color:var(--muted);">— 상단 제목 자동 생성</small></label>
       <textarea id="vrArticle" class="card-edit" style="width:100%;" rows="3" placeholder="기사 링크(https://...) 또는 기사 본문을 붙여넣으세요. AI가 상단 라벨 + 큰 제목을 만듭니다."></textarea>
-      <button class="btn-ghost btn-sm" id="vrSubBtn" style="border-color:var(--accent2); color:var(--accent2); margin-top:6px;" onclick="vrGenTitle()">기사로 제목 자동 생성</button>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;">
+        <button class="btn-ghost btn-sm" id="vrSubBtn" style="border-color:var(--accent2); color:var(--accent2);" onclick="vrGenTitle()">기사로 제목 자동 생성</button>
+        <button class="btn-ghost btn-sm" id="vrAnalyzeBtn" style="border-color:var(--accent); color:var(--accent);" onclick="vrAnalyzeVideo()">기사 없이 · 영상 분석해 바이럴 안 5개 생성</button>
+      </div>
+      <div id="vrIdeas" style="display:none; margin-top:12px;"></div>
     </div>
     <label style="margin-top:12px;">상단 라벨 <small style="text-transform:none; color:var(--muted);">— 흰색 박스 · 검은 글씨 (선택)</small></label>
     <input type="text" id="vrLabel" placeholder="예: 382kg의 달 암석이 지구로 온 역사적 순간" oninput="vrPreview()">
@@ -2870,6 +2874,120 @@ async function vrGenTitle(){
     vrSetStatus("상단 제목 + 게시물 본문 생성 완료. 라벨/제목/본문을 직접 수정할 수 있고, 본문은 [본문 복사]로 게시에 붙여넣으세요.", "ok");
   }catch(e){ vrSetStatus("제목 생성 실패: " + e.message, "err"); }
   finally{ btn.disabled = false; }
+}
+
+/* ===== 기사 없이: 영상 프레임을 분석해 바이럴 안 5개 생성 ===== */
+function vrEsc(s){ return String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+async function callClaudeVision(prompt, images){
+  const key = localStorage.getItem("icf_key");
+  const model = localStorage.getItem("icf_model") || "claude-haiku-4-5-20251001";
+  if(!key) throw new Error("API 키가 없습니다. 우측 상단 [API 설정]에서 입력하세요.");
+  const content = images.map(d=>({ type:"image", source:{ type:"base64", media_type:"image/jpeg", data:d } }));
+  content.push({ type:"text", text: prompt });
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method:"POST",
+    headers:{ "x-api-key":key, "anthropic-version":"2023-06-01", "content-type":"application/json", "anthropic-dangerous-direct-browser-access":"true" },
+    body: JSON.stringify({ model, max_tokens: 4000, messages:[{ role:"user", content }] })
+  });
+  if(!res.ok){ const t = await res.text(); throw new Error("API 오류 " + res.status + ": " + t.slice(0,200)); }
+  const data = await res.json();
+  if(data.error) throw new Error("API 오류: " + (data.error.message || "").slice(0,200));
+  const text = (data.content || []).filter(b=>b.type==="text").map(b=>b.text).join("");
+  if(!text) throw new Error("AI 응답이 비어 있습니다. 다시 시도하세요.");
+  return text;
+}
+
+/* 영상에서 순서대로 n장의 프레임을 추출(축소 JPEG base64) */
+async function vrGrabFrames(v, n){
+  const dur = v.duration || 0;
+  const W = 480, H = Math.max(1, Math.round(W * ((v.videoHeight||9)/(v.videoWidth||16))));
+  const c = makeCanvas(W, H), cx = c.getContext("2d");
+  const wasMuted = v.muted; v.muted = true; try{ v.pause(); }catch(e){}
+  const frames = [];
+  for(let i=0; i<n; i++){
+    const t = Math.min(Math.max(0, dur*((i+0.5)/n)), Math.max(0, dur-0.05));
+    await new Promise(res=>{ const h=()=>{ v.removeEventListener("seeked", h); res(); }; v.addEventListener("seeked", h); try{ v.currentTime = t; }catch(e){ res(); } setTimeout(res, 900); });
+    try{ cx.drawImage(v, 0, 0, W, H); frames.push(c.toDataURL("image/jpeg", 0.6).split(",")[1]); }catch(e){}
+  }
+  v.muted = wasMuted;
+  return frames;
+}
+
+function buildViralFromVideoPrompt(){
+  return `You are a world-class Korean short-form (Instagram Reels) strategist and copywriter for the "nowaythis" account. I give you a few frames sampled IN ORDER from a user's video. There is NO article and NO caption — infer from the frames only.
+${NOWAYTHIS_VOICE}
+${NOWAYTHIS_PLAYBOOK}
+할 일:
+1) 프레임을 근거로 영상 내용을 빠르고 정밀하게 추론하세요(장면·인물·행동·장소·분위기·가장 놀랍거나 궁금한 포인트). 프레임에서 확인 불가한 사실(구체적 지명·수치·인물명 등)은 지어내지 마세요.
+2) 이 영상이 바이럴 되도록 '바로 사용할 수 있는 안 5개'를 만드세요. 5개는 서로 확실히 다른 각도(예: 충격/반전/궁금증 유발/공감·감동/정보성).
+
+각 안(idea) 형식:
+- "label": 상단 흰색 박스 설정 문구(짧게)
+- "title": 큰 제목. 2~3줄, 줄바꿈 \\n. 핵심 한 줄만 **별표**로 감싸 노란색 강조. 나머지 흰색. 스크롤 멈추는 후킹.
+- "caption": 게시물 본문(합니다체): 후킹 → 설명 → 여운 통찰 → 팔로우/공유 CTA(@no.way.this) → 해시태그. 이모지 절제(0~2개).
+- "why": 이 안이 왜 먹히는지 한 줄(사용자용 근거).
+
+label·title에는 이모지 금지. 사실 왜곡·근거 없는 확정 금지(영상 내용과 어긋나면 안 됨).
+Return ONLY valid JSON (no fences): {"analysis":"영상 내용 1~2문장 요약","ideas":[{"label":"...","title":"...","caption":"...","why":"..."}, ...정확히 5개]}`;
+}
+
+async function vrAnalyzeVideo(){
+  const v = document.getElementById("vrVideo");
+  if(!v.src || !v.videoWidth){ vrSetStatus("먼저 영상을 업로드하세요.", "err"); return; }
+  const btn = document.getElementById("vrAnalyzeBtn"); btn.disabled = true;
+  const prevT = v.currentTime;
+  try{
+    vrSetStatus("영상 프레임 추출 중...", "busy");
+    const frames = await vrGrabFrames(v, 5);
+    try{ v.currentTime = prevT; }catch(e){}
+    if(!frames.length) throw new Error("프레임을 추출하지 못했습니다.");
+    vrSetStatus("AI가 영상을 분석해 바이럴 안 5개를 만드는 중... (약 10~20초)", "busy");
+    const raw = await callClaudeVision(buildViralFromVideoPrompt(), frames);
+    const j = tryParseJson(raw);
+    if(!j || !Array.isArray(j.ideas) || !j.ideas.length) throw new Error("분석 응답을 해석하지 못했습니다. 다시 시도하세요.");
+    window._vrIdeas = j.ideas;
+    renderVrIdeas(j);
+    vrSetStatus("바이럴 안 " + j.ideas.length + "개 생성 완료. 마음에 드는 안의 [이 안 적용]을 누르면 제목·본문에 채워집니다.", "ok");
+  }catch(e){ vrSetStatus("영상 분석 실패: " + e.message, "err"); }
+  finally{ btn.disabled = false; }
+}
+
+function renderVrIdeas(j){
+  const box = document.getElementById("vrIdeas");
+  box.innerHTML = "";
+  if(j.analysis){
+    const a = document.createElement("div");
+    a.className = "hint"; a.style.cssText = "margin-bottom:8px; color:var(--text); line-height:1.5;";
+    a.textContent = "영상 분석: " + j.analysis;
+    box.appendChild(a);
+  }
+  j.ideas.forEach((idea, i)=>{
+    const card = document.createElement("div");
+    card.style.cssText = "background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:8px;";
+    const titlePreview = String(idea.title||"").replace(/\*\*/g, "").replace(/\\n|\n/g, " / ");
+    card.innerHTML =
+      "<div style='font-size:12px; color:var(--muted);'>안 " + (i+1) + (idea.label ? " · " + vrEsc(idea.label) : "") + "</div>" +
+      "<div style='font-weight:800; margin:3px 0; line-height:1.35;'>" + vrEsc(titlePreview) + "</div>" +
+      (idea.why ? "<div class='hint' style='margin:2px 0;'>왜: " + vrEsc(idea.why) + "</div>" : "");
+    const btn = document.createElement("button");
+    btn.className = "btn-ghost btn-sm"; btn.textContent = "이 안 적용";
+    btn.style.cssText = "border-color:var(--ok); color:var(--ok); margin-top:4px;";
+    btn.onclick = ()=> vrApplyIdea(i);
+    card.appendChild(btn);
+    box.appendChild(card);
+  });
+  box.style.display = "block";
+}
+
+function vrApplyIdea(i){
+  const idea = (window._vrIdeas || [])[i]; if(!idea) return;
+  document.getElementById("vrLabel").value = (idea.label || "").trim();
+  document.getElementById("vrHook").value = String(idea.title || "").replace(/\\n/g, "\n").trim();
+  if(idea.caption) document.getElementById("vrCaption").value = String(idea.caption).replace(/\\n/g, "\n").trim();
+  vrPreview();
+  vrSetStatus((i+1) + "번 안을 적용했습니다. 미리보기를 확인하고 [영상 릴스 만들기]를 누르세요.", "ok");
+  const el = document.getElementById("vrHook"); if(el) el.scrollIntoView({ behavior:"smooth", block:"center" });
 }
 
 /* 원본 영상 오디오를 녹화 스트림에 연결.
