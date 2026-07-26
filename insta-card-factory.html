@@ -494,6 +494,23 @@
         <input type="number" id="vrEnd" min="0" step="0.1" placeholder="자동" oninput="vrPreview()">
       </div>
     </div>
+    <div style="margin-top:14px; padding-top:12px; border-top:1px dashed var(--line);">
+      <label>기사 URL 또는 본문 <small style="text-transform:none; color:var(--muted);">— 뉴스처럼 자막 자동 생성</small></label>
+      <textarea id="vrArticle" class="card-edit" style="width:100%;" rows="3" placeholder="기사 링크(https://...) 또는 기사 본문을 붙여넣으세요. AI가 의미 단위로 끊어 자막을 만듭니다."></textarea>
+      <button class="btn-ghost btn-sm" id="vrSubBtn" style="border-color:var(--accent2); color:var(--accent2); margin-top:6px;" onclick="vrGenSubs()">기사로 자막 자동 생성</button>
+    </div>
+    <label style="margin-top:12px;">자막 <small style="text-transform:none; color:var(--muted);">— 한 줄 = 한 자막 · 가운데 정렬 · G마켓 산스 · 영상 길이에 맞춰 자동 타이밍</small></label>
+    <textarea id="vrSubsText" class="card-edit" style="width:100%;" rows="6" placeholder="여기에 자막이 자동으로 채워집니다. 한 줄이 하나의 자막이며, 직접 수정할 수 있습니다." oninput="vrPreview()"></textarea>
+    <div class="style-row" style="margin-top:10px;">
+      <div>
+        <label>자막 위치</label>
+        <select id="vrSubPos" onchange="vrPreview()">
+          <option value="lower" selected>하단 (뉴스 스타일)</option>
+          <option value="center">중앙</option>
+        </select>
+      </div>
+      <div></div>
+    </div>
     <div style="margin-top:12px; display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start;">
       <video id="vrVideo" playsinline crossorigin="anonymous" style="display:none;"></video>
       <canvas id="vrCanvas" style="display:none; width:250px; border-radius:12px; border:1px solid var(--line); background:#000; cursor:default;"></canvas>
@@ -2632,19 +2649,142 @@ function vrDrawHook(ctx, W, H, text, pos){
   ctx.textAlign = "left";
 }
 
-function vrComposite(ctx, W, H){
+/* 자막 폰트 — G마켓 산스 고정 (헤드라인 폰트 설정과 무관) */
+const SUB_FONT = "'GmarketSans','CardSans','Malgun Gothic','Apple SD Gothic Neo','Hiragino Sans','Yu Gothic',sans-serif";
+
+/* 영상 구간을 읽어 [start,end] 계산 (자막 타이밍/녹화 공용) */
+function vrRange(){
   const v = document.getElementById("vrVideo");
+  const dur = v.duration || 0;
+  const start = Math.max(0, parseFloat(document.getElementById("vrStart").value) || 0);
+  let end = parseFloat(document.getElementById("vrEnd").value);
+  if(!(end > 0)) end = dur;
+  end = Math.min(end, dur || end, start + 90);
+  return { start, end: Math.max(end, start + 0.1) };
+}
+
+/* 자막 텍스트(한 줄=한 자막)를 영상 길이에 맞춰 타이밍 배분 */
+function vrRecomputeSubs(){
+  const segs = (document.getElementById("vrSubsText").value || "")
+    .split("\n").map(s=>s.trim()).filter(Boolean);
+  const { start, end } = vrRange();
+  const span = Math.max(0.1, end - start);
+  if(!segs.length){ window._vrSubs = []; return; }
+  // 글자 수에 비례하되 최소 1.4초 보장 → 전체 길이에 맞게 정규화
+  const perChar = 0.16, minDur = 1.4;
+  const raw = segs.map(s=> Math.max(minDur, s.replace(/\\n|\n/g,"").length * perChar));
+  const sum = raw.reduce((a,b)=>a+b, 0);
+  const k = span / sum;
+  const subs = []; let t = start;
+  for(let i=0; i<segs.length; i++){
+    const d = raw[i]*k;
+    subs.push({ text: segs[i], t0: t, t1: (i===segs.length-1 ? end : t + d) });
+    t += d;
+  }
+  window._vrSubs = subs;
+}
+
+function vrCurrentSub(time){
+  const subs = window._vrSubs || [];
+  for(let i=0; i<subs.length; i++){ if(time >= subs[i].t0 && time < subs[i].t1) return subs[i].text; }
+  if(subs.length && time >= subs[subs.length-1].t1 - 0.001) return subs[subs.length-1].text;
+  return "";
+}
+
+/* 뉴스 스타일 자막 — 가운데 정렬, G마켓 산스, 가독성 밴드 */
+function vrDrawSubtitle(ctx, W, H, text, pos){
+  const t = (text || "").trim(); if(!t) return;
+  const size = Math.round(W*0.055);
+  ctx.font = "700 " + size + "px " + SUB_FONT;
+  ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  const maxW = W - 150;
+  // 명시적 줄바꿈(\n) 유지 + 자동 줄바꿈
+  const lines = [];
+  String(t).replace(/\\n/g,"\n").split("\n").forEach(part=>{ wrapText(ctx, part, maxW).forEach(l=>lines.push(l)); });
+  const lh = size*1.28;
+  const blockH = lines.length*lh;
+  const centerY = pos === "center" ? H*0.5 : H*0.76;
+  let y = centerY - blockH/2 + size; // 첫 줄 baseline
+  // 가독성 밴드 (각 줄 너비에 맞춘 둥근 검정 반투명)
+  const padX = 26, padY = 12;
+  lines.forEach((ln, i)=>{
+    const tw = ctx.measureText(ln).width;
+    const bx = W/2 - tw/2 - padX, by = y - size - padY + 6, bw = tw + padX*2, bh = size + padY*2;
+    ctx.fillStyle = "rgba(0,0,0,.6)";
+    roundRect(ctx, bx, by, bw, bh, 12); ctx.fill();
+    y += lh;
+  });
+  // 텍스트
+  y = centerY - blockH/2 + size;
+  lines.forEach(ln=>{
+    ctx.shadowColor = "rgba(0,0,0,.9)"; ctx.shadowBlur = 10;
+    ctx.fillStyle = "#fff";
+    ctx.fillText(ln, W/2, y);
+    ctx.shadowBlur = 0;
+    y += lh;
+  });
+  ctx.textAlign = "left";
+}
+
+function vrComposite(ctx, W, H, time){
+  const v = document.getElementById("vrVideo");
+  const tt = (typeof time === "number") ? time : (v.currentTime || 0);
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
   if(v.videoWidth) vrFitDraw(ctx, v, W, H, document.getElementById("vrFit").value);
   vrDrawHook(ctx, W, H, document.getElementById("vrHook").value, document.getElementById("vrTextPos").value);
+  const subPos = (document.getElementById("vrSubPos")||{}).value || "lower";
+  vrDrawSubtitle(ctx, W, H, vrCurrentSub(tt), subPos);
 }
 
 function vrPreview(){
   const cv = document.getElementById("vrCanvas");
   if(!cv || cv.style.display === "none") return;
+  vrRecomputeSubs();
   const W = 1080, H = 1920; cv.width = W; cv.height = H;
   vrComposite(cv.getContext("2d"), W, H);
+}
+
+function buildSubtitlePrompt(source){
+  return `You are creating on-screen SUBTITLES for a Korean news-style Instagram reel (the "nowaythis" account). Based ONLY on the facts in the source, write the narration as a sequence of SHORT subtitle segments that appear one at a time over a video.
+${NOWAYTHIS_VOICE}
+SOURCE:
+"""${source}"""
+
+RULES:
+- 한국어. 모든 문장은 '합니다체' 평서형(~습니다/~됐습니다/~입니다). 사실(이름·숫자·날짜·장소)은 정확하게. 원문 문장을 그대로 복사하지 말고 재표현하세요.
+- 내레이션을 의미 단위(MEANING UNIT)로 끊으세요: 각 자막 = 화면에서 한 호흡에 깔끔히 읽히는 짧은 구/절.
+- 각 자막은 1줄이 이상적이며 최대 2줄. 한 줄 약 10~18자. 2줄이 필요하면 자연스러운 곳에 \\n을 넣고 두 줄 길이를 balanced하게.
+- 전체 8~20개. 스토리 전체를 담으세요: 도입(핵심) → 경위/배경 → 결과 → 마무리 한 줄.
+- 이모지·해시태그·출처 줄 넣지 마세요. 순수 내레이션만.
+- 그리고 "hook": 영상 상단에 얹을 1~2줄 강렬한 명사형 후킹 헤드라인.
+
+Return ONLY valid JSON (no fences, no commentary). \\n은 두 줄 자막에만.
+{"hook":"...","subtitles":["첫 자막","두 번째 자막","..."]}`;
+}
+
+async function vrGenSubs(){
+  let src = (document.getElementById("vrArticle").value || "").trim();
+  if(!src){ vrSetStatus("기사 URL 또는 본문을 입력하세요.", "err"); return; }
+  const btn = document.getElementById("vrSubBtn"); btn.disabled = true;
+  try{
+    if(/^https?:\/\//.test(src)){
+      vrSetStatus("기사 본문 추출 중... (여러 경로 시도)", "busy");
+      let found = null;
+      try{ found = await raceExtract(src); }catch(e){ /* fall through */ }
+      if(found && found.text){ src = found.text.replace(/\n{3,}/g, "\n\n").trim().slice(0, 6000); }
+      else { vrSetStatus("본문 추출이 어려워 입력한 URL 텍스트로 진행합니다. (실패 시 본문을 직접 붙여넣으세요)", "busy"); }
+    }
+    vrSetStatus("AI가 의미 단위로 자막을 만드는 중...", "busy");
+    const raw = await callClaude(buildSubtitlePrompt(src));
+    const j = tryParseJson(raw);
+    if(!j || !Array.isArray(j.subtitles) || !j.subtitles.length) throw new Error("자막 생성 응답을 해석하지 못했습니다. 다시 시도하세요.");
+    if(j.hook) document.getElementById("vrHook").value = j.hook;
+    document.getElementById("vrSubsText").value = j.subtitles.map(s=>String(s).trim()).filter(Boolean).join("\n");
+    vrPreview();
+    vrSetStatus("자막 " + j.subtitles.length + "개 생성 완료. 자막칸에서 수정할 수 있고, [영상 릴스 만들기]를 누르면 영상에 얹힙니다.", "ok");
+  }catch(e){ vrSetStatus("자막 생성 실패: " + e.message, "err"); }
+  finally{ btn.disabled = false; }
 }
 
 let _vrAudio = null;
@@ -2662,8 +2802,9 @@ async function vrGenerate(){
   const btn = document.getElementById("vrBtn"); btn.disabled = true;
   vrSetStatus("영상 릴스 준비 중...", "busy");
   try{
+    vrRecomputeSubs(); // 자막 타이밍을 현재 구간에 맞춰 확정
     const rec = makeCanvas(W, H); const rctx = rec.getContext("2d");
-    vrComposite(rctx, W, H);
+    vrComposite(rctx, W, H, start);
     if(!rec.captureStream) throw new Error("이 브라우저가 canvas 캡처를 지원하지 않습니다.");
     const stream = rec.captureStream(30);
 
