@@ -2387,189 +2387,170 @@ function updateReelEstimate(){
 
 /* offscreen 캔버스에 기존 드로잉 함수를 재사용해 9:16 프레임 렌더 */
 function makeCanvas(w, h){ const c = document.createElement("canvas"); c.width = w; c.height = h; return c; }
-function canvasToPng(cv){
-  return new Promise(res=>cv.toBlob(b=>{
-    const rd = new FileReader();
-    rd.onload = ()=>res(new Uint8Array(rd.result));
-    rd.readAsArrayBuffer(b);
-  }, "image/png"));
-}
-async function buildReelFrames(lang, W, H){
+
+/* 각 장면(표지·카드·CTA)을 캔버스로 렌더 (PNG 변환 없이 애니메이션 소스로 사용) */
+async function buildReelScenes(lang, W, H){
   const r = state.results[lang];
   if(!r) return [];
   const prev = state.activeLang;
-  state.activeLang = lang; // 드로잉 함수가 badge/RTL 등에 현재 언어를 사용하므로 고정
+  state.activeLang = lang;
   try{
-    const frames = [];
+    const scenes = [];
     let c = makeCanvas(W, H);
     drawCover(c, r.line1 || "", r.line2 || "", r.line3 || "");
-    frames.push(await canvasToPng(c));
+    scenes.push(c);
     const cards = r.cards || [];
     for(let i=0; i<cards.length; i++){
       c = makeCanvas(W, H);
       const cp = state.cardPhotos && state.cardPhotos[i];
       drawBodyCard(c, cards[i], i+1, cards.length, cp && cp.img);
-      frames.push(await canvasToPng(c));
+      scenes.push(c);
     }
-    if(r.cta){
-      c = makeCanvas(W, H);
-      drawCtaCard(c, r.cta);
-      frames.push(await canvasToPng(c));
-    }
-    return frames;
-  } finally {
-    state.activeLang = prev;
-  }
+    if(r.cta){ c = makeCanvas(W, H); drawCtaCard(c, r.cta); scenes.push(c); }
+    return scenes;
+  } finally { state.activeLang = prev; }
 }
 
-/* FFmpeg.wasm (단일 스레드 코어 — GitHub Pages/파일 열기에서도 동작) 지연 로드 */
-let _ffmpegPromise = null;
-function loadFFmpeg(){
-  if(window._ffmpeg) return Promise.resolve(window._ffmpeg);
-  if(_ffmpegPromise) return _ffmpegPromise;
-  _ffmpegPromise = (async ()=>{
-    if(!window.FFmpeg){
-      await new Promise((res, rej)=>{
-        const s = document.createElement("script");
-        s.src = "https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js";
-        s.onload = res;
-        s.onerror = ()=>rej(new Error("FFmpeg 스크립트 로드 실패 (네트워크/광고차단 확인)"));
-        document.head.appendChild(s);
-      });
-    }
-    const { createFFmpeg } = window.FFmpeg;
-    const ff = createFFmpeg({ log:false, corePath:"https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js" });
-    await ff.load();
-    window._ffmpeg = ff;
-    return ff;
-  })();
-  return _ffmpegPromise;
+/* 브라우저가 지원하는 녹화 포맷 선택 — 아이폰 사파리는 mp4(H.264), 그 외는 webm */
+function pickReelMime(){
+  if(typeof MediaRecorder === "undefined" || !MediaRecorder.isTypeSupported) return { mime:"", ext:"webm" };
+  const cands = ["video/mp4;codecs=h264,aac","video/mp4;codecs=avc1.42E01E","video/mp4",
+                 "video/webm;codecs=vp9","video/webm;codecs=vp8","video/webm"];
+  for(const m of cands){ if(MediaRecorder.isTypeSupported(m)) return { mime:m, ext: m.indexOf("mp4")>=0 ? "mp4" : "webm" }; }
+  return { mime:"", ext:"webm" };
 }
 
-/* 입력/필터그래프 조립 */
-function buildReelArgs(N, D, F, T, trans, zoom, W, H, hasAudio, totalDur){
-  const args = [];
-  // 각 이미지를 항상 유한한 D초 클립으로 (concat/xfade 모두 안전, zoompan 리셋 방지)
-  for(let i=0; i<N; i++) args.push("-loop", "1", "-t", String(D), "-i", "f" + i + ".png");
-  const audioIdx = N;
-  if(hasAudio) args.push("-stream_loop", "-1", "-i", "audio_in");
+/* 선택한 배경 음원을 녹화 스트림에 믹싱 (실패해도 영상만으로 진행) */
+async function attachReelAudio(stream, file){
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if(!AC) throw new Error("no AudioContext");
+  const ctx = new AC();
+  try{ await ctx.resume(); }catch(e){}
+  const buf = await ctx.decodeAudioData(await file.arrayBuffer());
+  const dest = ctx.createMediaStreamDestination();
+  const src = ctx.createBufferSource();
+  src.buffer = buf; src.loop = true; src.connect(dest); src.start();
+  dest.stream.getAudioTracks().forEach(tr=> stream.addTrack(tr));
+  return { stop:()=>{ try{ src.stop(); }catch(e){} try{ ctx.close(); }catch(e){} } };
+}
 
-  let fc = "";
-  const vlabels = [];
-  const d = Math.round(D * F);
-  for(let i=0; i<N; i++){
-    let ch = "[" + i + ":v]scale=" + W + ":" + H + ":force_original_aspect_ratio=increase,crop=" + W + ":" + H + ",setsar=1";
-    if(zoom){
-      // s=WxH, fps=F, d=총프레임 → 첫 프레임에서 한 번의 매끈한 줌. trim으로 D초에 정확히 컷.
-      ch += ",zoompan=z='min(zoom+0.0012,1.12)':d=" + d + ":x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=" + W + "x" + H + ":fps=" + F +
-            ",trim=duration=" + D + ",setpts=PTS-STARTPTS";
-    }
-    // fps/format 정규화 — xfade는 일정한 프레임레이트(CFR)와 동일 포맷을 요구
-    ch += ",fps=" + F + ",format=yuv420p[v" + i + "]";
-    fc += ch + ";";
-    vlabels.push("[v" + i + "]");
+/* 한 프레임을 그린다: 잔잔한 줌(Ken Burns) + 크로스페이드 */
+function drawReelFrame(ctx, scenes, t, o){
+  const { N, D, T, step, zoom, W, H } = o;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = "#000"; ctx.fillRect(0,0,W,H);
+  let i = Math.floor(t/step); if(i>N-1) i=N-1; if(i<0) i=0;
+  const drawScene = (idx, alpha)=>{
+    if(idx<0 || idx>=N || alpha<=0) return;
+    const tau = Math.max(0, Math.min(D, t - idx*step));
+    const scale = zoom ? (1 + 0.08*(tau/D)) : 1;
+    const dw = W*scale, dh = H*scale;
+    ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+    ctx.drawImage(scenes[idx], (W-dw)/2, (H-dh)/2, dw, dh);
+    ctx.globalAlpha = 1;
+  };
+  const overlapStart = i*step + step; // = 장면 i의 끝 T초 구간 시작
+  if(T>0 && i < N-1 && t >= overlapStart){
+    const f = (t - overlapStart)/T;
+    drawScene(i, 1-f); drawScene(i+1, f);
+  } else {
+    drawScene(i, 1);
   }
-
-  if(trans === "cut" || N === 1){
-    fc += vlabels.join("") + "concat=n=" + N + ":v=1:a=0[vpre];";
-  }else{
-    const tName = (trans === "slide") ? "slideleft" : "fade";
-    let prev = vlabels[0];
-    for(let j=1; j<N; j++){
-      const off = (j * (D - T)).toFixed(3);
-      const lbl = "[vx" + j + "]";
-      fc += prev + vlabels[j] + "xfade=transition=" + tName + ":duration=" + T + ":offset=" + off + lbl + ";";
-      prev = lbl;
-    }
-    fc += prev + "null[vpre];";
-  }
-  fc += "[vpre]format=yuv420p[vout]";
-
-  if(hasAudio){
-    const outSt = Math.max(0, totalDur - 1).toFixed(3);
-    fc += ";[" + audioIdx + ":a]atrim=0:" + totalDur.toFixed(3) +
-          ",asetpts=PTS-STARTPTS,afade=t=in:st=0:d=0.4,afade=t=out:st=" + outSt + ":d=1[aout]";
-  }
-
-  const out = args.concat(["-filter_complex", fc, "-map", "[vout]"]);
-  if(hasAudio) out.push("-map", "[aout]", "-c:a", "aac", "-b:a", "128k");
-  else out.push("-an");
-  out.push("-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", String(F),
-           "-t", totalDur.toFixed(3), "-preset", "ultrafast", "-movflags", "+faststart", "out.mp4");
-  return out;
 }
 
 async function generateReel(){
   const lang = state.activeLang;
   if(!lang || !state.results[lang]){ setReelStatus("먼저 카드뉴스를 생성하세요.", "err"); return; }
+  if(typeof MediaRecorder === "undefined"){ setReelStatus("이 브라우저는 영상 녹화를 지원하지 않습니다. 최신 사파리/크롬에서 시도하세요.", "err"); return; }
   const resSel = (document.getElementById("reelRes").value === "720");
   const W = resSel ? 720 : 1080, H = resSel ? 1280 : 1920;
   const D = parseFloat(document.getElementById("reelDur").value);
   const trans = document.getElementById("reelTrans").value;
   const zoom = document.getElementById("reelZoom").checked;
   const audioFile = (document.getElementById("reelAudioFile").files || [])[0] || null;
-  const F = 24;
+  const F = 30;
 
   const btn = document.getElementById("reelBtn");
   btn.disabled = true;
-  setReelStatus("① 프레임 렌더링 중...", "busy");
+  setReelStatus("① 장면 렌더링 중...", "busy");
   try{
-    const frames = await buildReelFrames(lang, W, H);
-    if(!frames.length) throw new Error("렌더할 카드가 없습니다.");
-    const N = frames.length;
+    const scenes = await buildReelScenes(lang, W, H);
+    if(!scenes.length) throw new Error("렌더할 카드가 없습니다.");
+    const N = scenes.length;
     const T = (trans === "cut") ? 0 : 0.5;
-    const totalDur = +(N*D - (N-1)*T).toFixed(3);
+    const step = D - T;
+    const total = +(N*D - (N-1)*T).toFixed(3);
 
-    setReelStatus("② FFmpeg 로딩 중... (최초 1회만 20~40초 · 약 25MB 다운로드)", "busy");
-    const ffmpeg = await loadFFmpeg();
-    const fetchFile = window.FFmpeg.fetchFile;
+    const rec = makeCanvas(W, H);
+    const rctx = rec.getContext("2d");
+    drawReelFrame(rctx, scenes, 0, { N, D, T, step, zoom, W, H }); // 첫 프레임 프라임
+    if(!rec.captureStream) throw new Error("이 브라우저가 canvas 캡처를 지원하지 않습니다.");
+    const stream = rec.captureStream(F);
 
-    // 기존 파일 정리 후 프레임 기록
-    for(let i=0; i<N; i++) ffmpeg.FS("writeFile", "f" + i + ".png", frames[i]);
-    const hasAudio = !!audioFile;
-    if(hasAudio) ffmpeg.FS("writeFile", "audio_in", await fetchFile(audioFile));
+    const { mime, ext } = pickReelMime();
+    let audio = null;
+    if(audioFile){ try{ audio = await attachReelAudio(stream, audioFile); }catch(e){ console.warn("audio skip", e); } }
 
-    const args = buildReelArgs(N, D, F, T, trans, zoom, W, H, hasAudio, totalDur);
-    if(ffmpeg.setProgress){
-      ffmpeg.setProgress(({ ratio })=>{
-        if(ratio >= 0 && ratio <= 1) setReelStatus("③ 인코딩 중... " + Math.round(ratio*100) + "%", "busy");
-      });
-    }
-    setReelStatus("③ 인코딩 중... 0% (" + N + "장 · " + totalDur + "초)", "busy");
-    await ffmpeg.run.apply(ffmpeg, args);
+    const recorder = new MediaRecorder(stream, mime ? { mimeType:mime, videoBitsPerSecond: resSel ? 6e6 : 12e6 } : undefined);
+    const chunks = [];
+    recorder.ondataavailable = e=>{ if(e.data && e.data.size) chunks.push(e.data); };
+    const stopped = new Promise(res=>{ recorder.onstop = res; });
+    recorder.start();
 
-    const data = ffmpeg.FS("readFile", "out.mp4");
-    // 메모리 정리
-    try{
-      for(let i=0; i<N; i++) ffmpeg.FS("unlink", "f" + i + ".png");
-      if(hasAudio) ffmpeg.FS("unlink", "audio_in");
-      ffmpeg.FS("unlink", "out.mp4");
-    }catch(e){ /* ignore */ }
+    const start = performance.now();
+    await new Promise(resolve=>{
+      (function frame(){
+        const t = (performance.now() - start)/1000;
+        drawReelFrame(rctx, scenes, Math.min(t, total), { N, D, T, step, zoom, W, H });
+        if(t < total){
+          setReelStatus("② 녹화 중... " + Math.min(100, Math.round(t/total*100)) + "% (" + N + "장 · " + total.toFixed(1) + "초)", "busy");
+          requestAnimationFrame(frame);
+        } else { resolve(); }
+      })();
+    });
+    recorder.stop();
+    await stopped;
+    if(audio) audio.stop();
 
     if(window._reelUrl) URL.revokeObjectURL(window._reelUrl);
-    const blob = new Blob([data.buffer], { type:"video/mp4" });
+    const blob = new Blob(chunks, { type: mime || "video/webm" });
     window._reelBlob = blob;
+    window._reelExt = ext;
     window._reelUrl = URL.createObjectURL(blob);
     const v = document.getElementById("reelVideo");
     v.src = window._reelUrl; v.style.display = "block";
     document.getElementById("reelActions").style.display = "flex";
-    setReelStatus("릴스 완성! " + totalDur + "초 · " + (blob.size/1e6).toFixed(1) + "MB. 아래 [MP4 저장] 권장.", "ok");
+    const note = ext === "mp4" ? " 아래 [저장]으로 앨범에 담아 인스타 릴스로 올리세요."
+                               : " (WebM 저장 — 아이폰에서 열면 MP4로 저장됩니다.)";
+    setReelStatus("릴스 완성! " + total.toFixed(1) + "초 · " + (blob.size/1e6).toFixed(1) + "MB." + note, "ok");
     toast("릴스 영상이 생성되었습니다");
   }catch(e){
     console.error(e);
-    setReelStatus("릴스 생성 실패: " + e.message + " (모바일이면 해상도 720 / 컷 전환으로 재시도)", "err");
+    setReelStatus("릴스 생성 실패: " + e.message + " (해상도 720 / 컷 전환으로 재시도해 보세요)", "err");
   }finally{
     btn.disabled = false;
   }
 }
 
-function downloadReel(){
+async function downloadReel(){
   if(!window._reelBlob){ setReelPubStatus("먼저 릴스를 생성하세요.", "err"); return; }
+  const blob = window._reelBlob;
+  const filename = "reel_" + (state.activeLang || "ko") + "_" + Date.now() + "." + (window._reelExt || "mp4");
+  // 모바일: 공유 시트로 '비디오 저장'을 눌러 바로 앨범에 저장 (인스타 릴스로 업로드)
+  try{
+    if(navigator.canShare){
+      const file = new File([blob], filename, { type: blob.type || "video/mp4" });
+      if(navigator.canShare({ files:[file] })){
+        try{ await navigator.share({ files:[file] }); toast("앨범에 저장 후 인스타 릴스로 올리세요"); return; }
+        catch(err){ if(err && err.name === "AbortError") return; }
+      }
+    }
+  }catch(e){ /* 폴백으로 진행 */ }
   const a = document.createElement("a");
-  a.download = "reel_" + (state.activeLang || "ko") + "_" + Date.now() + ".mp4";
-  a.href = window._reelUrl || URL.createObjectURL(window._reelBlob);
+  a.download = filename;
+  a.href = window._reelUrl || URL.createObjectURL(blob);
   a.click();
-  toast("MP4 저장됨 — 인스타 앱에서 인기 음원 얹어 올리면 도달 최대화");
+  toast("영상 저장됨 — 인스타 앱에서 인기 음원 얹어 올리면 도달 최대화");
 }
 
 async function publishReel(){
