@@ -458,6 +458,56 @@
       </div>
     </div>
   </div>
+
+  <div class="panel" id="videoReelPanel" style="margin-top:20px;">
+    <h2>5. 내 영상으로 릴스 만들기 <small style="text-transform:none; color:var(--muted);">— 보유한 원본 영상 위에 <b style="color:var(--accent2)">강력한 후킹 문구</b>를 얹어 9:16 릴스로</small></h2>
+    <div class="notice" style="margin-top:0;">
+      원본 영상을 올리고 <b>상단 후킹 문구</b>를 입력하세요. 영상의 소리도 그대로 포함됩니다. 완성하면 <b>[저장]</b>으로 앨범에 담아 인스타 앱에서 릴스로 올리며 <b>인기 음원</b>을 얹으면 도달이 커집니다. (인스타 릴스 권장 길이 15~90초)
+    </div>
+    <label>영상 업로드</label>
+    <input type="file" id="vrFile" accept="video/*" onchange="vrLoad()">
+    <div class="style-row" style="margin-top:12px;">
+      <div>
+        <label>후킹 문구 (상단 · 줄바꿈 가능)</label>
+        <textarea id="vrHook" class="card-edit" style="width:100%;" rows="3" placeholder="예: 이게 실화라고?  카메라에 잡힌 충격의 순간" oninput="vrPreview()"></textarea>
+      </div>
+      <div>
+        <label>영상 맞춤</label>
+        <select id="vrFit" onchange="vrPreview()">
+          <option value="cover" selected>화면 채우기 (좌우 잘림 · 몰입감)</option>
+          <option value="contain">전체 보기 (위아래 여백)</option>
+        </select>
+        <label style="margin-top:10px;">문구 위치</label>
+        <select id="vrTextPos" onchange="vrPreview()">
+          <option value="top" selected>상단</option>
+          <option value="upper">상단에서 조금 아래</option>
+        </select>
+      </div>
+    </div>
+    <div class="style-row" style="margin-top:10px;">
+      <div>
+        <label>시작 (초)</label>
+        <input type="number" id="vrStart" min="0" step="0.1" value="0" oninput="vrPreview()">
+      </div>
+      <div>
+        <label>끝 (초 · 비우면 끝까지, 최대 90초)</label>
+        <input type="number" id="vrEnd" min="0" step="0.1" placeholder="자동" oninput="vrPreview()">
+      </div>
+    </div>
+    <div style="margin-top:12px; display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start;">
+      <video id="vrVideo" playsinline crossorigin="anonymous" style="display:none;"></video>
+      <canvas id="vrCanvas" style="display:none; width:250px; border-radius:12px; border:1px solid var(--line); background:#000; cursor:default;"></canvas>
+    </div>
+    <button class="btn-primary" id="vrBtn" onclick="vrGenerate()">영상 릴스 만들기</button>
+    <div class="status" id="vrStatus"></div>
+    <div style="margin-top:14px; display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start;">
+      <video id="vrOut" controls playsinline style="display:none; width:250px; border-radius:12px; border:1px solid var(--line); background:#000;"></video>
+      <div id="vrActions" style="display:none; flex-direction:column; gap:8px; min-width:230px;">
+        <button class="btn-primary" style="margin-top:0;" onclick="vrSave()">저장 (앨범)</button>
+        <div class="hint" style="margin-top:-2px;">저장 후 인스타 앱에서 릴스로 올리며 <b>인기 음원</b> 선택 = 도달 최대화</div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- SETTINGS MODAL -->
@@ -2528,6 +2578,152 @@ async function generateReel(){
   }finally{
     btn.disabled = false;
   }
+}
+
+/* ================= 내 영상 + 후킹 문구로 릴스 만들기 ================= */
+function vrSetStatus(msg, cls){ const el = document.getElementById("vrStatus"); if(el){ el.textContent = msg; el.className = "status" + (cls ? (" " + cls) : ""); } }
+
+function vrLoad(){
+  const f = (document.getElementById("vrFile").files || [])[0];
+  if(!f) return;
+  const v = document.getElementById("vrVideo");
+  if(v.src){ try{ URL.revokeObjectURL(v.src); }catch(e){} }
+  v.src = URL.createObjectURL(f);
+  v.muted = true;
+  v.onloadedmetadata = ()=>{
+    document.getElementById("vrCanvas").style.display = "block";
+    const endEl = document.getElementById("vrEnd");
+    endEl.placeholder = v.duration.toFixed(1);
+    endEl.max = v.duration.toFixed(1);
+    document.getElementById("vrStart").max = v.duration.toFixed(1);
+    try{ v.currentTime = Math.min(parseFloat(document.getElementById("vrStart").value) || 0, v.duration || 0); }catch(e){ vrPreview(); }
+    const dur = v.duration;
+    vrSetStatus("영상 로드됨 (" + dur.toFixed(1) + "초). 후킹 문구를 입력하고 [영상 릴스 만들기]를 누르세요." + (dur > 90 ? " ※ 90초를 넘으면 릴스용으로 앞 90초만 사용됩니다." : ""), "ok");
+  };
+  v.onseeked = ()=>vrPreview();
+  v.onerror = ()=>vrSetStatus("영상을 불러오지 못했습니다. mp4/mov 파일로 시도하세요.", "err");
+}
+
+function vrFitDraw(ctx, v, W, H, fit){
+  const vw = v.videoWidth || 16, vh = v.videoHeight || 9;
+  const s = fit === "contain" ? Math.min(W/vw, H/vh) : Math.max(W/vw, H/vh);
+  const dw = vw*s, dh = vh*s;
+  ctx.drawImage(v, (W-dw)/2, (H-dh)/2, dw, dh);
+}
+
+function vrDrawHook(ctx, W, H, text, pos){
+  const g = ctx.createLinearGradient(0, 0, 0, H*0.42);
+  g.addColorStop(0, "rgba(0,0,0,.72)"); g.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H*0.42);
+  const t = (text || "").trim(); if(!t) return;
+  const size = Math.round(W*0.062);
+  ctx.font = "900 " + size + "px " + FONT;
+  ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  const lines = wrapText(ctx, t, W - 120);
+  const lh = size*1.24;
+  let y = (pos === "upper" ? H*0.16 : H*0.075) + size;
+  lines.forEach(ln=>{
+    ctx.shadowColor = "rgba(0,0,0,.92)"; ctx.shadowBlur = 18;
+    ctx.lineWidth = Math.max(6, size*0.11); ctx.strokeStyle = "rgba(0,0,0,.55)";
+    ctx.strokeText(ln, W/2, y);
+    ctx.fillStyle = "#fff"; ctx.fillText(ln, W/2, y);
+    ctx.shadowBlur = 0; y += lh;
+  });
+  ctx.textAlign = "left";
+}
+
+function vrComposite(ctx, W, H){
+  const v = document.getElementById("vrVideo");
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+  if(v.videoWidth) vrFitDraw(ctx, v, W, H, document.getElementById("vrFit").value);
+  vrDrawHook(ctx, W, H, document.getElementById("vrHook").value, document.getElementById("vrTextPos").value);
+}
+
+function vrPreview(){
+  const cv = document.getElementById("vrCanvas");
+  if(!cv || cv.style.display === "none") return;
+  const W = 1080, H = 1920; cv.width = W; cv.height = H;
+  vrComposite(cv.getContext("2d"), W, H);
+}
+
+let _vrAudio = null;
+async function vrGenerate(){
+  const v = document.getElementById("vrVideo");
+  if(!v.src || !v.videoWidth){ vrSetStatus("먼저 영상을 업로드하세요.", "err"); return; }
+  if(typeof MediaRecorder === "undefined"){ vrSetStatus("이 브라우저는 영상 녹화를 지원하지 않습니다. 최신 사파리/크롬에서 시도하세요.", "err"); return; }
+  const W = 1080, H = 1920;
+  const start = Math.max(0, parseFloat(document.getElementById("vrStart").value) || 0);
+  let end = parseFloat(document.getElementById("vrEnd").value);
+  if(!(end > 0)) end = v.duration;
+  end = Math.min(end, v.duration, start + 90);
+  if(end <= start){ vrSetStatus("끝 시간이 시작 시간보다 커야 합니다.", "err"); return; }
+
+  const btn = document.getElementById("vrBtn"); btn.disabled = true;
+  vrSetStatus("영상 릴스 준비 중...", "busy");
+  try{
+    const rec = makeCanvas(W, H); const rctx = rec.getContext("2d");
+    vrComposite(rctx, W, H);
+    if(!rec.captureStream) throw new Error("이 브라우저가 canvas 캡처를 지원하지 않습니다.");
+    const stream = rec.captureStream(30);
+
+    // 영상의 오디오를 녹화 스트림에 연결 (createMediaElementSource는 element당 1회만 가능 → 캐시)
+    try{
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if(AC){
+        if(!_vrAudio){
+          const ctx = new AC();
+          const srcNode = ctx.createMediaElementSource(v);
+          const dest = ctx.createMediaStreamDestination();
+          srcNode.connect(dest);
+          _vrAudio = { ctx, dest };
+        }
+        try{ await _vrAudio.ctx.resume(); }catch(e){}
+        _vrAudio.dest.stream.getAudioTracks().forEach(tr=> stream.addTrack(tr));
+      }
+    }catch(e){ console.warn("audio skip", e); }
+
+    const { mime, ext } = pickReelMime();
+    const recorder = new MediaRecorder(stream, mime ? { mimeType:mime, videoBitsPerSecond: 12e6 } : undefined);
+    const chunks = [];
+    recorder.ondataavailable = e=>{ if(e.data && e.data.size) chunks.push(e.data); };
+    const stopped = new Promise(res=>{ recorder.onstop = res; });
+
+    v.muted = false;
+    try{ v.currentTime = start; }catch(e){}
+    recorder.start();
+    await v.play();
+    await new Promise(resolve=>{
+      (function frame(){
+        vrComposite(rctx, W, H);
+        if(v.currentTime < end && !v.ended){
+          vrSetStatus("녹화 중... " + Math.min(100, Math.round((v.currentTime - start)/(end - start)*100)) + "%", "busy");
+          requestAnimationFrame(frame);
+        } else resolve();
+      })();
+    });
+    v.pause();
+    recorder.stop();
+    await stopped;
+
+    const blob = new Blob(chunks, { type: mime || "video/webm" });
+    if(window._reelUrl) URL.revokeObjectURL(window._reelUrl);
+    window._reelBlob = blob; window._reelExt = ext;
+    window._reelUrl = URL.createObjectURL(blob);
+    const out = document.getElementById("vrOut");
+    out.src = window._reelUrl; out.style.display = "block";
+    document.getElementById("vrActions").style.display = "flex";
+    const note = ext === "mp4" ? " [저장]으로 앨범에 담아 인스타 릴스로 올리세요." : " (WebM — 아이폰에서 열면 MP4로 저장됩니다.)";
+    vrSetStatus("완성! " + (end - start).toFixed(1) + "초 · " + (blob.size/1e6).toFixed(1) + "MB." + note, "ok");
+    toast("영상 릴스가 생성되었습니다");
+  }catch(e){
+    console.error(e); vrSetStatus("생성 실패: " + e.message, "err");
+  }finally{ v.muted = true; btn.disabled = false; }
+}
+
+async function vrSave(){
+  if(!window._reelBlob){ vrSetStatus("먼저 영상 릴스를 만드세요.", "err"); return; }
+  await downloadReel();
 }
 
 async function downloadReel(){
