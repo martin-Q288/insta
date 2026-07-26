@@ -842,6 +842,23 @@ function onFormatChange(){
 }
 
 /* ---------- 프롬프트: 썸네일 1장 + 캡션 본문 (신규 포맷) ---------- */
+/* ---------- nowaythis 브랜드 보이스 + 지적재산권 가드 (모든 프롬프트 공통 주입) ---------- */
+const NOWAYTHIS_VOICE = `
+═══ nowaythis 브랜드 보이스 (필수) ═══
+This is the "nowaythis" account — the name is the reader's own reaction: "이게 말이 돼?" / "no way… this is real?". Everything you write must sound like nowaythis, NOT like the source outlet. Rewrite the outlet's dry press/newswire tone into nowaythis's voice:
+- 구어체·대화체: like a sharp, excited friend who just found out something unbelievable and has to tell you RIGHT NOW.
+- 짧고 리듬감 있는 문장. 문어체·만연체·보도자료 말투 금지. 말줄임표(…)와 작은따옴표('')로 리듬과 긴장을 준다.
+- 담백하되 위트 있게. 자극적이되 신뢰는 잃지 않는다 — 과장·낚시·허위는 금지.
+- 어려운 전문용어·기사체 표현은 nowaythis의 쉬운 말로 풀어 쓴다.
+- 이 보이스를 각 언어/시장에 맞게 현지화한다(직역이 아니라, 그 시장의 nowaythis라면 이렇게 말한다).
+
+═══ 지적재산권 — 절대 규칙 (CRITICAL) ═══
+This is a restyling of TONE, never a reinterpretation of FACTS.
+- FACTS are free and MUST stay accurate: 이름·숫자·날짜·장소·사건은 원문 그대로 정확하게. 사실을 지어내거나 바꾸지 말 것.
+- But NEVER reuse the source's HEADLINE, and NEVER copy the source's sentences or phrasing. 원문의 제목을 변형만 하는 것도 금지. Every sentence must be RE-EXPRESSED from scratch in nowaythis's own words and structure — different sentence order, different framing, your own hook.
+- 자가 점검: 만약 당신이 쓴 어떤 문구가 원문 기사에서 그대로 검색될 수 있다면, 그 문구는 다시 써라.
+`;
+
 function buildThumbPrompt(source, style, langs, handle){
   const brand = handle ? ("The account handle is \"" + handle + "\" — use it in the follow-CTA line.") : "Use a generic 'follow us' style follow-CTA line.";
   return `You are a WORLD-CLASS viral Instagram hook copywriter for a faceless "shocking & fascinating global news" account (Korean issue-account style: whynotmag_, hey.news, kinetic_trigger). Your ONE job: write a thumbnail headline so magnetic that a thumb SToPS mid-scroll. Base everything ONLY on facts in the source — rewrite in your own words, never copy verbatim, never fabricate.
@@ -850,7 +867,7 @@ SOURCE:
 """${source}"""
 
 EXTRA STYLE GUIDE: ${style || "punchy, provocative, curiosity-gap"}
-
+${NOWAYTHIS_VOICE}
 ═══ THE HOOK IS EVERYTHING ═══
 First, silently find the SINGLE most shocking / unbelievable / counter-intuitive / "wait, WHAT?" detail in this story. That detail — not a bland summary — is your headline. Then WITHHOLD the payoff: the headline must open a curiosity gap that FORCES the reader into the caption. Weak = summarizing. Strong = making them NEED to know.
 
@@ -902,7 +919,7 @@ SOURCE:
 """${source}"""
 
 EXTRA STYLE GUIDE: ${style || "credible, real-case-driven, warning-signs framing"}
-
+${NOWAYTHIS_VOICE}
 ═══ THE FORMULA (medical_newsroom pattern) ═══
 Real, relatable medical stories hook through a SPECIFIC PERSON'S EXPERIENCE + a TWIST ENDING, then earn trust with expert guidance and a named source. Two proven templates:
 A) "증상→반전 진단" (symptom → shocking diagnosis): "[평범해 보이는 증상] 하던 [나이대/성별], 결국 [충격적 진단/결말]"
@@ -948,7 +965,7 @@ SOURCE:
 """${source}"""
 
 EXTRA STYLE GUIDE: ${style || "warm, sincere, moving — like sharing good news about someone you admire"}
-
+${NOWAYTHIS_VOICE}
 For EACH of these languages: ${langs.join(", ")} produce a JSON object with:
 - "person": the celebrity's name for a photo lookup — give the INTERNATIONALLY-KNOWN English/romanized name (e.g. "IU", "Son Heung-min", "BTS Jin"). If the story isn't about one identifiable person, use "".
 - "hooks": array of EXACTLY 4 DISTINCT headline options {"line1","line2","line3"} (line3 "" if 2 lines suffice), each emphasizing a different angle (the scale/number, the backstory, the surprise, the impact). Order STRONGEST FIRST. Each line ~8-16 chars Korean, no ** markup. Make them scroll-stopping but true.
@@ -981,7 +998,7 @@ SOURCE:
 """${source}"""
 
 STYLE GUIDE: ${style || "curiosity-driven, easy to understand"}
-
+${NOWAYTHIS_VOICE}
 LOCALIZE, DON'T TRANSLATE: write each language as a NATIVE of that market would — adapt idioms, cultural references, tone, units and currency. It must read like it was originally written by a local, not translated. A literal translation is a failure.
 
 For EACH of these languages: ${langs.join(", ")} produce:
@@ -1025,7 +1042,7 @@ SOURCE:
 """${source}"""
 
 STYLE GUIDE: ${style || "warm, personal-essay tone, like a wiser friend talking to you"}
-
+${NOWAYTHIS_VOICE}
 GOAL: readers should feel "이 문장 저장해야겠다" (I need to save this) — this genre performs well specifically because swiping through multiple cards increases dwell time, which is what Instagram's Bonuses program rewards.
 
 For EACH of these languages: ${langs.join(", ")} produce:
