@@ -434,8 +434,7 @@
       <div>
         <label>해상도</label>
         <select id="reelRes">
-          <option value="1080" selected>1080×1920 (고화질 · PC 권장)</option>
-          <option value="720">720×1280 (가벼움 · 모바일)</option>
+          <option value="1080" selected>1080×1920 (고화질 · 인스타 권장)</option>
         </select>
       </div>
       <div>
@@ -2462,8 +2461,7 @@ async function generateReel(){
   const lang = state.activeLang;
   if(!lang || !state.results[lang]){ setReelStatus("먼저 카드뉴스를 생성하세요.", "err"); return; }
   if(typeof MediaRecorder === "undefined"){ setReelStatus("이 브라우저는 영상 녹화를 지원하지 않습니다. 최신 사파리/크롬에서 시도하세요.", "err"); return; }
-  const resSel = (document.getElementById("reelRes").value === "720");
-  const W = resSel ? 720 : 1080, H = resSel ? 1280 : 1920;
+  const W = 1080, H = 1920; // 인스타 릴스 최소 해상도 고정
   const D = parseFloat(document.getElementById("reelDur").value);
   const trans = document.getElementById("reelTrans").value;
   const zoom = document.getElementById("reelZoom").checked;
@@ -2491,7 +2489,7 @@ async function generateReel(){
     let audio = null;
     if(audioFile){ try{ audio = await attachReelAudio(stream, audioFile); }catch(e){ console.warn("audio skip", e); } }
 
-    const recorder = new MediaRecorder(stream, mime ? { mimeType:mime, videoBitsPerSecond: resSel ? 6e6 : 12e6 } : undefined);
+    const recorder = new MediaRecorder(stream, mime ? { mimeType:mime, videoBitsPerSecond: 12e6 } : undefined);
     const chunks = [];
     recorder.ondataavailable = e=>{ if(e.data && e.data.size) chunks.push(e.data); };
     const stopped = new Promise(res=>{ recorder.onstop = res; });
@@ -2526,7 +2524,7 @@ async function generateReel(){
     toast("릴스 영상이 생성되었습니다");
   }catch(e){
     console.error(e);
-    setReelStatus("릴스 생성 실패: " + e.message + " (해상도 720 / 컷 전환으로 재시도해 보세요)", "err");
+    setReelStatus("릴스 생성 실패: " + e.message + " (장면 수를 줄이거나 컷 전환으로 재시도해 보세요)", "err");
   }finally{
     btn.disabled = false;
   }
