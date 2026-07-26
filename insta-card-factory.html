@@ -1611,7 +1611,12 @@ function drawCover(cv, line1, line2, line3){
   const ctx = cv.getContext("2d");
   const W=cv.width, H=cv.height;
 
-  if(state.image){ coverFit(ctx, state.image, W, H, state.imgTransform); }
+  // 매 프레임 캔버스를 먼저 비운다 — 이동/확대 시 이전 프레임 잔상(잔물결)이 남는 것을 방지
+  ctx.clearRect(0,0,W,H);
+  if(state.image){
+    ctx.fillStyle = "#000"; ctx.fillRect(0,0,W,H); // 이동으로 드러난 여백은 검은 배경으로
+    coverFit(ctx, state.image, W, H, state.imgTransform);
+  }
   else{
     const g = ctx.createLinearGradient(0,0,W,H);
     g.addColorStop(0,"#3b1d8f"); g.addColorStop(1,"#12061f");
@@ -1934,11 +1939,21 @@ function attachCoverImageEditor(box, canvas, redraw){
   canvas.addEventListener("wheel", e=>{
     e.preventDefault();
     t.scale = clamp(t.scale * (e.deltaY < 0 ? 1.06 : 0.94), 1, 4);
-    syncUI(); redraw();
+    requestCoverRedraw(syncUI, redraw);
   }, {passive:false});
 }
 
-let _coverDrag = null;
+// 렉/잔물결 방지: 포인터 이벤트마다 즉시 그리지 않고 requestAnimationFrame으로 프레임당 1회만 그린다.
+let _coverDrag = null, _coverRaf = 0, _coverPending = null;
+function requestCoverRedraw(syncUI, redraw){
+  _coverPending = {syncUI, redraw};
+  if(_coverRaf) return;
+  _coverRaf = requestAnimationFrame(()=>{
+    _coverRaf = 0;
+    const p = _coverPending; _coverPending = null;
+    if(p){ p.syncUI(); p.redraw(); }
+  });
+}
 function coverDragMove(cx, cy){
   const d = _coverDrag; if(!d) return;
   const rect = d.canvas.getBoundingClientRect();
@@ -1947,7 +1962,7 @@ function coverDragMove(cx, cy){
   d.t.x = cl(d.t.x + (cx - d.lx)/rect.width*100);
   d.t.y = cl(d.t.y + (cy - d.ly)/rect.height*100);
   d.lx = cx; d.ly = cy;
-  d.syncUI(); d.redraw();
+  requestCoverRedraw(d.syncUI, d.redraw);
 }
 window.addEventListener("mousemove", e=>coverDragMove(e.clientX, e.clientY));
 window.addEventListener("mouseup", ()=>{ _coverDrag = null; });
