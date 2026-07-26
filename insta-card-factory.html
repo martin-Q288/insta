@@ -867,6 +867,48 @@ This is a restyling of TONE, never a reinterpretation of FACTS.
 - 자가 점검: 만약 당신이 쓴 어떤 문구가 원문 기사에서 그대로 검색될 수 있다면, 그 문구는 다시 써라.
 `;
 
+/* ---------- nowaythis 플레이북: 실제 1,000회+ 반응 터진 콘텐츠 20건 분석에서 뽑은 규칙 ----------
+   (whynotmag_ / kinetic_trigger / medical_newsroom / _hey.news_ / yonhap_news 벤치마크) */
+const NOWAYTHIS_PLAYBOOK = `
+═══ nowaythis 플레이북 — 바이럴 규칙 (반드시 적용) ═══
+아래는 실제로 좋아요 1,000~48,000, 공유 수천~15만이 나온 게시물들에서 검증된 규칙입니다.
+
+[1] 소재를 보는 렌즈 — 즉각 반응이 터지는 앵글로 프레이밍하라. 이 스토리가 아래 중 무엇에 가장 가까운지 먼저 판단:
+  - 초현실·황당 "이게 실화?" (예: 양떼가 대마초 100kg을 먹어치움 / 미슐랭 식당이 개미를 요리에)
+  - 밈·인터넷 문화 현상 (예: 라스베이거스 스피어에 '클럽 고양이' 밈, 15억 원)
+  - 충격 시사·비리 (예: 수능 문항 거래 일타강사 징역 1년 구형)
+  - 부고·비극, 의미 있는 죽음 (예: '고질라' 한국계 배우 18세에 교통사고 사망)
+  - 정책·꿀정보, 내 삶에 영향 (예: 전기차 낮 충전료 '0원', 한강 밤샘 캠핑 8년 만에 허용)
+  - 감동 실화·미담 (예: 집 살 2천만 원으로 할아버지에게 월드컵을 보여준 손자 / 해경이 포상금 1천만 원 기부)
+  - 훈훈·힐링 (예: 어린이 병원으로 출근하는 치료견들)
+  → 대부분의 승자는 '돈·숫자·스케일'이 헤드라인에 박혀 있고(15억, 2천만 원, 100kg, 4만9천 마리), 감정(경악/분노/감동/훈훈)이 3초 안에 튄다.
+
+[2] 헤드라인 스타일 (검증됨):
+  - 명사·동사 종결형으로 임팩트: "…먹어버렸다", "15억 원을 썼다", "징역 1년 구형", "18세에 사망", "포상금 기부", "8년 만에 허용"
+  - 따옴표+말줄임표로 여운: "전기차 낮 충전료 '0원'…"
+  - 금액·수치·기간을 그대로 노출: '2,000만원', '100kg', '15억 원'
+  - 금기/반전 병치: "식용 불가 '개미 토핑' → 미슐랭2스타 대표 징역"
+
+[3] 캡션 본문 — 소재에 맞춰 아래 두 모드 중 하나를 선택:
+  · 모드 A (뉴스 서술형): 사건·시사·부고·황당뉴스에 적합.
+    리드(핵심 사실 한 줄) → 배경·경위 2~4단락(구체적 이름/숫자/날짜/장소) → 관계자 직접 인용 → 마무리.
+  · 모드 B (요약·설명형): 정책·꿀정보·감동 사연에 적합.
+    리드(후킹+상황) → '핵심 요약' 3항목 내외를 "라벨: 설명" 형태로 나열
+      (정책 예: "낮 충전료 0원: …입니다." / "왜 하필 낮 시간대?: …전략입니다.")
+      (감동 예: "평생의 소원: …" / "망설임 없는 선택: …" / "돈으로 살 수 없는 가치: …")
+    → 여운·질문 마무리.
+
+[4] 직접 인용 (신뢰도 급상승): 원문에 발언/코멘트가 있으면 캡션에 최소 1개를 큰따옴표로 그대로가 아닌 재표현해 인용하라
+   (예: 검찰 측은 "…"라며 질책했습니다 / 당사자는 "…"고 말했습니다). 없는 발언을 지어내지는 말 것.
+
+[5] 마무리 시그니처 — 캡션 끝(팔로우 CTA 직전)에 '여운을 남기는 통찰 한 줄'을 반드시 넣어라. 요약이 아니라 관점.
+   실제 예: "세상에서 가장 이상한 사건은 항상 예고 없이 찾아옵니다." / "점점 삭막해지는 세상 속, 진짜 소중한 것이 무엇인지 다시 생각하게 만드는 사연입니다." / "여러분에게 돈으로 환산할 수 없는 가장 소중한 가치는 무엇인가요?"
+
+[6] 금액은 항상 원화 병기: "약 100만 달러(한화 약 15억 원)"처럼. 외화 단독 표기 금지.
+
+[7] CTA는 두 가지 중 소재에 맞게: 팔로우 유도("팔로우하고 최신 소식을 확인하세요") 또는 공유·태그 유도("주변에 알려주고 싶은 친구를 태그해 보세요"). 감동·미담엔 태그형이 잘 먹힌다.
+`;
+
 function buildThumbPrompt(source, style, langs, handle){
   const brand = handle ? ("The account handle is \"" + handle + "\" — use it in the follow-CTA line.") : "Use a generic 'follow us' style follow-CTA line.";
   return `You are a WORLD-CLASS viral Instagram hook copywriter for a faceless "shocking & fascinating global news" account (Korean issue-account style: whynotmag_, hey.news, kinetic_trigger). Your ONE job: write a thumbnail headline so magnetic that a thumb SToPS mid-scroll. Base everything ONLY on facts in the source — rewrite in your own words, never copy verbatim, never fabricate.
@@ -876,6 +918,7 @@ SOURCE:
 
 EXTRA STYLE GUIDE: ${style || "punchy, provocative, curiosity-gap"}
 ${NOWAYTHIS_VOICE}
+${NOWAYTHIS_PLAYBOOK}
 ═══ THE HOOK IS EVERYTHING ═══
 First, silently find the SINGLE most shocking / unbelievable / counter-intuitive / "wait, WHAT?" detail in this story. That detail — not a bland summary — is your headline. Then WITHHOLD the payoff: the headline must open a curiosity gap that FORCES the reader into the caption. Weak = summarizing. Strong = making them NEED to know.
 
@@ -899,13 +942,16 @@ For EACH of these languages: ${langs.join(", ")} produce a JSON object with:
 - "hooks": an array of EXACTLY 10 DISTINCT headline options, each {"line1","line2","line3"} (line3 "" if 2 lines suffice). Draw on a VARIETY of the hook patterns from the list — you may revisit a pattern with a genuinely fresh angle to reach 10, but no two hooks may be near-duplicates. Order them STRONGEST FIRST (hooks[0] = the single most scroll-stopping one). The array MUST contain 10 items.
 - "line1","line2","line3": copy hooks[0] here (the strongest headline).
 - "badge": a short punchy tone word (2-4 chars) in that language (충격/경악/소름/반전/신기 · SHOCK/INSANE/WOW · 衝撃/驚愕).
-- "caption": the COMPLETE Instagram caption in that language, real line breaks (\\n):
+- "caption": the COMPLETE Instagram caption in that language, real line breaks (\\n). FOLLOW THE PLAYBOOK above. Pick caption MODE A (뉴스 서술형) or MODE B (요약·설명형) based on the story type, then build:
   (1) HOOK line: one punchy sentence that escalates the headline (don't just repeat it).
-  (2) blank line, then 2-4 SHORT body paragraphs (1-3 sentences each): WHO/WHERE/WHAT then HOW/WHY, each with CONCRETE facts from the source (names, numbers, dates, places). Lead with the most surprising fact. Money → convert to reader's local currency.
-  (3) blank line, then ONE closing payoff line.
-  (4) blank line, then a FOLLOW-CTA line. ${brand}
+  (2) blank line, then the BODY per the chosen mode:
+      · MODE A: 2-4 SHORT paragraphs (1-3 sentences each) — WHO/WHERE/WHAT then HOW/WHY, each with CONCRETE facts (names, numbers, dates, places). Lead with the most surprising fact.
+      · MODE B: a "핵심 요약" block of 3-ish labeled items in "라벨: 설명" form, each a concrete point from the source.
+      In EITHER mode, if the source contains a statement/comment, weave in at least ONE direct quote (re-expressed, in quotation marks) from a named party. Money → always show local currency alongside (외화 단독 금지).
+  (3) blank line, then the SIGNATURE CLOSING: one 여운-남기는 통찰 line — a perspective, not a summary (see playbook [5]).
+  (4) blank line, then a CTA line — follow-CTA or share/tag-CTA per the story (playbook [7]). ${brand}
   (5) blank line, then a source line starting with "출처:" (or that language's "Source:") citing the org/outlet from the source.
-  COMPREHENSION IS MANDATORY: the caption must fully explain the story so a reader with zero context understands and is convinced. If you raise a question in the body (e.g. "what was the defect?"), you MUST answer it concretely in the same caption using facts from the source — never leave an open question unanswered (only the CTA may be a call to action). No vague filler ("무수한 과실", "어떤 결함") without the actual specifics. Engaging and TRUE — no invented facts. Do NOT use any emoji anywhere in the caption.
+  COMPREHENSION IS MANDATORY: the caption must fully explain the story so a reader with zero context understands and is convinced. If you raise a question in the body, you MUST answer it concretely in the same caption using facts from the source — never leave an open question unanswered (only the CTA may be a call to action). No vague filler ("무수한 과실", "어떤 결함") without the actual specifics. Engaging and TRUE — no invented facts. Do NOT use any emoji anywhere in the caption.
 - "hashtags": one line of 6-10 relevant hashtags for that language/market.
 - "image_queries": an array of EXACTLY 4 DISTINCT cover-image concepts, ranked STRONGEST FIRST. Each is a SHORT English image-generation prompt (4-8 words) for the single most CURIOSITY-MAXIMIZING cover visual — a viewer should see it and NEED to read the story. RULES: ONE clear subject or scene only (NEVER a collage, split-screen, or two things side by side); cinematic/atmospheric and specific to THIS story's shocking core (e.g. for a dangerous restaurant stool: "ominous empty metal stool dim korean bbq restaurant, moody lighting"); photographic/realistic; NO text, NO watermark, NO close-up identifiable faces. Make each of the 4 a genuinely different visual angle so the user can pick the best.
 
@@ -944,7 +990,8 @@ For EACH of these languages: ${langs.join(", ")} produce a JSON object with:
   (1) HOOK line: one sentence stating the core finding as a health headline (e.g. "밤에 소변 자주 보는 증상, 전립선암 신호일 수도 있다").
   (2) blank line, then THE CASE paragraph (1-3 sentences): the concrete real-world case from the source — who (age/gender, anonymized), what symptom/situation, what happened. Concrete details only.
   (3) blank line, then THE MEDICAL EXPLANATION paragraph(s) (1-2 short paragraphs): what this condition is, why the symptom is easy to mistake for something else, what the real warning signs are. Grounded in the source.
-  (4) blank line, then EXPERT GUIDANCE paragraph: what doctors/experts recommend (checkups, age thresholds, when to see a doctor) — actionable and specific if the source supports it.
+  (4) blank line, then EXPERT GUIDANCE paragraph: what doctors/experts recommend (checkups, age thresholds, when to see a doctor) — actionable and specific if the source supports it. 원문에 의료진·전문가·당사자 발언이 있으면 큰따옴표로 1개 이상 인용하세요(없는 말은 지어내지 말 것).
+  (4b) blank line, then a SIGNATURE CLOSING: 여운을 남기는 통찰 한 줄(요약이 아닌 관점 — 예: "작은 신호를 흘려보내지 않는 것이 때로 생명을 지킵니다.").
   (5) blank line, then a source line starting with "출처:" citing the ACTUAL named outlet/journal/association from the source (e.g. "출처: The Sun, 대한비뇨기종양학회" or "출처: American Association of Neurological Surgeons (AANS)"). Never invent a source not implied by the material.
   (6) blank line, then a FOLLOW-CTA line inviting readers to follow for more health news. ${brand}
   Tone: serious, credible, caring — NOT clickbait-trashy. This account's power is TRUST. Do NOT use any emoji anywhere in the caption.
@@ -981,9 +1028,9 @@ For EACH of these languages: ${langs.join(", ")} produce a JSON object with:
 - "badge": short word (2-4 chars) fitting the story's tone in that language (미담/감동/화제/컴백/데뷔).
 - "caption": the COMPLETE Instagram caption, real line breaks (\\n):
   (1) HOOK line stating the core fact.
-  (2) blank line, then 2-3 short paragraphs telling the story concretely (who, what, the specific number/scale, the backstory) — grounded in the source.
-  (3) blank line, then a closing line (the impact, or what it means).
-  (4) blank line, then a FOLLOW-CTA inviting readers to follow for more. ${brand}
+  (2) blank line, then 2-3 short paragraphs telling the story concretely (who, what, the specific number/scale, the backstory) — grounded in the source. 원문에 당사자·관계자 발언이 있으면 큰따옴표로 1개 이상 인용하세요(없는 말은 지어내지 말 것). 금액은 원화로 표기.
+  (3) blank line, then a SIGNATURE CLOSING: 여운을 남기는 통찰 한 줄(단순 요약이 아니라 관점 — 감동·의미를 짚는 문장, 또는 독자에게 던지는 질문).
+  (4) blank line, then a CTA — 팔로우 유도 또는 공유·태그 유도(미담·감동엔 태그형이 잘 먹힙니다). ${brand}
   (5) blank line, then a source line starting with "출처:" citing the actual outlet from the source.
   Do NOT use any emoji anywhere in the caption. (A photo-credit line will be appended automatically — do not add one yourself.)
 - "hashtags": one line of 6-10 warm/celebrity hashtags for the Korean market.
