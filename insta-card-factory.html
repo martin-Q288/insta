@@ -462,7 +462,8 @@
   <div class="panel" id="videoReelPanel" style="margin-top:20px;">
     <h2>5. 내 영상으로 릴스 만들기 <small style="text-transform:none; color:var(--muted);">— 보유한 원본 영상 위에 <b style="color:var(--accent2)">강력한 후킹 문구</b>를 얹어 9:16 릴스로</small></h2>
     <div class="notice" style="margin-top:0;">
-      원본 영상을 올리고 <b>상단 후킹 문구</b>를 입력하세요. 영상의 소리도 그대로 포함됩니다. 완성하면 <b>[저장]</b>으로 앨범에 담아 인스타 앱에서 릴스로 올리며 <b>인기 음원</b>을 얹으면 도달이 커집니다. (인스타 릴스 권장 길이 15~90초)
+      원본 영상을 올리고, 기사를 넣으면 <b>스크롤을 멈추게 할 임팩트 자막</b>을 자동으로 함축해 만듭니다(4~8개). 상단 후킹은 <b>검은 띠 배경</b>으로 가독성을 높였고, 미리보기에서 <b>영상 크기·좌우·상하 편집</b>도 됩니다. 영상 소리도 그대로 포함됩니다.<br>
+      <b>속도 팁</b> — 녹화는 영상 길이만큼 실시간으로 진행됩니다. <b>시작/끝을 15~30초로 트림</b>하면 훨씬 빠르고, 릴스도 짧을수록 완주율이 높습니다. 완성 후 <b>[저장]</b> → 인스타 앱에서 릴스로 올리며 <b>인기 음원</b>을 얹으면 도달이 커집니다.
     </div>
     <label>영상 업로드</label>
     <input type="file" id="vrFile" accept="video/*" onchange="vrLoad()">
@@ -513,7 +514,15 @@
     </div>
     <div style="margin-top:12px; display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start;">
       <video id="vrVideo" playsinline crossorigin="anonymous" style="display:none;"></video>
-      <canvas id="vrCanvas" style="display:none; width:250px; border-radius:12px; border:1px solid var(--line); background:#000; cursor:default;"></canvas>
+      <canvas id="vrCanvas" style="display:none; width:250px; border-radius:12px; border:1px solid var(--line); background:#000; cursor:move;"></canvas>
+      <div id="vrEdit" class="img-edit" style="display:none; width:250px; margin-top:0;">
+        <div style="font-size:12px; color:var(--muted);">영상 편집 (크기·좌우·상하)</div>
+        <div class="img-edit-row"><span class="img-edit-lab">크기</span><input type="range" id="vrScale" min="1" max="4" step="0.02" value="1" oninput="vrSlider()"></div>
+        <div class="img-edit-row"><span class="img-edit-lab">좌우</span><input type="range" id="vrX" min="-100" max="100" step="1" value="0" oninput="vrSlider()"></div>
+        <div class="img-edit-row"><span class="img-edit-lab">상하</span><input type="range" id="vrY" min="-100" max="100" step="1" value="0" oninput="vrSlider()"></div>
+        <button class="btn-ghost btn-sm" onclick="vrResetTransform()">영상 위치 초기화</button>
+        <div class="img-edit-hint">미리보기를 드래그해 이동, 마우스 휠로 확대/축소할 수 있어요.</div>
+      </div>
     </div>
     <button class="btn-primary" id="vrBtn" onclick="vrGenerate()">영상 릴스 만들기</button>
     <div class="status" id="vrStatus"></div>
@@ -2619,32 +2628,103 @@ function vrLoad(){
   };
   v.onseeked = ()=>vrPreview();
   v.onerror = ()=>vrSetStatus("영상을 불러오지 못했습니다. mp4/mov 파일로 시도하세요.", "err");
+  document.getElementById("vrEdit").style.display = "flex";
+  vrResetTransform();
+  vrBindEditor();
+}
+
+/* 슬라이더 → 변형값 반영 */
+function vrSlider(){
+  const num = (id, d)=>{ const el=document.getElementById(id); return el ? parseFloat(el.value) : d; };
+  vrTransform.scale = num("vrScale", 1);
+  vrTransform.x = num("vrX", 0);
+  vrTransform.y = num("vrY", 0);
+  vrPreview();
+}
+
+/* 미리보기 드래그 이동 + 휠 확대 (이미지 편집기와 동일 개념). 리스너는 1회만 바인딩. */
+function vrBindEditor(){
+  if(window._vrBound) return; window._vrBound = true;
+  const cv = document.getElementById("vrCanvas");
+  const cl = (v)=>Math.max(-100, Math.min(100, v));
+  let drag = null;
+  const syncSliders = ()=>{
+    const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v; };
+    set("vrScale", vrTransform.scale); set("vrX", vrTransform.x); set("vrY", vrTransform.y);
+  };
+  const down = (x,y)=>{ drag = { x, y }; };
+  const move = (x,y)=>{
+    if(!drag) return;
+    const rect = cv.getBoundingClientRect();
+    if(!rect.width || !rect.height) return;
+    vrTransform.x = cl(vrTransform.x + (x - drag.x)/rect.width*100);
+    vrTransform.y = cl(vrTransform.y + (y - drag.y)/rect.height*100);
+    drag = { x, y }; syncSliders(); vrPreview();
+  };
+  cv.addEventListener("mousedown", e=>{ e.preventDefault(); down(e.clientX, e.clientY); });
+  window.addEventListener("mousemove", e=>move(e.clientX, e.clientY));
+  window.addEventListener("mouseup", ()=>{ drag = null; });
+  cv.addEventListener("touchstart", e=>{ if(e.touches[0]) down(e.touches[0].clientX, e.touches[0].clientY); }, {passive:true});
+  cv.addEventListener("touchmove", e=>{ if(e.touches[0]){ e.preventDefault(); move(e.touches[0].clientX, e.touches[0].clientY); } }, {passive:false});
+  cv.addEventListener("touchend", ()=>{ drag = null; });
+  cv.addEventListener("wheel", e=>{
+    e.preventDefault();
+    vrTransform.scale = Math.max(1, Math.min(4, (vrTransform.scale||1) * (e.deltaY < 0 ? 1.06 : 0.94)));
+    syncSliders(); vrPreview();
+  }, {passive:false});
+}
+
+/* 영상 크기·위치 편집 변형 (이미지 편집기와 동일 개념) */
+let vrTransform = { x:0, y:0, scale:1 };
+function vrResetTransform(){
+  vrTransform = { x:0, y:0, scale:1 };
+  const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.value=v; };
+  set("vrScale",1); set("vrX",0); set("vrY",0);
+  vrPreview();
 }
 
 function vrFitDraw(ctx, v, W, H, fit){
   const vw = v.videoWidth || 16, vh = v.videoHeight || 9;
-  const s = fit === "contain" ? Math.min(W/vw, H/vh) : Math.max(W/vw, H/vh);
+  const base = fit === "contain" ? Math.min(W/vw, H/vh) : Math.max(W/vw, H/vh);
+  const s = base * (vrTransform.scale || 1);
   const dw = vw*s, dh = vh*s;
-  ctx.drawImage(v, (W-dw)/2, (H-dh)/2, dw, dh);
+  const ox = (W-dw)/2 + ((vrTransform.x||0)/100)*W;
+  const oy = (H-dh)/2 + ((vrTransform.y||0)/100)*H;
+  ctx.drawImage(v, ox, oy, dw, dh);
 }
 
+/* 상단 후킹 — 검은 띠 배경 + 흰 글씨(가운데). 줄 계산은 캐싱. */
+function vrHookLines(ctx, text, size, maxW){
+  const key = text + "|" + size + "|" + maxW;
+  if(window._vrHookCache && window._vrHookCache.key === key) return window._vrHookCache.lines;
+  ctx.font = "900 " + size + "px " + FONT;
+  const lines = wrapText(ctx, text, maxW);
+  window._vrHookCache = { key, lines };
+  return lines;
+}
 function vrDrawHook(ctx, W, H, text, pos){
-  const g = ctx.createLinearGradient(0, 0, 0, H*0.42);
-  g.addColorStop(0, "rgba(0,0,0,.72)"); g.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H*0.42);
   const t = (text || "").trim(); if(!t) return;
   const size = Math.round(W*0.062);
+  const maxW = W - 150;
+  const lines = vrHookLines(ctx, t, size, maxW);
   ctx.font = "900 " + size + "px " + FONT;
   ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
-  const lines = wrapText(ctx, t, W - 120);
   const lh = size*1.24;
-  let y = (pos === "upper" ? H*0.16 : H*0.075) + size;
+  const padX = 34, padY = 20;
+  const topY = pos === "upper" ? H*0.14 : H*0.055;
+  const blockH = lines.length*lh;
+  // 검은 띠(전체 블록을 감싸는 둥근 배경)
+  let widest = 0;
+  lines.forEach(ln=>{ widest = Math.max(widest, ctx.measureText(ln).width); });
+  const bw = Math.min(W - 40, widest + padX*2);
+  const bx = (W - bw)/2;
+  ctx.fillStyle = "rgba(0,0,0,.82)";
+  roundRect(ctx, bx, topY, bw, blockH + padY*2 - (lh - size), 16); ctx.fill();
+  // 흰 글씨
+  let y = topY + padY + size;
   lines.forEach(ln=>{
-    ctx.shadowColor = "rgba(0,0,0,.92)"; ctx.shadowBlur = 18;
-    ctx.lineWidth = Math.max(6, size*0.11); ctx.strokeStyle = "rgba(0,0,0,.55)";
-    ctx.strokeText(ln, W/2, y);
     ctx.fillStyle = "#fff"; ctx.fillText(ln, W/2, y);
-    ctx.shadowBlur = 0; y += lh;
+    y += lh;
   });
   ctx.textAlign = "left";
 }
@@ -2663,22 +2743,33 @@ function vrRange(){
   return { start, end: Math.max(end, start + 0.1) };
 }
 
-/* 자막 텍스트(한 줄=한 자막)를 영상 길이에 맞춰 타이밍 배분 */
+const VR_SUB_SIZE = Math.round(1080*0.055);
+function vrMeasureCtx(){
+  if(!window._vrMeasure) window._vrMeasure = makeCanvas(1080, 100).getContext("2d");
+  const c = window._vrMeasure; c.font = "700 " + VR_SUB_SIZE + "px " + SUB_FONT; return c;
+}
+function vrWrapSub(text){
+  const c = vrMeasureCtx(); const maxW = 1080 - 150; const lines = [];
+  String(text||"").replace(/\\n/g,"\n").split("\n").forEach(part=>{ wrapText(c, part, maxW).forEach(l=>lines.push(l)); });
+  return lines;
+}
+
+/* 자막 텍스트(한 줄=한 자막)를 영상 길이에 맞춰 타이밍 배분 + 줄 캐싱 */
 function vrRecomputeSubs(){
   const segs = (document.getElementById("vrSubsText").value || "")
     .split("\n").map(s=>s.trim()).filter(Boolean);
   const { start, end } = vrRange();
   const span = Math.max(0.1, end - start);
   if(!segs.length){ window._vrSubs = []; return; }
-  // 글자 수에 비례하되 최소 1.4초 보장 → 전체 길이에 맞게 정규화
-  const perChar = 0.16, minDur = 1.4;
+  // 글자 수에 비례하되 최소 1.8초 보장(적은 자막 = 더 오래 = 잘 읽힘) → 전체 길이에 맞게 정규화
+  const perChar = 0.18, minDur = 1.8;
   const raw = segs.map(s=> Math.max(minDur, s.replace(/\\n|\n/g,"").length * perChar));
   const sum = raw.reduce((a,b)=>a+b, 0);
   const k = span / sum;
   const subs = []; let t = start;
   for(let i=0; i<segs.length; i++){
     const d = raw[i]*k;
-    subs.push({ text: segs[i], t0: t, t1: (i===segs.length-1 ? end : t + d) });
+    subs.push({ text: segs[i], lines: vrWrapSub(segs[i]), t0: t, t1: (i===segs.length-1 ? end : t + d) });
     t += d;
   }
   window._vrSubs = subs;
@@ -2686,41 +2777,32 @@ function vrRecomputeSubs(){
 
 function vrCurrentSub(time){
   const subs = window._vrSubs || [];
-  for(let i=0; i<subs.length; i++){ if(time >= subs[i].t0 && time < subs[i].t1) return subs[i].text; }
-  if(subs.length && time >= subs[subs.length-1].t1 - 0.001) return subs[subs.length-1].text;
-  return "";
+  for(let i=0; i<subs.length; i++){ if(time >= subs[i].t0 && time < subs[i].t1) return subs[i]; }
+  if(subs.length && time >= subs[subs.length-1].t1 - 0.001) return subs[subs.length-1];
+  return null;
 }
 
-/* 뉴스 스타일 자막 — 가운데 정렬, G마켓 산스, 가독성 밴드 */
-function vrDrawSubtitle(ctx, W, H, text, pos){
-  const t = (text || "").trim(); if(!t) return;
+/* 뉴스 스타일 자막 — 가운데 정렬, G마켓 산스, 검정 가독성 밴드 (줄은 캐싱됨) */
+function vrDrawSubtitle(ctx, W, H, sub, pos){
+  if(!sub || !sub.lines || !sub.lines.length) return;
+  const lines = sub.lines;
   const size = Math.round(W*0.055);
   ctx.font = "700 " + size + "px " + SUB_FONT;
   ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
-  const maxW = W - 150;
-  // 명시적 줄바꿈(\n) 유지 + 자동 줄바꿈
-  const lines = [];
-  String(t).replace(/\\n/g,"\n").split("\n").forEach(part=>{ wrapText(ctx, part, maxW).forEach(l=>lines.push(l)); });
   const lh = size*1.28;
   const blockH = lines.length*lh;
   const centerY = pos === "center" ? H*0.5 : H*0.76;
-  let y = centerY - blockH/2 + size; // 첫 줄 baseline
-  // 가독성 밴드 (각 줄 너비에 맞춘 둥근 검정 반투명)
+  let y = centerY - blockH/2 + size;
   const padX = 26, padY = 12;
-  lines.forEach((ln, i)=>{
+  lines.forEach(ln=>{
     const tw = ctx.measureText(ln).width;
-    const bx = W/2 - tw/2 - padX, by = y - size - padY + 6, bw = tw + padX*2, bh = size + padY*2;
-    ctx.fillStyle = "rgba(0,0,0,.6)";
-    roundRect(ctx, bx, by, bw, bh, 12); ctx.fill();
+    ctx.fillStyle = "rgba(0,0,0,.62)";
+    roundRect(ctx, W/2 - tw/2 - padX, y - size - padY + 6, tw + padX*2, size + padY*2, 12); ctx.fill();
     y += lh;
   });
-  // 텍스트
   y = centerY - blockH/2 + size;
   lines.forEach(ln=>{
-    ctx.shadowColor = "rgba(0,0,0,.9)"; ctx.shadowBlur = 10;
-    ctx.fillStyle = "#fff";
-    ctx.fillText(ln, W/2, y);
-    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#fff"; ctx.fillText(ln, W/2, y);
     y += lh;
   });
   ctx.textAlign = "left";
@@ -2746,20 +2828,21 @@ function vrPreview(){
 }
 
 function buildSubtitlePrompt(source){
-  return `You are creating on-screen SUBTITLES for a Korean news-style Instagram reel (the "nowaythis" account). Based ONLY on the facts in the source, write the narration as a sequence of SHORT subtitle segments that appear one at a time over a video.
+  return `You are writing SCROLL-STOPPING on-screen subtitles for a Korean news-style Instagram reel (the "nowaythis" account). The video is short and people decide in 1-2 seconds whether to keep watching. Your job: distill the article into a FEW, high-impact subtitle beats — not a full transcript.
 ${NOWAYTHIS_VOICE}
 SOURCE:
 """${source}"""
 
-RULES:
-- 한국어. 모든 문장은 '합니다체' 평서형(~습니다/~됐습니다/~입니다). 사실(이름·숫자·날짜·장소)은 정확하게. 원문 문장을 그대로 복사하지 말고 재표현하세요.
-- 내레이션을 의미 단위(MEANING UNIT)로 끊으세요: 각 자막 = 화면에서 한 호흡에 깔끔히 읽히는 짧은 구/절.
-- 각 자막은 1줄이 이상적이며 최대 2줄. 한 줄 약 10~18자. 2줄이 필요하면 자연스러운 곳에 \\n을 넣고 두 줄 길이를 balanced하게.
-- 전체 8~20개. 스토리 전체를 담으세요: 도입(핵심) → 경위/배경 → 결과 → 마무리 한 줄.
-- 이모지·해시태그·출처 줄 넣지 마세요. 순수 내레이션만.
-- 그리고 "hook": 영상 상단에 얹을 1~2줄 강렬한 명사형 후킹 헤드라인.
+핵심 원칙 (반드시):
+- 함축하라. 기사를 요약·나열하지 말고, 스크롤을 멈추게 할 '결정적 한 방'들만 남기세요. 곁가지·배경설명은 과감히 버립니다.
+- 자막 수는 4~8개로 제한. 너무 많으면 사람들이 못 읽고 이탈합니다. 적을수록 강합니다.
+- 각 자막은 짧고 강하게. 한 줄 약 8~16자, 최대 2줄(2줄이 꼭 필요할 때만 \\n). 화면에서 0.5초 안에 읽히는 길이.
+- 배열 순서 = 몰입 곡선: (1) 가장 충격적/궁금한 한 방으로 시작 → (2~3) 핵심 사실·숫자·반전 → (마지막) 여운/한 방 마무리.
+- 사실(이름·숫자·날짜·장소)은 정확하게. 외화는 원화로. 원문 문장 그대로 복사 금지 — 재표현. '합니다체' 유지하되 짧게 끊어 임팩트를 살립니다(명사 종결도 허용: "…충격", "…역대 최대").
+- 이모지·해시태그·출처 줄 금지. 순수 자막만.
+- "hook": 영상 상단 검은 띠에 얹을 1~2줄 초강력 명사형 후킹(가장 궁금하게 만드는 문구). 자막보다 더 세게.
 
-Return ONLY valid JSON (no fences, no commentary). \\n은 두 줄 자막에만.
+Return ONLY valid JSON (no fences, no commentary). \\n은 두 줄일 때만.
 {"hook":"...","subtitles":["첫 자막","두 번째 자막","..."]}`;
 }
 
