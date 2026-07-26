@@ -372,7 +372,7 @@
       <div class="preview-area" id="previewArea">
         <div class="lang-empty">소재를 입력하고 [카드뉴스 생성]을 누르면 미리보기가 나타납니다.<br><small>카드 이미지를 클릭하면 클립보드에 복사됩니다.</small></div>
       </div>
-      <div id="celebPicker" style="display:none; margin-top:12px; padding:12px; background:var(--panel2); border:1px solid var(--line); border-radius:10px;"></div>
+      <div id="coverPicker" style="display:none; margin-top:12px; padding:12px; background:var(--panel2); border:1px solid var(--line); border-radius:10px;"></div>
       <div id="captionWrap" style="display:none;">
         <label style="margin-top:18px;">캡션 + 해시태그 <small style="color:var(--muted);">(직접 수정 가능)</small></label>
         <div class="caption-box" id="captionBox" contenteditable="true" style="cursor:text;"></div>
@@ -579,8 +579,9 @@ async function fetchArticle(){
       setStatus("본문 추출 완료 (" + clean.length + "자, " + found.src + " 경로). 필요하면 편집 후 생성하세요.", "ok");
     }
     window._pendingMeta = null;
+    window._articleImageUrl = "";
     // 기사 이미지 자동 적용: RSS 썸네일이 있으면 그것을, 없으면 og:image 추출
-    if(window._pendingThumb){ setCoverFromUrl(window._pendingThumb); window._pendingThumb = null; }
+    if(window._pendingThumb){ window._articleImageUrl = window._pendingThumb; setCoverFromUrl(window._pendingThumb); window._pendingThumb = null; }
     else{ extractOgImage(url); }
   }catch(e){
     setStatus("추출 실패: " + e.message, "err");
@@ -672,7 +673,7 @@ async function findArticleImage(url){
 }
 async function extractOgImage(url){
   const im = await findArticleImage(url);
-  if(im) setCoverFromUrl(im);
+  if(im){ window._articleImageUrl = im; setCoverFromUrl(im); }
 }
 
 /* ---------- lang checkboxes ---------- */
@@ -868,12 +869,12 @@ For EACH of these languages: ${langs.join(", ")} produce a JSON object with:
 - "caption": the COMPLETE Instagram caption in that language, real line breaks (\\n):
   (1) HOOK line: one punchy sentence that escalates the headline (don't just repeat it).
   (2) blank line, then 2-4 SHORT body paragraphs (1-3 sentences each): WHO/WHERE/WHAT then HOW/WHY, each with CONCRETE facts from the source (names, numbers, dates, places). Lead with the most surprising fact. Money → convert to reader's local currency.
-  (3) blank line, then ONE closing payoff line that resolves the curiosity gap (reader: "헐… 진짜 신기하다").
+  (3) blank line, then ONE closing payoff line.
   (4) blank line, then a FOLLOW-CTA line. ${brand}
   (5) blank line, then a source line starting with "출처:" (or that language's "Source:") citing the org/outlet from the source.
-  Engaging and TRUE — no invented facts. Do NOT use any emoji anywhere in the caption.
+  COMPREHENSION IS MANDATORY: the caption must fully explain the story so a reader with zero context understands and is convinced. If you raise a question in the body (e.g. "what was the defect?"), you MUST answer it concretely in the same caption using facts from the source — never leave an open question unanswered (only the CTA may be a call to action). No vague filler ("무수한 과실", "어떤 결함") without the actual specifics. Engaging and TRUE — no invented facts. Do NOT use any emoji anywhere in the caption.
 - "hashtags": one line of 6-10 relevant hashtags for that language/market.
-- "image_queries": array with EXACTLY ONE short English stock-photo query (2-4 concrete words) — the single most scroll-stopping visual. Prefer concrete photographable nouns/scenes; AVOID close-up human faces (they look AI-generated) unless the story is about a specific famous person.
+- "image_queries": an array of EXACTLY 4 DISTINCT cover-image concepts, ranked STRONGEST FIRST. Each is a SHORT English image-generation prompt (4-8 words) for the single most CURIOSITY-MAXIMIZING cover visual — a viewer should see it and NEED to read the story. RULES: ONE clear subject or scene only (NEVER a collage, split-screen, or two things side by side); cinematic/atmospheric and specific to THIS story's shocking core (e.g. for a dangerous restaurant stool: "ominous empty metal stool dim korean bbq restaurant, moody lighting"); photographic/realistic; NO text, NO watermark, NO close-up identifiable faces. Make each of the 4 a genuinely different visual angle so the user can pick the best.
 
 STRICT JSON RULES:
 - Respond with ONLY valid JSON. No markdown fences, no commentary.
@@ -1062,7 +1063,7 @@ async function generate(){
   const btn = document.getElementById("genBtn");
   btn.disabled = true; setStatus("AI가 각색·번역 중... (10~30초)", "busy");
   state.cardPhotos = [];
-  const cpk = document.getElementById("celebPicker"); if(cpk){ cpk.style.display = "none"; cpk.innerHTML = ""; }
+  const cpk = document.getElementById("coverPicker"); if(cpk){ cpk.style.display = "none"; cpk.innerHTML = ""; }
 
   const prompt = (fmt === "thumb")
     ? (niche === "medical" ? buildMedicalThumbPrompt(source, style, langs, handle)
@@ -1091,8 +1092,9 @@ async function generate(){
     buildTabs(langs);
     setActiveLang(langs[0]);
     setStatus("생성 완료. 카드 클릭 = 복사, 다운로드 버튼 = 저장.", "ok");
-    if(niche === "celeb"){ applyCelebCover(langs[0]); }   // 합법 이미지(위키미디어 커먼즈) 자동 적용
-    else { prepareCardImages(); }
+    if(niche === "celeb"){ applyCelebCover(langs[0]); }        // 합법 이미지(위키미디어 커먼즈) 후보 픽커
+    else if(fmt === "thumb"){ showGeneralCoverPicker(langs[0]); } // 표지 후보(기사 원본+AI) 픽커
+    else { prepareCardImages(); }                                // 멀티 카드: 기존 카드별 이미지
   }catch(e){
     setStatus("실패: " + e.message, "err");
   }finally{
@@ -1313,9 +1315,14 @@ async function fetchCommonsCandidates(name){
 }
 
 /* 연예인 미담: 자동 적용하지 않고 '후보'를 보여주고 사용자가 직접 고르게 한다 (오적용 방지) */
+function weservThumb(url){
+  return "https://images.weserv.nl/?w=220&h=280&fit=cover&url=" + encodeURIComponent(url.replace(/^https?:\/\//, ""));
+}
+
+/* 연예인(합법 CC) 표지 후보 픽커 */
 async function applyCelebCover(lang){
   const r = state.results[lang];
-  const box = document.getElementById("celebPicker");
+  const box = document.getElementById("coverPicker");
   if(!box) return;
   if(!r || !r.person){
     box.style.display = "block";
@@ -1326,21 +1333,41 @@ async function applyCelebCover(lang){
   box.style.display = "block";
   box.innerHTML = "<div class='hint'>‘" + escapeHtml(r.person) + "’ 합법(CC) 사진 검색 중...</div>";
   const cands = await fetchCommonsCandidates(r.person);
-  renderCelebPicker(cands, r.person);
+  const head = cands.length
+    ? "<b>표지 사진을 직접 선택하세요</b> — ‘" + escapeHtml(r.person) + "’ 위키미디어 커먼즈 합법(CC) 후보입니다. <u>인물이 맞는지 꼭 확인</u>하고 클릭. 맞는 게 없으면 왼쪽 ‘표지 이미지’에서 직접 업로드하세요."
+    : "‘" + escapeHtml(r.person) + "’ 합법 사진을 못 찾았습니다. 왼쪽 ‘표지 이미지’에서 <b>합법 이미지를 직접 업로드</b>하세요 (기획사 보도자료 등).";
+  renderCoverPicker(cands.map(c=>({ url:c.url, thumb:c.thumb, sub:c.license, credit:c.credit })), head);
   setStatus("생성 완료 — 아래에서 인물 사진을 직접 확인하고 골라주세요 (자동 적용 안 함).", "ok");
 }
 
-function renderCelebPicker(cands, person){
-  const box = document.getElementById("celebPicker");
+/* 일반 니치 표지 후보 픽커: AI가 뽑은 '궁금증 최대화' 이미지 4장 + 기사 원본 이미지 중 선택 */
+function showGeneralCoverPicker(lang){
+  const r = state.results[lang];
+  const box = document.getElementById("coverPicker");
+  if(!r || !box) return;
+  const queries = (r.image_queries || []).slice(0, 4);
+  const cands = [];
+  const artUrl = window._articleImageUrl || window._pendingThumb || "";
+  if(artUrl) cands.push({ url:artUrl, thumb:weservThumb(artUrl), sub:"기사 원본" });
+  queries.forEach((q, i)=>{
+    const u = pollinationsUrl(q, 137 + i*89);
+    cands.push({ url:u, thumb:weservThumb(u), sub:"AI 후보 " + (i+1) });
+  });
+  const head = "<b>표지 이미지를 직접 고르세요</b> — 내용에 맞고 <u>궁금증을 최대로 키우는</u> 한 장을 선택하세요. ‘AI 후보’는 생성되며 시간이 조금 걸립니다. 마음에 안 들면 왼쪽 ‘표지 이미지’에서 직접 업로드하세요.";
+  renderCoverPicker(cands, head);
+  // 기본으로 첫 후보(기사 원본 있으면 그것, 없으면 AI 1번) 적용
+  if(cands.length) selectCoverPhoto(cands[0], null, true);
+  setStatus("생성 완료 — 아래에서 표지 이미지를 골라주세요.", "ok");
+}
+
+function renderCoverPicker(cands, headHtml){
+  const box = document.getElementById("coverPicker");
   if(!box) return;
   box.style.display = "block";
   box.innerHTML = "";
   const head = document.createElement("div");
-  head.className = "hint";
-  head.style.marginBottom = "6px";
-  head.innerHTML = cands.length
-    ? "<b>표지 사진을 직접 선택하세요</b> — ‘" + escapeHtml(person) + "’ 위키미디어 커먼즈 합법(CC) 후보입니다. <u>인물이 맞는지 꼭 확인</u>하고 클릭하세요. 맞는 게 없으면 왼쪽 ‘표지 이미지’에서 직접 업로드하세요."
-    : "‘" + escapeHtml(person) + "’ 합법 사진을 못 찾았습니다. 왼쪽 ‘표지 이미지’에서 <b>합법 이미지를 직접 업로드</b>하세요 (기획사 보도자료 등).";
+  head.className = "hint"; head.style.marginBottom = "6px";
+  head.innerHTML = headHtml;
   box.appendChild(head);
   if(!cands.length) return;
   const strip = document.createElement("div");
@@ -1351,37 +1378,37 @@ function renderCelebPicker(cands, person){
     const im = document.createElement("img");
     im.src = c.thumb; im.loading = "lazy";
     im.style.cssText = "width:110px; height:140px; object-fit:cover; border-radius:8px; border:2px solid var(--line); background:#000;";
-    im.onmouseover = ()=>im.style.borderColor = "var(--accent)";
-    im.onmouseout = ()=>im.style.borderColor = "var(--line)";
+    im.onmouseover = ()=>{ if(im.style.borderColor.indexOf("62") < 0) im.style.borderColor = "var(--accent)"; };
     const cap = document.createElement("div");
     cap.className = "hint"; cap.style.cssText = "font-size:10px; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;";
-    cap.textContent = c.license;
+    cap.textContent = c.sub || "";
     cell.append(im, cap);
-    cell.onclick = ()=>selectCelebPhoto(c, cell);
+    cell.onclick = ()=>selectCoverPhoto(c, cell);
     strip.appendChild(cell);
   });
   box.appendChild(strip);
 }
 
-function selectCelebPhoto(c, cell){
-  setStatus("표지 사진 불러오는 중...", "busy");
+function selectCoverPhoto(c, cell, quiet){
+  if(!quiet) setStatus("표지 이미지 불러오는 중...", "busy");
   loadImageCors(c.url, img=>{
     state.image = img;
-    // 이전 출처표기 제거 후 새 출처로 갱신 (사진 바꿔도 중복/오표기 방지)
+    // 출처 표기가 필요한 경우(연예인 CC)만 캡션에 붙임
     Object.values(state.results).forEach(rr=>{
       if(!rr) return;
       rr.caption = (rr.caption || "").replace(/\n*사진: .*(위키미디어 커먼즈\)|보도자료)\s*$/,"").trimEnd();
-      rr.caption = (rr.caption || "").trimEnd() + "\n\n" + c.credit;
+      if(c.credit) rr.caption = (rr.caption || "").trimEnd() + "\n\n" + c.credit;
     });
     rerender();
     const cur = state.results[state.activeLang] || {};
     document.getElementById("captionBox").textContent = (cur.caption || "") + "\n\n" + (cur.hashtags || "");
-    // 선택 표시
-    const strip = cell.parentElement;
-    [...strip.children].forEach(ch=>ch.querySelector("img").style.borderColor = "var(--line)");
-    cell.querySelector("img").style.borderColor = "var(--ok)";
-    setStatus("표지 사진 적용 완료 (" + c.license + "). 출처를 캡션에 표기했습니다.", "ok");
-  }, ()=>setStatus("사진을 불러오지 못했습니다 — 직접 업로드하세요.", "err"));
+    if(cell){
+      const strip = cell.parentElement;
+      [...strip.children].forEach(ch=>ch.querySelector("img").style.borderColor = "var(--line)");
+      cell.querySelector("img").style.borderColor = "var(--ok)";
+    }
+    if(!quiet) setStatus("표지 이미지 적용 완료." + (c.credit ? " 출처를 캡션에 표기했습니다." : ""), "ok");
+  }, ()=>{ if(!quiet) setStatus("이미지를 불러오지 못했습니다 — 직접 업로드하세요.", "err"); });
 }
 
 function pollinationsUrl(prompt, seed){
@@ -2775,5 +2802,5 @@ function escapeHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").repl
 </script>
 </body>
 </html>
-<!-- v3.18 — 국가 탭 기본을 일반 니치(모든 기사)로. 연예인은 선택형 -->
+<!-- v3.19 — 표지 이미지 후보 픽커(일반 니치) + 궁금증형 이미지 프롬프트 + 캡션 이해도 강화 -->
 
