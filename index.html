@@ -581,21 +581,35 @@
         <select id="aiDur"><option value="2.4">2.4초 (빠름)</option><option value="2.8" selected>2.8초 (권장)</option><option value="3.2">3.2초 (여유)</option></select>
       </div>
     </div>
-    <button class="btn-primary" id="aiBtn" onclick="aiGenerateReel()">AI 영상 만들기</button>
+    <button class="btn-primary" id="aiPlanBtn" onclick="aiPlanScenes()">1단계 · 장면 구성 만들기</button>
     <div class="status" id="aiStatus"></div>
+
+    <div id="aiPlanWrap" style="display:none; margin-top:14px; padding-top:12px; border-top:1px dashed var(--line);">
+      <div class="notice" style="margin-top:0;">아래에서 <b>제목·장면 자막·이미지 설명</b>을 직접 편집할 수 있습니다. 자막칸에서 <b>Enter로 줄바꿈</b>을 넣으면 영상에도 그대로 반영됩니다. 다 되면 <b>[2단계]</b>를 누르세요.</div>
+      <label style="margin-top:10px;">상단 라벨 <small style="text-transform:none; color:var(--muted);">— 흰색 박스 (선택)</small></label>
+      <input type="text" id="aiLabel" placeholder="상단 흰 박스 문구">
+      <label style="margin-top:10px;">제목 <small style="text-transform:none; color:var(--muted);">— 줄바꿈 = 줄 나눔 · **강조** = 노란색</small></label>
+      <textarea id="aiTitle" class="card-edit" style="width:100%;" rows="3"></textarea>
+      <label style="margin-top:10px;">장면 (자막 · 이미지 설명) <small style="text-transform:none; color:var(--muted);">— 자막에서 Enter로 줄바꿈 편집</small></label>
+      <div id="aiScenesList"></div>
+      <button class="btn-ghost btn-sm" style="margin-top:6px;" onclick="aiAddScene()">+ 장면 추가</button>
+      <label style="margin-top:12px;">게시물 본문 (캡션)</label>
+      <textarea id="aiCaption" class="card-edit" style="width:100%;" rows="6"></textarea>
+      <button class="btn-ghost btn-sm" style="margin-top:6px;" onclick="aiCopyCaption()">본문 복사</button>
+      <button class="btn-primary" id="aiRenderBtn" style="margin-top:10px;" onclick="aiRenderReel()">2단계 · 이미지 생성 &amp; 영상 만들기</button>
+    </div>
+
     <div id="aiOutWrap" style="display:none; margin-top:14px; padding-top:12px; border-top:1px dashed var(--line);">
       <label>최종 확인 <small style="text-transform:none; color:var(--muted);">— 저장 전에 완성 영상을 재생해 확인하세요</small></label>
       <div style="margin-top:8px; display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start;">
         <video id="aiOut" controls playsinline style="width:270px; border-radius:12px; border:1px solid var(--line); background:#000;"></video>
         <div style="flex-direction:column; gap:8px; min-width:230px; display:flex;">
           <button class="btn-primary" style="margin-top:0;" onclick="aiPlayOutput()">▶ 재생하여 확인</button>
+          <button class="btn-ghost btn-sm" onclick="document.getElementById('aiPlanWrap').scrollIntoView({behavior:'smooth'})">✎ 편집 계속하기</button>
           <button class="btn-primary" style="border-color:var(--ok); background:var(--ok);" onclick="vrSave()">확인 완료 · 저장 (앨범)</button>
           <div class="hint" style="margin-top:-2px;">저장 후 인스타 앱에서 릴스로 올리며 <b>인기 음원</b> 선택 = 도달 최대화</div>
         </div>
       </div>
-      <label style="margin-top:12px;">게시물 본문 (캡션)</label>
-      <textarea id="aiCaption" class="card-edit" style="width:100%;" rows="6"></textarea>
-      <button class="btn-ghost btn-sm" style="margin-top:6px;" onclick="aiCopyCaption()">본문 복사</button>
     </div>
   </div>
 </div>
@@ -3041,7 +3055,29 @@ function aiImageUrl(prompt, seed){
   const p = "cinematic photograph, " + (prompt||"atmospheric scene") + ", dramatic lighting, realistic, highly detailed, moody, no text, no watermark, no caption";
   return "https://image.pollinations.ai/prompt/" + encodeURIComponent(p) + "?width=1080&height=1920&nologo=true&model=flux&enhance=true&seed=" + seed;
 }
-function aiLoadImg(url){ return new Promise(res=>{ loadImageCors(url, img=>res(img), ()=>res(null)); }); }
+/* AI 이미지 로드 — 여러 CORS 프록시 + 타임아웃(생성 지연 대비). 실패 시 null. */
+function aiLoadImg(url){
+  const clean = url.replace(/^https?:\/\//, "");
+  const candidates = [
+    url,
+    "https://images.weserv.nl/?url=" + encodeURIComponent(clean),
+    "https://corsproxy.io/?url=" + encodeURIComponent(url),
+    "https://api.allorigins.win/raw?url=" + encodeURIComponent(url)
+  ];
+  return new Promise(res=>{
+    let i = 0;
+    const tryNext = ()=>{
+      if(i >= candidates.length){ res(null); return; }
+      const img = new Image(); img.crossOrigin = "anonymous";
+      let settled = false;
+      const to = setTimeout(()=>{ if(!settled){ settled = true; i++; tryNext(); } }, 40000);
+      img.onload = ()=>{ if(!settled){ settled = true; clearTimeout(to); (img.decode ? img.decode().catch(()=>{}) : Promise.resolve()).then(()=>res(img)); } };
+      img.onerror = ()=>{ if(!settled){ settled = true; clearTimeout(to); i++; tryNext(); } };
+      img.src = candidates[i];
+    };
+    tryNext();
+  });
+}
 
 function aiParseTitle(label, titleText, mctx, W){
   const rawLines = (titleText||"").split("\n").map(s=>s.trim()).filter(Boolean);
@@ -3092,10 +3128,17 @@ function drawAiFrame(ctx, scenes, imgs, t, o){
   ctx.clearRect(0,0,W,H); ctx.fillStyle = "#000"; ctx.fillRect(0,0,W,H);
   let i = Math.floor(t/step); if(i>N-1) i=N-1; if(i<0) i=0;
   const drawScene = (idx, alpha)=>{
-    if(idx<0 || idx>=N || alpha<=0 || !imgs[idx]) return;
-    const tau = Math.max(0, Math.min(D, t - idx*step)); const scale = 1 + 0.08*(tau/D);
-    const im = imgs[idx]; const s = Math.max(W/im.width, H/im.height)*scale; const dw = im.width*s, dh = im.height*s;
-    ctx.globalAlpha = Math.max(0, Math.min(1, alpha)); ctx.drawImage(im, (W-dw)/2, (H-dh)/2, dw, dh); ctx.globalAlpha = 1;
+    if(idx<0 || idx>=N || alpha<=0) return;
+    ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+    if(imgs[idx]){
+      const tau = Math.max(0, Math.min(D, t - idx*step)); const scale = 1 + 0.08*(tau/D);
+      const im = imgs[idx]; const s = Math.max(W/im.width, H/im.height)*scale; const dw = im.width*s, dh = im.height*s;
+      ctx.drawImage(im, (W-dw)/2, (H-dh)/2, dw, dh);
+    } else {
+      const gg = ctx.createLinearGradient(0, 0, W, H); gg.addColorStop(0, "#20232b"); gg.addColorStop(1, "#0e1014");
+      ctx.fillStyle = gg; ctx.fillRect(0, 0, W, H);
+    }
+    ctx.globalAlpha = 1;
   };
   const overlapStart = i*step + step; let curSub = i;
   if(T>0 && i<N-1 && t>=overlapStart){ const f = (t-overlapStart)/T; drawScene(i, 1-f); drawScene(i+1, f); if(f>0.5) curSub = i+1; }
@@ -3124,13 +3167,12 @@ SOURCE:
 Return ONLY valid JSON (no fences): {"label":"...","title":"...","caption":"...","scenes":[{"img":"...","sub":"..."}, ...정확히 ${n}개]}`;
 }
 
-async function aiGenerateReel(){
+/* 1단계: 기사 분석 → 편집 가능한 장면 구성 생성 */
+async function aiPlanScenes(){
   let src = (document.getElementById("aiArticle").value || "").trim();
   if(!src){ aiSetStatus("기사 URL 또는 본문을 입력하세요.", "err"); return; }
-  if(typeof MediaRecorder === "undefined"){ aiSetStatus("이 브라우저는 영상 녹화를 지원하지 않습니다.", "err"); return; }
   const n = parseInt((document.getElementById("aiScenes")||{}).value) || 6;
-  const D = parseFloat((document.getElementById("aiDur")||{}).value) || 2.8;
-  const btn = document.getElementById("aiBtn"); btn.disabled = true;
+  const btn = document.getElementById("aiPlanBtn"); btn.disabled = true;
   try{
     if(/^https?:\/\//.test(src)){
       aiSetStatus("기사 본문 추출 중...", "busy");
@@ -3142,19 +3184,68 @@ async function aiGenerateReel(){
     const raw = await callClaude(buildAiReelPrompt(src, n));
     const j = tryParseJson(raw);
     if(!j || !Array.isArray(j.scenes) || !j.scenes.length) throw new Error("장면 구성 응답을 해석하지 못했습니다. 다시 시도하세요.");
-    const scenes = j.scenes.slice(0, n);
-    if(j.caption) document.getElementById("aiCaption").value = String(j.caption).replace(/\\n/g,"\n").trim();
+    aiRenderPlan(j);
+    aiSetStatus("장면 구성 완료. 제목·자막·이미지 설명을 편집한 뒤 [2단계]를 누르세요. (자막칸 Enter=줄바꿈)", "ok");
+  }catch(e){ aiSetStatus("장면 구성 실패: " + e.message, "err"); }
+  finally{ btn.disabled = false; }
+}
 
-    aiSetStatus("장면 이미지 생성 중... (0/" + scenes.length + ")  ※ 20~60초 걸릴 수 있어요", "busy");
-    const imgs = new Array(scenes.length).fill(null); let done = 0;
-    await Promise.all(scenes.map((sc, i)=> aiLoadImg(aiImageUrl(sc.img || "", 100 + i*97)).then(im=>{
-      imgs[i] = im; done++; aiSetStatus("장면 이미지 생성 중... (" + done + "/" + scenes.length + ")", "busy");
+function aiRenumber(){
+  document.querySelectorAll("#aiScenesList .ai-scene").forEach((el, i)=>{ const s = el.querySelector(".ai-scene-n"); if(s) s.textContent = "장면 " + (i+1); });
+}
+function aiSceneRow(sub, img){
+  const row = document.createElement("div"); row.className = "ai-scene";
+  row.style.cssText = "background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:8px;";
+  const head = document.createElement("div"); head.style.cssText = "display:flex; justify-content:space-between; align-items:center;";
+  const n = document.createElement("span"); n.className = "ai-scene-n"; n.style.cssText = "font-size:12px; color:var(--muted);"; n.textContent = "장면";
+  const del = document.createElement("button"); del.className = "btn-ghost btn-sm"; del.textContent = "삭제";
+  del.style.cssText = "border-color:var(--err); color:var(--err);";
+  del.onclick = ()=>{ row.remove(); aiRenumber(); };
+  head.append(n, del);
+  const ta = document.createElement("textarea"); ta.className = "ai-sub card-edit"; ta.style.cssText = "width:100%; margin-top:6px;"; ta.rows = 2; ta.value = sub; ta.placeholder = "자막 (Enter로 줄바꿈)";
+  const inp = document.createElement("input"); inp.type = "text"; inp.className = "ai-img"; inp.style.cssText = "width:100%; margin-top:6px;"; inp.value = img; inp.placeholder = "이미지 설명 (영문 권장 · 예: dark empty film set at night)";
+  row.append(head, ta, inp);
+  return row;
+}
+function aiAddScene(){ document.getElementById("aiScenesList").appendChild(aiSceneRow("", "")); aiRenumber(); }
+function aiRenderPlan(j){
+  document.getElementById("aiLabel").value = (j.label || "").trim();
+  document.getElementById("aiTitle").value = String(j.title || "").replace(/\\n/g, "\n").trim();
+  if(j.caption) document.getElementById("aiCaption").value = String(j.caption).replace(/\\n/g, "\n").trim();
+  const list = document.getElementById("aiScenesList"); list.innerHTML = "";
+  (j.scenes || []).forEach(sc=> list.appendChild(aiSceneRow((sc.sub||"").trim(), (sc.img||"").trim())));
+  aiRenumber();
+  document.getElementById("aiPlanWrap").style.display = "block";
+  document.getElementById("aiPlanWrap").scrollIntoView({ behavior:"smooth", block:"nearest" });
+}
+function aiCollectScenes(){
+  return [...document.querySelectorAll("#aiScenesList .ai-scene")].map(el=>({
+    sub: el.querySelector(".ai-sub").value.trim(),
+    img: el.querySelector(".ai-img").value.trim()
+  })).filter(s=> s.sub || s.img);
+}
+
+/* 2단계: 편집된 장면으로 이미지 생성 + 영상 녹화 */
+async function aiRenderReel(){
+  if(typeof MediaRecorder === "undefined"){ aiSetStatus("이 브라우저는 영상 녹화를 지원하지 않습니다.", "err"); return; }
+  const scenes = aiCollectScenes();
+  if(!scenes.length){ aiSetStatus("장면이 없습니다. 먼저 [1단계]로 장면을 만드세요.", "err"); return; }
+  const D = parseFloat((document.getElementById("aiDur")||{}).value) || 2.8;
+  const label = document.getElementById("aiLabel").value;
+  const titleText = document.getElementById("aiTitle").value;
+  const btn = document.getElementById("aiRenderBtn"); btn.disabled = true;
+  try{
+    aiSetStatus("장면 이미지 생성 중... (0/" + scenes.length + ")  ※ 이미지당 5~20초 걸릴 수 있어요", "busy");
+    const imgs = new Array(scenes.length).fill(null); let done = 0, ok = 0;
+    await Promise.all(scenes.map((sc, i)=> aiLoadImg(aiImageUrl(sc.img || sc.sub || "atmospheric scene", 100 + i*97)).then(im=>{
+      imgs[i] = im; done++; if(im) ok++;
+      aiSetStatus("장면 이미지 생성 중... (" + done + "/" + scenes.length + " · 성공 " + ok + ")", "busy");
     })));
-    if(!imgs.some(Boolean)) throw new Error("이미지 생성에 실패했습니다. 잠시 후 다시 시도하세요.");
+    if(!ok) throw new Error("이미지 생성에 모두 실패했습니다. 잠시 후 다시 시도하거나 [이미지 설명]을 영문으로 바꿔보세요.");
 
     const W = 1080, H = 1920;
     const mctx = makeCanvas(W, 140).getContext("2d");
-    const title = aiParseTitle(j.label || "", String(j.title||"").replace(/\\n/g,"\n"), mctx, W);
+    const title = aiParseTitle(label, String(titleText||"").replace(/\\n/g,"\n"), mctx, W);
     scenes.forEach(sc=> sc._lines = aiWrapSub(mctx, sc.sub || "", W));
 
     const T = 0.6, step = D - T, total = +(scenes.length*D - (scenes.length-1)*T).toFixed(3);
@@ -3184,7 +3275,8 @@ async function aiGenerateReel(){
     const out = document.getElementById("aiOut"); out.src = window._reelUrl; out.load();
     document.getElementById("aiOutWrap").style.display = "block";
     document.getElementById("aiOutWrap").scrollIntoView({ behavior:"smooth", block:"nearest" });
-    aiSetStatus("완성! " + total.toFixed(1) + "초 · " + (blob.size/1e6).toFixed(1) + "MB. 재생해 확인 후 저장하세요.", "ok");
+    const failNote = ok < scenes.length ? " (이미지 " + (scenes.length - ok) + "장 실패 → 해당 장면은 어두운 배경. [이미지 설명] 수정 후 다시 시도해 보세요.)" : "";
+    aiSetStatus("완성! " + total.toFixed(1) + "초 · " + (blob.size/1e6).toFixed(1) + "MB. 재생해 확인 후 저장하세요." + failNote, ok < scenes.length ? "busy" : "ok");
     toast("AI 영상이 생성되었습니다");
   }catch(e){ console.error(e); aiSetStatus("생성 실패: " + e.message, "err"); }
   finally{ btn.disabled = false; }
