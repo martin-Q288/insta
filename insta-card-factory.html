@@ -68,6 +68,12 @@
   .card-edit:focus{border-color:var(--accent); outline:none;}
   .cover-edit{width:270px; display:flex; flex-direction:column; gap:5px;}
   .cover-edit input{font-size:12px; padding:7px 10px;}
+  .img-edit{width:270px; display:flex; flex-direction:column; gap:6px; margin-top:8px; padding:9px 10px; background:var(--panel2); border:1px solid var(--line); border-radius:8px;}
+  .img-edit-row{display:flex; align-items:center; gap:8px;}
+  .img-edit-lab{font-size:12px; color:var(--muted); width:32px; flex:none;}
+  .img-edit-row input[type=range]{flex:1; accent-color:var(--accent2); margin:0;}
+  .img-edit .btn-sm{margin-top:2px;}
+  .img-edit-hint{font-size:11px; color:var(--muted); line-height:1.4;}
   .caption-box{background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:12px;
     font-size:13px; white-space:pre-wrap; margin-top:14px; max-height:220px; overflow:auto; cursor:pointer;}
   .caption-box:hover{border-color:var(--accent);}
@@ -515,7 +521,8 @@ window.addEventListener("error", function(e){
 
 const LANG_NAMES = {ko:"한국어", en:"English", ja:"日本語", de:"Deutsch", es:"Español", pt:"Português", fr:"Français", vi:"Tiếng Việt", id:"Bahasa", ar:"العربية"};
 const RTL_LANGS = ["ar"];
-const state = { image:null, results:{}, activeLang:null, cardPhotos:[] };
+const state = { image:null, results:{}, activeLang:null, cardPhotos:[], imgTransform:{x:0,y:0,scale:1} };
+function resetImgTransform(){ state.imgTransform = {x:0, y:0, scale:1}; }
 
 /* ---------- settings ---------- */
 function saveSettings(){
@@ -625,6 +632,7 @@ dz.addEventListener("drop", e=>{
 fi.addEventListener("change", ()=>{ if(fi.files[0]) loadImage(fi.files[0]); });
 function applyImage(img){
   state.image = img;
+  resetImgTransform();
   document.getElementById("thumbWrap").innerHTML = "";
   const t = new Image(); t.src = img.src;
   document.getElementById("thumbWrap").appendChild(t);
@@ -1170,6 +1178,10 @@ function renderLang(l){
   in3.oninput = ()=>{ r.line3 = in3.value; redraw(); };
   ce.append(in1, in2, in3);
   coverBox.box.appendChild(ce);
+  // 표지 사진 편집 — 크기(확대/축소) + 좌우/상하 이동. 사진이 있을 때만 표시.
+  if(state.image){
+    attachCoverImageEditor(coverBox.box, coverBox.canvas, redraw);
+  }
   // 다른 후킹 — AI가 만든 4개 후보를 순환
   if(r.hooks && r.hooks.length > 1){
     if(r._hookIdx == null) r._hookIdx = 0;
@@ -1393,6 +1405,7 @@ function selectCoverPhoto(c, cell, quiet){
   if(!quiet) setStatus("표지 이미지 불러오는 중...", "busy");
   loadImageCors(c.url, img=>{
     state.image = img;
+    resetImgTransform();
     // 출처 표기가 필요한 경우(연예인 CC)만 캡션에 붙임
     Object.values(state.results).forEach(rr=>{
       if(!rr) return;
@@ -1580,7 +1593,7 @@ function drawCover(cv, line1, line2, line3){
   const ctx = cv.getContext("2d");
   const W=cv.width, H=cv.height;
 
-  if(state.image){ coverFit(ctx, state.image, W, H); }
+  if(state.image){ coverFit(ctx, state.image, W, H, state.imgTransform); }
   else{
     const g = ctx.createLinearGradient(0,0,W,H);
     g.addColorStop(0,"#3b1d8f"); g.addColorStop(1,"#12061f");
@@ -1845,11 +1858,81 @@ function roundRect(ctx, x, y, w, h, r){
   ctx.closePath();
 }
 
-function coverFit(ctx, img, W, H){
-  const s = Math.max(W/img.width, H/img.height);
+function coverFit(ctx, img, W, H, tf){
+  const t = tf || {x:0, y:0, scale:1};
+  const base = Math.max(W/img.width, H/img.height);
+  const s = base * (t.scale || 1);
   const w = img.width*s, hh = img.height*s;
-  ctx.drawImage(img, (W-w)/2, (H-hh)/2, w, hh);
+  // x,y: 캔버스 크기 대비 백분율(-100~100) 이동값
+  const ox = (W-w)/2 + ((t.x||0)/100)*W;
+  const oy = (H-hh)/2 + ((t.y||0)/100)*H;
+  ctx.drawImage(img, ox, oy, w, hh);
 }
+
+/* 표지 사진 편집기 — 크기(확대/축소) + 좌우/상하 이동. 슬라이더 + 캔버스 드래그 + 휠 확대. */
+function attachCoverImageEditor(box, canvas, redraw){
+  const t = state.imgTransform;
+  const wrap = document.createElement("div");
+  wrap.className = "img-edit";
+  const clamp = (v,a,b)=>Math.max(a, Math.min(b, v));
+
+  function row(labelText, min, max, step, getV, setV){
+    const r = document.createElement("div"); r.className = "img-edit-row";
+    const lab = document.createElement("span"); lab.className = "img-edit-lab"; lab.textContent = labelText;
+    const sl = document.createElement("input"); sl.type = "range";
+    sl.min = min; sl.max = max; sl.step = step; sl.value = getV();
+    sl.oninput = ()=>{ setV(parseFloat(sl.value)); redraw(); };
+    r.append(lab, sl);
+    wrap.appendChild(r);
+    return sl;
+  }
+
+  const scaleSl = row("크기", 1, 4, 0.02, ()=>t.scale, v=>t.scale = v);
+  const xSl = row("좌우", -100, 100, 1, ()=>t.x, v=>t.x = v);
+  const ySl = row("상하", -100, 100, 1, ()=>t.y, v=>t.y = v);
+
+  const syncUI = ()=>{ scaleSl.value = t.scale; xSl.value = t.x; ySl.value = t.y; };
+
+  const reset = document.createElement("button");
+  reset.className = "btn-ghost btn-sm";
+  reset.textContent = "사진 위치 초기화";
+  reset.onclick = ()=>{ resetImgTransform(); syncUI(); redraw(); };
+  wrap.appendChild(reset);
+
+  const hint = document.createElement("div");
+  hint.className = "img-edit-hint";
+  hint.textContent = "사진을 드래그해 이동, 마우스 휠로 확대/축소할 수 있어요.";
+  wrap.appendChild(hint);
+
+  box.appendChild(wrap);
+
+  // 캔버스 드래그로 이동 (표시 크기 기준 백분율 델타). 전역 리스너는 1회만 설치.
+  canvas.style.cursor = "move";
+  const onDown = (cx, cy)=>{ _coverDrag = {t, canvas, redraw, syncUI, lx:cx, ly:cy}; };
+  canvas.addEventListener("mousedown", e=>{ e.preventDefault(); onDown(e.clientX, e.clientY); });
+  canvas.addEventListener("touchstart", e=>{ if(e.touches[0]) onDown(e.touches[0].clientX, e.touches[0].clientY); }, {passive:true});
+  canvas.addEventListener("touchmove", e=>{ if(e.touches[0]){ e.preventDefault(); coverDragMove(e.touches[0].clientX, e.touches[0].clientY); } }, {passive:false});
+  canvas.addEventListener("touchend", ()=>{ _coverDrag = null; });
+  canvas.addEventListener("wheel", e=>{
+    e.preventDefault();
+    t.scale = clamp(t.scale * (e.deltaY < 0 ? 1.06 : 0.94), 1, 4);
+    syncUI(); redraw();
+  }, {passive:false});
+}
+
+let _coverDrag = null;
+function coverDragMove(cx, cy){
+  const d = _coverDrag; if(!d) return;
+  const rect = d.canvas.getBoundingClientRect();
+  if(!rect.width || !rect.height) return;
+  const cl = (v)=>Math.max(-100, Math.min(100, v));
+  d.t.x = cl(d.t.x + (cx - d.lx)/rect.width*100);
+  d.t.y = cl(d.t.y + (cy - d.ly)/rect.height*100);
+  d.lx = cx; d.ly = cy;
+  d.syncUI(); d.redraw();
+}
+window.addEventListener("mousemove", e=>coverDragMove(e.clientX, e.clientY));
+window.addEventListener("mouseup", ()=>{ _coverDrag = null; });
 
 /* **강조** 마크업을 지원하는 리치 텍스트 줄바꿈/렌더링 */
 function splitKeepSpace(s){
