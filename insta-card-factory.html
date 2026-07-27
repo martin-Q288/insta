@@ -3197,6 +3197,18 @@ function aiWrapSub(mctx, text, W){
   String(text||"").replace(/\\n/g,"\n").split("\n").forEach(part=> wrapText(mctx, part, maxW).forEach(l=> out.push(l)));
   return out;
 }
+/* 영상 장면 자막: 빈 줄로 구분된 여러 자막을 영상 길이에 맞춰 타이밍 배분(각 자막 내부는 줄바꿈 유지) */
+function aiParseVideoSubs(text, dur, mctx, W){
+  const segs = String(text||"").replace(/\\n/g,"\n").split(/\n\s*\n/).map(s=>s.trim()).filter(Boolean);
+  if(!segs.length) return [];
+  if(segs.length === 1) return [{ lines: aiWrapSub(mctx, segs[0], W), t0:0, t1:dur }];
+  const perChar = 0.18, minDur = 1.5;
+  const raw = segs.map(s=> Math.max(minDur, s.replace(/\n/g,"").length * perChar));
+  const sum = raw.reduce((a,b)=>a+b, 0), k = dur / sum;
+  const subs = []; let t = 0;
+  for(let i=0; i<segs.length; i++){ const d = raw[i]*k; subs.push({ lines: aiWrapSub(mctx, segs[i], W), t0:t, t1:(i===segs.length-1 ? dur : t+d) }); t += d; }
+  return subs;
+}
 function aiDrawTitle(ctx, W, title, H){
   if(!title || (!title.label && !title.lines.length)) return;
   const ts = aiTitleStyle();
@@ -3495,7 +3507,8 @@ function aiVideoAttach(row, file){
     vedit.style.display = "flex";
     try{ vprev.currentTime = 0.05; }catch(e){}
     setTimeout(()=> aiDrawVtfPreview(row), 120);
-    vinfo.textContent = "영상 " + row._vdur.toFixed(1) + "초 — 타임라인으로 넣을 구간을 정하고, 크기·좌우·상하로 화면을 맞추세요(오른쪽 9:16 미리보기 반영).";
+    vinfo.innerHTML = "영상 " + row._vdur.toFixed(1) + "초 — 타임라인으로 넣을 구간을 정하고, 크기·좌우·상하로 화면을 맞추세요(오른쪽 9:16 미리보기 반영).<br><b style='color:var(--accent2)'>긴 영상이면 자막칸에 여러 자막을 '빈 줄'로 구분해 넣으세요 — 영상 길이에 맞춰 순서대로 표시됩니다.</b>";
+    const ta = row.querySelector(".ai-sub"); if(ta){ ta.rows = 5; ta.placeholder = "자막 (Enter=줄바꿈). 영상엔 여러 자막을 빈 줄로 구분해 넣으면 순서대로 표시됩니다."; }
   };
 }
 async function aiPreviewScene(row){
@@ -3660,7 +3673,11 @@ async function aiRenderWithVideo(rows){
 
     const mctx = makeCanvas(W, 140).getContext("2d");
     const title = aiParseTitle(label, String(titleText||"").replace(/\\n/g,"\n"), mctx, W);
-    clips.forEach(c=> c._lines = aiWrapSub(mctx, c.sub || "", W));
+    clips.forEach(c=>{
+      c._lines = aiWrapSub(mctx, c.sub || "", W);
+      // 영상 장면: 자막칸의 여러 자막(빈 줄 구분)을 영상 길이에 맞춰 타이밍 배분
+      if(c.type === "video"){ c.subs = aiParseVideoSubs(c.row.querySelector(".ai-sub").value, c.dur, mctx, W); }
+    });
     let acc = 0; clips.forEach(c=>{ c.t0 = acc; acc += c.dur; }); const total = +acc.toFixed(3);
 
     const rec = makeCanvas(W, H), rctx = rec.getContext("2d");
@@ -3702,7 +3719,14 @@ async function aiRenderWithVideo(rows){
         }
         const g = rctx.createLinearGradient(0, H*0.58, 0, H); g.addColorStop(0,"rgba(0,0,0,0)"); g.addColorStop(1,"rgba(0,0,0,.65)");
         rctx.fillStyle = g; rctx.fillRect(0, H*0.58, W, H*0.42);
-        aiDrawSub(rctx, W, H, c._lines);
+        // 영상 장면이면 클립 내 시간에 맞는 자막을, 이미지 장면이면 단일 자막을
+        let subLines = c._lines;
+        if(c.type === "video" && c.subs && c.subs.length){
+          const lt = t - c.t0;
+          const cur = c.subs.find(sx=> lt >= sx.t0 && lt < sx.t1) || c.subs[c.subs.length-1];
+          subLines = cur ? cur.lines : null;
+        }
+        aiDrawSub(rctx, W, H, subLines);
         aiDrawTitle(rctx, W, title);
         if(t < total){ aiSetStatus("영상 녹화 중... " + Math.min(100, Math.round(t/total*100)) + "%", "busy"); requestAnimationFrame(frame); }
         else resolve();
