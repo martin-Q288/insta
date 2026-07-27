@@ -590,6 +590,16 @@
       <input type="text" id="aiLabel" placeholder="상단 흰 박스 문구" oninput="aiUpdateSubPreview()">
       <label style="margin-top:10px;">제목 <small style="text-transform:none; color:var(--muted);">— 줄바꿈 = 줄 나눔 · **강조** = 노란색</small></label>
       <textarea id="aiTitle" class="card-edit" style="width:100%;" rows="3" oninput="aiUpdateSubPreview()"></textarea>
+      <div class="style-row" style="margin-top:6px;">
+        <div>
+          <label>제목 크기</label>
+          <input type="range" id="aiTitleSize" min="0.7" max="1.5" step="0.05" value="1" style="width:100%;" oninput="aiUpdateSubPreview()">
+        </div>
+        <div>
+          <label>제목 위치 (위 ↔ 아래)</label>
+          <input type="range" id="aiTitlePos" min="0.02" max="0.5" step="0.01" value="0.03" style="width:100%;" oninput="aiUpdateSubPreview()">
+        </div>
+      </div>
       <label style="margin-top:10px;">장면 (자막 · 이미지 설명) <small style="text-transform:none; color:var(--muted);">— 자막에서 Enter로 줄바꿈 편집</small></label>
       <div id="aiScenesList"></div>
       <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;">
@@ -3111,10 +3121,16 @@ function aiLoadImg(url){
   });
 }
 
+/* 제목 크기·위치 사용자 설정 (패널 6 슬라이더) */
+function aiTitleStyle(){
+  const sizeMul = parseFloat((document.getElementById("aiTitleSize")||{}).value) || 1;
+  const posY = parseFloat((document.getElementById("aiTitlePos")||{}).value) || 0.03;
+  return { sizeMul, posY };
+}
 function aiParseTitle(label, titleText, mctx, W){
   const rawLines = (titleText||"").split("\n").map(s=>s.trim()).filter(Boolean);
   const anyHl = rawLines.some(l=>/\*\*/.test(l));
-  const size = Math.round(W*0.066); mctx.font = "900 " + size + "px " + TITLE_FONT; const maxW = W - 90;
+  const size = Math.round(W*0.066*aiTitleStyle().sizeMul); mctx.font = "900 " + size + "px " + TITLE_FONT; const maxW = W - 90;
   const lines = [];
   rawLines.forEach((l, idx)=>{ const hl = /\*\*/.test(l) || (!anyHl && idx===0); wrapText(mctx, l.replace(/\*\*/g,"").trim(), maxW).forEach(t=> lines.push({ text:t, hl })); });
   return { label:(label||"").trim(), lines };
@@ -3130,10 +3146,11 @@ function aiWrapSub(mctx, text, W){
   String(text||"").replace(/\\n/g,"\n").split("\n").forEach(part=> wrapText(mctx, part, maxW).forEach(l=> out.push(l)));
   return out;
 }
-function aiDrawTitle(ctx, W, title){
+function aiDrawTitle(ctx, W, title, H){
   if(!title || (!title.label && !title.lines.length)) return;
+  const ts = aiTitleStyle();
   ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
-  const marginTop = Math.round(W*0.05), labelSize = Math.round(W*0.039), titleSize = Math.round(W*0.066), titleLH = Math.round(titleSize*1.2), gap = Math.round(W*0.02);
+  const marginTop = Math.round((H || 1920) * ts.posY), labelSize = Math.round(W*0.039*ts.sizeMul), titleSize = Math.round(W*0.066*ts.sizeMul), titleLH = Math.round(titleSize*1.2), gap = Math.round(W*0.02);
   let y = marginTop;
   if(title.label){
     ctx.font = "800 " + labelSize + "px " + TITLE_FONT;
