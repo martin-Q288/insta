@@ -567,7 +567,7 @@
     <h2>6. 기사 URL만으로 AI 영상 만들기 <small style="text-transform:none; color:var(--muted);">— 기사→장면별 <b style="color:var(--accent2)">AI 이미지</b> 슬라이드쇼 릴스(줌·전환·자막·제목)</small></h2>
     <div class="notice" style="margin-top:0;">
       기사 URL이나 본문만 넣으면 내용을 파악해 장면 구성을 만들고, 켄번즈 줌·전환·<b>자막</b>·<b>상단 제목</b>을 얹은 9:16 릴스를 자동으로 만듭니다.<br>
-      <b style="color:var(--accent2)">첫 장면에는 기사에 실린 이미지를 자동으로 넣고</b>, 나머지 장면은 AI 이미지로 채웁니다. 각 장면의 <b>이미지 URL</b>을 직접 지정하거나 AI 설명으로 바꿀 수 있습니다. 음원은 저장 후 인스타 앱에서 <b>인기 음원</b>을 얹으세요.
+      <b style="color:var(--accent2)">첫 장면에는 기사에 실린 이미지를 자동으로 넣고</b>, 나머지 장면은 AI 이미지로 채웁니다. 각 장면은 <b>이미지 URL 지정 / AI 설명 / 내 영상 첨부(구간 선택)</b> 중 원하는 방식으로 만들 수 있고, 영상 장면은 이어붙여집니다. 음원은 저장 후 인스타 앱에서 <b>인기 음원</b>을 얹으세요.
     </div>
     <label>기사 URL 또는 본문</label>
     <textarea id="aiArticle" class="card-edit" style="width:100%;" rows="3" placeholder="기사 링크(https://...) 또는 기사 본문을 붙여넣으세요."></textarea>
@@ -3244,8 +3244,40 @@ function aiSceneRow(sub, img, url){
   const st = document.createElement("span"); st.className = "ai-prev-st hint"; st.style.cssText = "margin:0;";
   bar.append(bPrev, bRegen, st);
   const prev = document.createElement("img"); prev.className = "ai-prev"; prev.style.cssText = "display:none; margin-top:8px; width:150px; max-height:230px; object-fit:cover; border-radius:8px; border:1px solid var(--line);";
-  row.append(head, ta, urlin, inp, bar, prev);
+  // ── 내 영상 첨부(이 장면을 영상으로) + 구간 선택 ──
+  const vwrap = document.createElement("div"); vwrap.style.cssText = "margin-top:10px; padding-top:8px; border-top:1px dotted var(--line);";
+  const vlab = document.createElement("div"); vlab.className = "hint"; vlab.style.cssText = "margin:0 0 4px;"; vlab.textContent = "또는 내 영상 첨부 (이 장면을 영상으로 대체):";
+  const vfile = document.createElement("input"); vfile.type = "file"; vfile.accept = "video/*"; vfile.className = "ai-vfile";
+  const vinfo = document.createElement("span"); vinfo.className = "ai-vinfo hint"; vinfo.style.cssText = "display:block; margin-top:4px;";
+  const vprev = document.createElement("video"); vprev.className = "ai-vprev"; vprev.controls = true; vprev.playsInline = true; vprev.muted = true; vprev.style.cssText = "display:none; margin-top:6px; width:180px; border-radius:8px; border:1px solid var(--line); background:#000;";
+  const vtrim = document.createElement("div"); vtrim.className = "ai-vtrim"; vtrim.style.cssText = "display:none; gap:6px; align-items:center; margin-top:6px; flex-wrap:wrap;";
+  const mk = (t)=>{ const s=document.createElement("span"); s.className="hint"; s.style.margin="0"; s.textContent=t; return s; };
+  const vs = document.createElement("input"); vs.type="number"; vs.min=0; vs.step=0.1; vs.value=0; vs.className="ai-vstart"; vs.style.width="72px";
+  const ve = document.createElement("input"); ve.type="number"; ve.min=0; ve.step=0.1; ve.className="ai-vend"; ve.style.width="72px";
+  const bS = document.createElement("button"); bS.className="btn-ghost btn-sm"; bS.textContent="현재→시작"; bS.onclick=()=>{ vs.value=(vprev.currentTime||0).toFixed(1); };
+  const bE = document.createElement("button"); bE.className="btn-ghost btn-sm"; bE.textContent="현재→끝"; bE.onclick=()=>{ ve.value=(vprev.currentTime||0).toFixed(1); };
+  const vrm = document.createElement("button"); vrm.className="btn-ghost btn-sm"; vrm.textContent="영상 제거"; vrm.style.cssText="border-color:var(--err); color:var(--err);";
+  vrm.onclick=()=>{ if(row._vurl){ try{ URL.revokeObjectURL(row._vurl); }catch(e){} } row._vfile=null; row._vurl=null; row._vdur=0; vfile.value=""; vprev.style.display="none"; vtrim.style.display="none"; vinfo.textContent=""; };
+  vtrim.append(mk("구간(초)  시작"), vs, mk("끝"), ve, bS, bE, vrm);
+  vfile.onchange = ()=>{ const f=(vfile.files||[])[0]; if(f) aiVideoAttach(row, f); };
+  vwrap.append(vlab, vfile, vinfo, vprev, vtrim);
+  row.append(head, ta, urlin, inp, bar, prev, vwrap);
   return row;
+}
+function aiVideoAttach(row, file){
+  if(row._vurl){ try{ URL.revokeObjectURL(row._vurl); }catch(e){} }
+  row._vfile = file; row._vurl = URL.createObjectURL(file); row._img = null;
+  const vprev = row.querySelector(".ai-vprev"), vinfo = row.querySelector(".ai-vinfo"), vtrim = row.querySelector(".ai-vtrim");
+  const vs = row.querySelector(".ai-vstart"), ve = row.querySelector(".ai-vend");
+  const prev = row.querySelector(".ai-prev"); if(prev) prev.style.display = "none";
+  vprev.src = row._vurl; vprev.style.display = "block";
+  vprev.onloadedmetadata = ()=>{
+    row._vdur = vprev.duration || 0;
+    vs.max = row._vdur.toFixed(1); ve.max = row._vdur.toFixed(1);
+    if(!(parseFloat(ve.value) > 0)) ve.value = Math.min(row._vdur, 6).toFixed(1);
+    vinfo.textContent = "영상 " + row._vdur.toFixed(1) + "초 — 미리보기를 원하는 지점에 멈춘 뒤 [현재→시작]/[현재→끝]으로 넣을 구간을 정하세요.";
+    vtrim.style.display = "flex";
+  };
 }
 async function aiPreviewScene(row){
   const url = row.querySelector(".ai-url").value.trim();
@@ -3294,9 +3326,11 @@ function aiCollectScenes(){
 async function aiRenderReel(){
   if(typeof MediaRecorder === "undefined"){ aiSetStatus("이 브라우저는 영상 녹화를 지원하지 않습니다.", "err"); return; }
   const rows = [...document.querySelectorAll("#aiScenesList .ai-scene")].filter(r=>{
-    return r.querySelector(".ai-sub").value.trim() || r.querySelector(".ai-img").value.trim() || r.querySelector(".ai-url").value.trim();
+    return r._vfile || r.querySelector(".ai-sub").value.trim() || r.querySelector(".ai-img").value.trim() || r.querySelector(".ai-url").value.trim();
   });
   if(!rows.length){ aiSetStatus("장면이 없습니다. 먼저 [1단계]로 장면을 만드세요.", "err"); return; }
+  // 영상이 첨부된 장면이 하나라도 있으면 영상+이미지 혼합 렌더 경로로
+  if(rows.some(r=> r._vfile)){ return aiRenderWithVideo(rows); }
   const scenes = rows.map(r=>({ sub: r.querySelector(".ai-sub").value.trim(), row: r }));
   const D = parseFloat((document.getElementById("aiDur")||{}).value) || 2.8;
   const label = document.getElementById("aiLabel").value;
@@ -3353,6 +3387,114 @@ async function aiRenderReel(){
     aiSetStatus("완성! " + total.toFixed(1) + "초 · " + (blob.size/1e6).toFixed(1) + "MB. 재생해 확인 후 저장하세요." + failNote, ok < scenes.length ? "busy" : "ok");
     toast("AI 영상이 생성되었습니다");
   }catch(e){ console.error(e); aiSetStatus("생성 실패: " + e.message, "err"); }
+  finally{ btn.disabled = false; }
+}
+
+/* 영상+이미지 혼합 렌더: 이미지 장면은 켄번즈, 영상 장면은 선택 구간을 재생해 이어붙임(컷 전환).
+   영상 장면 오디오는 AudioContext로 해당 구간에만 믹싱. */
+async function aiRenderWithVideo(rows){
+  if(typeof MediaRecorder === "undefined"){ aiSetStatus("이 브라우저는 영상 녹화를 지원하지 않습니다.", "err"); return; }
+  const D = parseFloat((document.getElementById("aiDur")||{}).value) || 2.8;
+  const label = document.getElementById("aiLabel").value;
+  const titleText = document.getElementById("aiTitle").value;
+  const W = 1080, H = 1920;
+  const btn = document.getElementById("aiRenderBtn"); btn.disabled = true;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  let actx = null, dest = null;
+  try{
+    // 클립 구성
+    const clips = rows.map(r=>{
+      const sub = r.querySelector(".ai-sub").value.trim();
+      if(r._vfile){
+        const vsIn = parseFloat(r.querySelector(".ai-vstart").value) || 0;
+        let veIn = parseFloat(r.querySelector(".ai-vend").value);
+        const vdur = r._vdur || 0;
+        if(!(veIn > vsIn)) veIn = vdur || (vsIn + 3);
+        veIn = Math.min(veIn, vdur || veIn, vsIn + 30);
+        return { type:"video", url:r._vurl, vs:vsIn, ve:veIn, dur:Math.max(0.3, veIn - vsIn), sub, row:r };
+      }
+      return { type:"image", row:r, sub, dur:D };
+    });
+
+    if(AC){ actx = new AC(); dest = actx.createMediaStreamDestination(); }
+    // 준비: 영상 엘리먼트/오디오 그래프 + 이미지 로드
+    aiSetStatus("영상·이미지 준비 중...", "busy");
+    for(const c of clips){
+      if(c.type === "video"){
+        const v = document.createElement("video"); v.src = c.url; v.playsInline = true; v.muted = false; v.preload = "auto";
+        c.v = v;
+        await new Promise((res, rej)=>{ v.onloadedmetadata = res; v.onerror = ()=>rej(new Error("첨부 영상을 불러오지 못했습니다.")); });
+        try{ await v.play(); v.pause(); }catch(e){}   // iOS 재생 잠금 해제 시도
+        try{ v.currentTime = c.vs; }catch(e){}
+        if(actx){ try{ const sn = actx.createMediaElementSource(v); const g = actx.createGain(); g.gain.value = 0; sn.connect(g); g.connect(dest); c.gain = g; }catch(e){} }
+      }else{
+        if(!c.row._img){
+          const url = c.row.querySelector(".ai-url").value.trim();
+          const desc = c.row.querySelector(".ai-img").value.trim();
+          c.row._img = await aiLoadImg(url ? url : aiImageUrl(desc || c.sub || "atmospheric scene", c.row._seed));
+        }
+        c.img = c.row._img;
+      }
+    }
+
+    const mctx = makeCanvas(W, 140).getContext("2d");
+    const title = aiParseTitle(label, String(titleText||"").replace(/\\n/g,"\n"), mctx, W);
+    clips.forEach(c=> c._lines = aiWrapSub(mctx, c.sub || "", W));
+    let acc = 0; clips.forEach(c=>{ c.t0 = acc; acc += c.dur; }); const total = +acc.toFixed(3);
+
+    const rec = makeCanvas(W, H), rctx = rec.getContext("2d");
+    const stream = rec.captureStream(30);
+    if(actx){ try{ await actx.resume(); }catch(e){} dest.stream.getAudioTracks().forEach(tr=> stream.addTrack(tr)); }
+    const { mime, ext } = pickReelMime();
+    const recOpts = { videoBitsPerSecond: 12e6, audioBitsPerSecond: 192000 }; if(mime) recOpts.mimeType = mime;
+    const recorder = new MediaRecorder(stream, recOpts); const chunks = [];
+    recorder.ondataavailable = e=>{ if(e.data && e.data.size) chunks.push(e.data); };
+    const stopped = new Promise(res=>{ recorder.onstop = res; });
+    recorder.start();
+    const startT = performance.now(); let cur = -1;
+    await new Promise(resolve=>{
+      (function frame(){
+        const t = (performance.now() - startT)/1000;
+        let i = clips.findIndex(c=> t >= c.t0 && t < c.t0 + c.dur);
+        if(i < 0) i = (t >= total) ? clips.length-1 : 0;
+        if(i !== cur){
+          if(cur >= 0 && clips[cur].type === "video"){ try{ clips[cur].v.pause(); }catch(e){} if(clips[cur].gain) clips[cur].gain.gain.value = 0; }
+          cur = i;
+          if(clips[i].type === "video"){ try{ clips[i].v.currentTime = clips[i].vs; }catch(e){} const pr = clips[i].v.play(); if(pr && pr.catch) pr.catch(()=>{}); if(clips[i].gain) clips[i].gain.gain.value = 1; }
+        }
+        rctx.clearRect(0,0,W,H); rctx.fillStyle = "#000"; rctx.fillRect(0,0,W,H);
+        const c = clips[i];
+        if(c.type === "video" && c.v.videoWidth){
+          const im = c.v, s = Math.max(W/im.videoWidth, H/im.videoHeight), dw = im.videoWidth*s, dh = im.videoHeight*s;
+          rctx.drawImage(im, (W-dw)/2, (H-dh)/2, dw, dh);
+        }else if(c.type === "image" && c.img){
+          const tau = Math.max(0, Math.min(c.dur, t - c.t0)), scale = 1 + 0.08*(tau/c.dur);
+          const im = c.img, s = Math.max(W/im.width, H/im.height)*scale, dw = im.width*s, dh = im.height*s;
+          rctx.drawImage(im, (W-dw)/2, (H-dh)/2, dw, dh);
+        }else{
+          const gg = rctx.createLinearGradient(0,0,W,H); gg.addColorStop(0,"#20232b"); gg.addColorStop(1,"#0e1014"); rctx.fillStyle = gg; rctx.fillRect(0,0,W,H);
+        }
+        const g = rctx.createLinearGradient(0, H*0.58, 0, H); g.addColorStop(0,"rgba(0,0,0,0)"); g.addColorStop(1,"rgba(0,0,0,.65)");
+        rctx.fillStyle = g; rctx.fillRect(0, H*0.58, W, H*0.42);
+        aiDrawSub(rctx, W, H, c._lines);
+        aiDrawTitle(rctx, W, title);
+        if(t < total){ aiSetStatus("영상 녹화 중... " + Math.min(100, Math.round(t/total*100)) + "%", "busy"); requestAnimationFrame(frame); }
+        else resolve();
+      })();
+    });
+    clips.forEach(c=>{ if(c.type === "video"){ try{ c.v.pause(); }catch(e){} } });
+    recorder.stop(); await stopped;
+    if(actx){ try{ actx.close(); }catch(e){} }
+
+    const blob = new Blob(chunks, { type: mime || "video/webm" });
+    if(window._reelUrl) URL.revokeObjectURL(window._reelUrl);
+    window._reelBlob = blob; window._reelExt = ext; window._reelUrl = URL.createObjectURL(blob);
+    const out = document.getElementById("aiOut"); out.src = window._reelUrl; out.load();
+    document.getElementById("aiOutWrap").style.display = "block";
+    document.getElementById("aiOutWrap").scrollIntoView({ behavior:"smooth", block:"nearest" });
+    aiSetStatus("완성! " + total.toFixed(1) + "초 · " + (blob.size/1e6).toFixed(1) + "MB (영상+이미지 혼합). 재생해 확인 후 저장하세요.", "ok");
+    toast("AI 영상이 생성되었습니다");
+  }catch(e){ console.error(e); if(actx){ try{ actx.close(); }catch(_e){} } aiSetStatus("생성 실패: " + e.message, "err"); }
   finally{ btn.disabled = false; }
 }
 
