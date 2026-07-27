@@ -596,34 +596,26 @@
       <input type="text" id="aiLabel" placeholder="상단 흰 박스 문구" oninput="aiUpdateSubPreview()">
       <label style="margin-top:10px;">제목 <small style="text-transform:none; color:var(--muted);">— 줄바꿈 = 줄 나눔 · **강조** = 노란색</small></label>
       <textarea id="aiTitle" class="card-edit" style="width:100%;" rows="3" oninput="aiUpdateSubPreview()"></textarea>
-      <div class="style-row" style="margin-top:6px;">
-        <div>
-          <label>제목 크기</label>
-          <input type="range" id="aiTitleSize" min="0.7" max="1.5" step="0.05" value="1" style="width:100%;" oninput="aiUpdateSubPreview()">
-        </div>
-        <div>
-          <label>제목 위치 (위 ↔ 아래)</label>
-          <input type="range" id="aiTitlePos" min="0.02" max="0.5" step="0.01" value="0.03" style="width:100%;" oninput="aiUpdateSubPreview()">
+      <label style="margin-top:10px;">제목·자막 스타일 &amp; 미리보기 <small style="text-transform:none; color:var(--muted);">— 슬라이더를 움직이면 옆 미리보기에 바로 반영됩니다</small></label>
+      <div id="aiStyleBox" style="margin-top:6px; display:flex; gap:14px; flex-wrap:wrap; align-items:flex-start;">
+        <canvas id="aiSubPreview" style="width:150px; border-radius:10px; border:1px solid var(--accent2); background:#000; flex:0 0 auto;"></canvas>
+        <div style="flex:1; min-width:210px;">
+          <div class="style-row">
+            <div><label>제목 크기</label><input type="range" id="aiTitleSize" min="0.7" max="1.5" step="0.05" value="1" style="width:100%;" oninput="aiUpdateSubPreview()"></div>
+            <div><label>제목 위치</label><input type="range" id="aiTitlePos" min="0.02" max="0.5" step="0.01" value="0.03" style="width:100%;" oninput="aiUpdateSubPreview()"></div>
+          </div>
+          <div class="style-row" style="margin-top:6px;">
+            <div><label>자막 크기</label><input type="range" id="aiSubSize" min="0.8" max="1.7" step="0.05" value="1" style="width:100%;" oninput="aiUpdateSubPreview()"></div>
+            <div><label>자막 위치</label><input type="range" id="aiSubPos" min="0.35" max="0.9" step="0.01" value="0.8" style="width:100%;" oninput="aiUpdateSubPreview()"></div>
+          </div>
         </div>
       </div>
-      <label style="margin-top:10px;">장면 (자막 · 이미지 설명) <small style="text-transform:none; color:var(--muted);">— 자막에서 Enter로 줄바꿈 편집</small></label>
+      <label style="margin-top:10px;">장면 (자막 · 이미지 · 영상) <small style="text-transform:none; color:var(--muted);">— 자막 Enter=줄바꿈 · 이미지/영상 크기·상하좌우 편집</small></label>
       <div id="aiScenesList"></div>
       <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;">
         <button class="btn-ghost btn-sm" onclick="aiAddScene()">+ 장면 추가</button>
         <button class="btn-ghost btn-sm" style="border-color:var(--accent); color:var(--accent);" onclick="aiPreviewAll()">모든 장면 이미지 미리보기</button>
       </div>
-      <label style="margin-top:12px;">자막 스타일 <small style="text-transform:none; color:var(--muted);">— 크기·위치를 조절하세요 (아래 미리보기에 바로 반영)</small></label>
-      <div class="style-row" style="margin-top:6px;">
-        <div>
-          <label>자막 크기</label>
-          <input type="range" id="aiSubSize" min="0.8" max="1.7" step="0.05" value="1" style="width:100%;" oninput="aiUpdateSubPreview()">
-        </div>
-        <div>
-          <label>자막 위치 (위 ↔ 아래)</label>
-          <input type="range" id="aiSubPos" min="0.35" max="0.9" step="0.01" value="0.8" style="width:100%;" oninput="aiUpdateSubPreview()">
-        </div>
-      </div>
-      <canvas id="aiSubPreview" style="display:none; width:200px; margin-top:8px; border-radius:10px; border:1px solid var(--line); background:#000;"></canvas>
       <label style="margin-top:12px;">게시물 본문 (캡션)</label>
       <textarea id="aiCaption" class="card-edit" style="width:100%;" rows="6"></textarea>
       <button class="btn-ghost btn-sm" style="margin-top:6px;" onclick="aiCopyCaption()">본문 복사</button>
@@ -3246,7 +3238,7 @@ function aiUpdateSubPreview(){
   const firstRow = document.querySelector("#aiScenesList .ai-scene");
   const im = firstRow && firstRow._img;
   ctx.clearRect(0,0,W,H);
-  if(im){ const s = Math.max(W/im.width, H/im.height), dw = im.width*s, dh = im.height*s; ctx.drawImage(im, (W-dw)/2, (H-dh)/2, dw, dh); }
+  if(im){ const tf = firstRow._itf || {x:0,y:0,scale:1}; const s = Math.max(W/im.width, H/im.height)*(tf.scale||1), dw = im.width*s, dh = im.height*s; const ox=(W-dw)/2+((tf.x||0)/100)*W, oy=(H-dh)/2+((tf.y||0)/100)*H; ctx.drawImage(im, ox, oy, dw, dh); }
   else { const gg = ctx.createLinearGradient(0,0,W,H); gg.addColorStop(0,"#20232b"); gg.addColorStop(1,"#0e1014"); ctx.fillStyle = gg; ctx.fillRect(0,0,W,H); }
   const g = ctx.createLinearGradient(0, H*0.58, 0, H); g.addColorStop(0,"rgba(0,0,0,0)"); g.addColorStop(1,"rgba(0,0,0,.65)"); ctx.fillStyle = g; ctx.fillRect(0, H*0.58, W, H*0.42);
   const mctx = makeCanvas(W, 140).getContext("2d");
@@ -3263,9 +3255,11 @@ function drawAiFrame(ctx, scenes, imgs, t, o){
     if(idx<0 || idx>=N || alpha<=0) return;
     ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
     if(imgs[idx]){
-      const tau = Math.max(0, Math.min(D, t - idx*step)); const scale = 1 + 0.08*(tau/D);
-      const im = imgs[idx]; const s = Math.max(W/im.width, H/im.height)*scale; const dw = im.width*s, dh = im.height*s;
-      ctx.drawImage(im, (W-dw)/2, (H-dh)/2, dw, dh);
+      const tf = (scenes[idx] && scenes[idx].itf) || { x:0, y:0, scale:1 };
+      const tau = Math.max(0, Math.min(D, t - idx*step)); const kb = 1 + 0.06*(tau/D);
+      const im = imgs[idx]; const s = Math.max(W/im.width, H/im.height) * (tf.scale||1) * kb; const dw = im.width*s, dh = im.height*s;
+      const ox = (W-dw)/2 + ((tf.x||0)/100)*W, oy = (H-dh)/2 + ((tf.y||0)/100)*H;
+      ctx.drawImage(im, ox, oy, dw, dh);
     } else {
       const gg = ctx.createLinearGradient(0, 0, W, H); gg.addColorStop(0, "#20232b"); gg.addColorStop(1, "#0e1014");
       ctx.fillStyle = gg; ctx.fillRect(0, 0, W, H);
@@ -3375,7 +3369,22 @@ function aiSceneRow(sub, img, url){
   idrop.addEventListener("dragover", e=>{ e.preventDefault(); idrop.classList.add("drag"); });
   idrop.addEventListener("dragleave", ()=> idrop.classList.remove("drag"));
   idrop.addEventListener("drop", e=>{ e.preventDefault(); idrop.classList.remove("drag"); const f=(e.dataTransfer.files||[])[0]; if(f && /^image\//.test(f.type||"")) aiImageAttach(row, f); });
-  const prev = document.createElement("img"); prev.className = "ai-prev"; prev.style.cssText = "display:none; margin-top:8px; width:150px; max-height:230px; object-fit:cover; border-radius:8px; border:1px solid var(--line);";
+  // 이미지 9:16 미리보기 + 크기·좌우·상하 편집
+  row._itf = { x:0, y:0, scale:1 };
+  const ipwrap = document.createElement("div"); ipwrap.style.cssText = "display:none; gap:10px; align-items:flex-start; flex-wrap:wrap; margin-top:8px;"; ipwrap.className = "ai-ipwrap";
+  const iprev = document.createElement("canvas"); iprev.className = "ai-iprev"; iprev.width = 270; iprev.height = 480; iprev.style.cssText = "width:120px; border-radius:8px; border:1px solid var(--accent2); background:#000;";
+  const iedit = document.createElement("div"); iedit.className = "img-edit ai-iedit"; iedit.style.cssText = "width:200px; margin-top:0;";
+  iedit.innerHTML =
+    "<div style='font-size:12px; color:var(--muted);'>이미지 편집 (크기·좌우·상하)</div>" +
+    "<div class='img-edit-row'><span class='img-edit-lab'>크기</span><input type='range' class='ai-iscale' min='1' max='4' step='0.02' value='1'></div>" +
+    "<div class='img-edit-row'><span class='img-edit-lab'>좌우</span><input type='range' class='ai-ix' min='-100' max='100' step='1' value='0'></div>" +
+    "<div class='img-edit-row'><span class='img-edit-lab'>상하</span><input type='range' class='ai-iy' min='-100' max='100' step='1' value='0'></div>";
+  iedit.querySelectorAll("input[type=range]").forEach(sl=> sl.oninput = ()=> aiISlider(row));
+  const irst = document.createElement("button"); irst.className = "btn-ghost btn-sm"; irst.textContent = "위치 초기화";
+  irst.onclick = ()=>{ row._itf = { x:0, y:0, scale:1 }; iedit.querySelector(".ai-iscale").value=1; iedit.querySelector(".ai-ix").value=0; iedit.querySelector(".ai-iy").value=0; aiDrawIPreview(row); aiUpdateSubPreview(); };
+  iedit.appendChild(irst);
+  ipwrap.append(iprev, iedit);
+  const prev = document.createElement("span"); prev.className = "ai-prev"; prev.style.display = "none"; // 레거시 참조 호환용(숨김)
   // ── 내 영상 첨부(이 장면을 영상으로) + 구간 선택 + 크기·좌우·상하 ──
   row._vtf = { x:0, y:0, scale:1 };
   const vwrap = document.createElement("div"); vwrap.style.cssText = "margin-top:10px; padding-top:8px; border-top:1px dotted var(--line);";
@@ -3410,8 +3419,29 @@ function aiSceneRow(sub, img, url){
   vrm.style.display = "none";
   vfile.onchange = ()=>{ const f=(vfile.files||[])[0]; if(f) aiVideoAttach(row, f); };
   vwrap.append(vlab, vdrop, vfile, vinfo, vpvwrap, vbarHolder, vs, ve, vedit, vrm);
-  row.append(head, ta, urlin, inp, bar, idrop, prev, vwrap);
+  row.append(head, ta, urlin, inp, bar, idrop, prev, ipwrap, vwrap);
   return row;
+}
+function aiISlider(row){
+  const g = (c)=>{ const el = row.querySelector(c); return el ? parseFloat(el.value) : null; };
+  row._itf = { scale: g(".ai-iscale") || 1, x: g(".ai-ix") || 0, y: g(".ai-iy") || 0 };
+  aiDrawIPreview(row); aiUpdateSubPreview();
+}
+function aiDrawIPreview(row){
+  const cv = row.querySelector(".ai-iprev"), im = row._img; if(!cv || !im) return;
+  const W = cv.width, H = cv.height, ctx = cv.getContext("2d");
+  ctx.clearRect(0,0,W,H); ctx.fillStyle = "#000"; ctx.fillRect(0,0,W,H);
+  const tf = row._itf || { x:0, y:0, scale:1 };
+  const base = Math.max(W/im.width, H/im.height) * (tf.scale||1);
+  const dw = im.width*base, dh = im.height*base;
+  const ox = (W-dw)/2 + ((tf.x||0)/100)*W, oy = (H-dh)/2 + ((tf.y||0)/100)*H;
+  try{ ctx.drawImage(im, ox, oy, dw, dh); }catch(e){}
+}
+function aiShowImageEditor(row){
+  const ipwrap = row.querySelector(".ai-ipwrap"); if(ipwrap) ipwrap.style.display = "flex";
+  const sc = row.querySelector(".ai-iscale"), sx = row.querySelector(".ai-ix"), sy = row.querySelector(".ai-iy");
+  if(sc) sc.value = row._itf ? row._itf.scale : 1; if(sx) sx.value = row._itf ? row._itf.x : 0; if(sy) sy.value = row._itf ? row._itf.y : 0;
+  aiDrawIPreview(row);
 }
 function aiDrawVtfPreview(row){
   const cv = row.querySelector(".ai-vtfprev"), v = row.querySelector(".ai-vprev");
@@ -3425,10 +3455,10 @@ function aiDrawVtfPreview(row){
   try{ ctx.drawImage(v, ox, oy, dw, dh); }catch(e){}
 }
 function aiImageAttach(row, file){
-  const st = row.querySelector(".ai-prev-st"), prev = row.querySelector(".ai-prev");
+  const st = row.querySelector(".ai-prev-st");
   if(st) st.textContent = "이미지 불러오는 중...";
   const img = new Image();
-  img.onload = ()=>{ row._img = img; if(prev){ prev.src = img.src; prev.style.display = "block"; } if(st) st.textContent = "✓ 첨부됨"; aiUpdateSubPreview(); };
+  img.onload = ()=>{ row._img = img; row._itf = { x:0, y:0, scale:1 }; if(st) st.textContent = "✓ 첨부됨"; aiShowImageEditor(row); aiUpdateSubPreview(); };
   img.onerror = ()=>{ if(st) st.textContent = "이미지를 불러오지 못했습니다. 다른 파일로 시도하세요."; };
   img.src = URL.createObjectURL(file);
 }
@@ -3476,8 +3506,8 @@ async function aiPreviewScene(row){
   st.textContent = url ? "이미지 불러오는 중..." : "AI 이미지 생성 중... (5~20초)";
   const target = url ? url : aiImageUrl(desc || sub || "atmospheric scene", row._seed);
   const im = await aiLoadImg(target);
-  if(im){ row._img = im; prev.src = im.src; prev.style.display = "block"; st.textContent = "✓ 확인됨"; }
-  else { row._img = null; prev.style.display = "none"; st.textContent = "실패 — 설명/URL을 바꾸거나 다시 시도하세요"; }
+  if(im){ row._img = im; row._itf = { x:0, y:0, scale:1 }; st.textContent = "✓ 확인됨"; aiShowImageEditor(row); }
+  else { row._img = null; const ipw=row.querySelector(".ai-ipwrap"); if(ipw) ipw.style.display="none"; st.textContent = "실패 — 설명/URL을 바꾸거나 다시 시도하세요"; }
   aiUpdateSubPreview();
 }
 function aiRegenScene(row){
@@ -3522,7 +3552,7 @@ async function aiRenderReel(){
   if(!rows.length){ aiSetStatus("장면이 없습니다. 먼저 [1단계]로 장면을 만드세요.", "err"); return; }
   // 영상이 첨부된 장면이 하나라도 있으면 영상+이미지 혼합 렌더 경로로
   if(rows.some(r=> r._vfile)){ return aiRenderWithVideo(rows); }
-  const scenes = rows.map(r=>({ sub: r.querySelector(".ai-sub").value.trim(), row: r }));
+  const scenes = rows.map(r=>({ sub: r.querySelector(".ai-sub").value.trim(), row: r, itf: r._itf }));
   const D = parseFloat((document.getElementById("aiDur")||{}).value) || 2.8;
   const label = document.getElementById("aiLabel").value;
   const titleText = document.getElementById("aiTitle").value;
@@ -3662,9 +3692,11 @@ async function aiRenderWithVideo(rows){
           const ox = (W-dw)/2 + ((tf.x||0)/100)*W, oy = (H-dh)/2 + ((tf.y||0)/100)*H;
           rctx.drawImage(im, ox, oy, dw, dh);
         }else if(c.type === "image" && c.img){
-          const tau = Math.max(0, Math.min(c.dur, t - c.t0)), scale = 1 + 0.08*(tau/c.dur);
-          const im = c.img, s = Math.max(W/im.width, H/im.height)*scale, dw = im.width*s, dh = im.height*s;
-          rctx.drawImage(im, (W-dw)/2, (H-dh)/2, dw, dh);
+          const tf = c.row._itf || { x:0, y:0, scale:1 };
+          const tau = Math.max(0, Math.min(c.dur, t - c.t0)), kb = 1 + 0.06*(tau/c.dur);
+          const im = c.img, s = Math.max(W/im.width, H/im.height)*(tf.scale||1)*kb, dw = im.width*s, dh = im.height*s;
+          const ox = (W-dw)/2 + ((tf.x||0)/100)*W, oy = (H-dh)/2 + ((tf.y||0)/100)*H;
+          rctx.drawImage(im, ox, oy, dw, dh);
         }else{
           const gg = rctx.createLinearGradient(0,0,W,H); gg.addColorStop(0,"#20232b"); gg.addColorStop(1,"#0e1014"); rctx.fillStyle = gg; rctx.fillRect(0,0,W,H);
         }
