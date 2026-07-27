@@ -3362,8 +3362,19 @@ function aiSceneRow(sub, img, url){
   bPrev.onclick = ()=> aiPreviewScene(row);
   const bRegen = document.createElement("button"); bRegen.className = "btn-ghost btn-sm"; bRegen.textContent = "다시 생성";
   bRegen.onclick = ()=> aiRegenScene(row);
+  const bImg = document.createElement("button"); bImg.className = "btn-ghost btn-sm"; bImg.textContent = "이미지 첨부";
+  bImg.style.cssText = "border-color:var(--ok); color:var(--ok);";
+  const ifile = document.createElement("input"); ifile.type = "file"; ifile.accept = "image/*"; ifile.className = "ai-ifile"; ifile.style.display = "none";
+  bImg.onclick = ()=> ifile.click();
+  ifile.onchange = ()=>{ const f=(ifile.files||[])[0]; if(f) aiImageAttach(row, f); };
   const st = document.createElement("span"); st.className = "ai-prev-st hint"; st.style.cssText = "margin:0;";
-  bar.append(bPrev, bRegen, st);
+  bar.append(bPrev, bRegen, bImg, ifile, st);
+  // 이미지 드래그&드롭 존
+  const idrop = document.createElement("div"); idrop.className = "vdrop ai-idrop"; idrop.style.cssText = "margin-top:8px; padding:10px;"; idrop.innerHTML = "이미지 파일을 <b>드래그&드롭</b> 하거나 눌러서 첨부";
+  idrop.onclick = ()=> ifile.click();
+  idrop.addEventListener("dragover", e=>{ e.preventDefault(); idrop.classList.add("drag"); });
+  idrop.addEventListener("dragleave", ()=> idrop.classList.remove("drag"));
+  idrop.addEventListener("drop", e=>{ e.preventDefault(); idrop.classList.remove("drag"); const f=(e.dataTransfer.files||[])[0]; if(f && /^image\//.test(f.type||"")) aiImageAttach(row, f); });
   const prev = document.createElement("img"); prev.className = "ai-prev"; prev.style.cssText = "display:none; margin-top:8px; width:150px; max-height:230px; object-fit:cover; border-radius:8px; border:1px solid var(--line);";
   // ── 내 영상 첨부(이 장면을 영상으로) + 구간 선택 + 크기·좌우·상하 ──
   row._vtf = { x:0, y:0, scale:1 };
@@ -3395,8 +3406,16 @@ function aiSceneRow(sub, img, url){
   vrm.style.display = "none";
   vfile.onchange = ()=>{ const f=(vfile.files||[])[0]; if(f) aiVideoAttach(row, f); };
   vwrap.append(vlab, vdrop, vfile, vinfo, vprev, vbarHolder, vs, ve, vedit, vrm);
-  row.append(head, ta, urlin, inp, bar, prev, vwrap);
+  row.append(head, ta, urlin, inp, bar, idrop, prev, vwrap);
   return row;
+}
+function aiImageAttach(row, file){
+  const st = row.querySelector(".ai-prev-st"), prev = row.querySelector(".ai-prev");
+  if(st) st.textContent = "이미지 불러오는 중...";
+  const img = new Image();
+  img.onload = ()=>{ row._img = img; if(prev){ prev.src = img.src; prev.style.display = "block"; } if(st) st.textContent = "✓ 첨부됨"; aiUpdateSubPreview(); };
+  img.onerror = ()=>{ if(st) st.textContent = "이미지를 불러오지 못했습니다. 다른 파일로 시도하세요."; };
+  img.src = URL.createObjectURL(file);
 }
 function aiVSlider(row){
   const g = (c)=>{ const el = row.querySelector(c); return el ? parseFloat(el.value) : null; };
@@ -3474,7 +3493,7 @@ function aiCollectScenes(){
 async function aiRenderReel(){
   if(typeof MediaRecorder === "undefined"){ aiSetStatus("이 브라우저는 영상 녹화를 지원하지 않습니다.", "err"); return; }
   const rows = [...document.querySelectorAll("#aiScenesList .ai-scene")].filter(r=>{
-    return r._vfile || r.querySelector(".ai-sub").value.trim() || r.querySelector(".ai-img").value.trim() || r.querySelector(".ai-url").value.trim();
+    return r._vfile || r._img || r.querySelector(".ai-sub").value.trim() || r.querySelector(".ai-img").value.trim() || r.querySelector(".ai-url").value.trim();
   });
   if(!rows.length){ aiSetStatus("장면이 없습니다. 먼저 [1단계]로 장면을 만드세요.", "err"); return; }
   // 영상이 첨부된 장면이 하나라도 있으면 영상+이미지 혼합 렌더 경로로
