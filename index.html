@@ -74,6 +74,12 @@
   .img-edit-row input[type=range]{flex:1; accent-color:var(--accent2); margin:0;}
   .img-edit .btn-sm{margin-top:2px;}
   .img-edit-hint{font-size:11px; color:var(--muted); line-height:1.4;}
+  .vdrop{border:1.5px dashed var(--line); border-radius:10px; padding:14px; text-align:center; color:var(--muted); font-size:13px; cursor:pointer; transition:.15s;}
+  .vdrop.drag,.vdrop:hover{border-color:var(--accent); color:var(--text); background:var(--panel2);}
+  .trimbar{position:relative; height:34px; background:var(--panel2); border:1px solid var(--line); border-radius:8px; margin-top:6px; touch-action:none; -webkit-user-select:none; user-select:none; overflow:hidden;}
+  .trim-sel{position:absolute; top:0; bottom:0; background:rgba(124,92,255,.30); border-left:2px solid var(--accent); border-right:2px solid var(--accent);}
+  .trim-h{position:absolute; top:-1px; bottom:-1px; width:16px; margin-left:-8px; background:var(--accent); border-radius:6px; cursor:ew-resize;}
+  .trim-lab{font-size:12px; color:var(--muted); margin-top:4px;}
   /* 사진 편집 중인 표지는 드래그가 쉽도록 크게 (4:5 비율 유지, 모바일 대응) */
   .card-box.editing-cover canvas{width:min(460px,calc(100vw - 88px)); height:auto; aspect-ratio:4/5;}
   .card-box.editing-cover .cover-edit,
@@ -169,11 +175,8 @@
 <aside class="rail" id="rail">
   <div class="rail-brand" title="카드 팩토리 스튜디오">CF</div>
   <nav class="rail-nav">
-    <a href="#sec-discovery"><em>발굴</em></a>
-    <a href="#sec-input"><em>소재</em></a>
-    <a href="#sec-input"><em>스타일</em></a>
-    <a href="#sec-preview"><em>카드</em></a>
-    <a href="#reelPanel"><em>릴스</em></a>
+    <a href="#videoReelPanel"><em>내영상</em></a>
+    <a href="#aiReelPanel"><em>AI영상</em></a>
   </nav>
   <div class="rail-bottom">
     <a onclick="document.getElementById('settings').classList.add('open')"><em>설정</em></a>
@@ -188,15 +191,15 @@
     <button class="btn-ghost btn-sm" onclick="document.getElementById('settings').classList.add('open')">API 설정</button>
   </header>
 
-  <!-- COUNTRY TABS (나라별 콘텐츠) -->
-  <div class="country-tabs" id="countryTabs">
+  <!-- COUNTRY TABS (나라별 콘텐츠) — 숨김(레거시, 삭제 아님) -->
+  <div class="country-tabs" id="countryTabs" style="display:none;">
     <button class="ctab on" data-c="kr" onclick="selectCountry('kr')">한국 콘텐츠<small>모든 기사 · 한국어</small></button>
     <button class="ctab" data-c="jp" onclick="selectCountry('jp')">일본 콘텐츠<small>모든 기사 · 일본어</small></button>
     <button class="ctab" data-c="us" onclick="selectCountry('us')">미국 콘텐츠<small>모든 기사 · 영어</small></button>
   </div>
 
-  <!-- DISCOVERY (보조 기능 · 기본 접힘) -->
-  <div class="panel" id="sec-discovery" style="margin-bottom:20px;">
+  <!-- DISCOVERY (보조 기능 · 기본 접힘) — 숨김(레거시, 삭제 아님) -->
+  <div class="panel" id="sec-discovery" style="margin-bottom:20px; display:none;">
     <h2 style="cursor:pointer; margin-bottom:0;" onclick="toggleDiscovery()">
       <span id="discoveryCaret">▸</span> 소재 자동 발굴 <small style="text-transform:none; color:var(--muted);">(보조 기능 — 소재가 없을 때만. 누르면 펼치기)</small>
     </h2>
@@ -221,7 +224,7 @@
     </div>
   </div>
 
-  <div class="grid">
+  <div class="grid" style="display:none;">
     <!-- LEFT: INPUT -->
     <div class="panel" id="sec-input">
       <h2>1. 소재 입력 <small style="text-transform:none; color:var(--accent2);">— 메인: 기사 링크를 붙여넣으세요</small></h2>
@@ -467,7 +470,8 @@
       <b>속도 팁</b> — 녹화는 영상 길이만큼 실시간으로 진행됩니다. <b>시작/끝을 15~30초로 트림</b>하면 훨씬 빠릅니다. 완성 후 <b>[저장]</b> → 인스타 앱에서 릴스로 올리며 <b>인기 음원</b>을 얹으면 도달이 커집니다.
     </div>
     <label>영상 업로드</label>
-    <input type="file" id="vrFile" accept="video/*" onchange="vrLoad()">
+    <div id="vrDrop" class="vdrop" onclick="document.getElementById('vrFile').click()">영상을 여기로 <b>드래그&amp;드롭</b> 하거나 눌러서 선택</div>
+    <input type="file" id="vrFile" accept="video/*" style="display:none" onchange="vrLoad()">
     <div style="margin-top:14px; padding-top:12px; border-top:1px dashed var(--line);">
       <label>기사 URL 또는 본문 <small style="text-transform:none; color:var(--muted);">— 상단 제목 자동 생성</small></label>
       <textarea id="vrArticle" class="card-edit" style="width:100%;" rows="3" placeholder="기사 링크(https://...) 또는 기사 본문을 붙여넣으세요. AI가 상단 라벨 + 큰 제목을 만듭니다."></textarea>
@@ -502,14 +506,16 @@
         </select>
       </div>
     </div>
-    <div class="style-row" style="margin-top:10px;">
+    <label style="margin-top:10px;">넣을 구간 <small style="text-transform:none; color:var(--muted);">— 타임라인 손잡이를 드래그해 하이라이트 구간을 정하세요 (미리보기 자동 이동)</small></label>
+    <div id="vrTrimBar"></div>
+    <div class="style-row" style="margin-top:8px;">
       <div>
         <label>시작 (초)</label>
-        <input type="number" id="vrStart" min="0" step="0.1" value="0" oninput="vrPreview()">
+        <input type="number" id="vrStart" min="0" step="0.1" value="0" oninput="vrTrimSync(); vrPreview()">
       </div>
       <div>
         <label>끝 (초 · 비우면 끝까지, 최대 90초)</label>
-        <input type="number" id="vrEnd" min="0" step="0.1" placeholder="자동" oninput="vrPreview()">
+        <input type="number" id="vrEnd" min="0" step="0.1" placeholder="자동" oninput="vrTrimSync(); vrPreview()">
       </div>
     </div>
     <div style="margin-top:12px; display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start;">
@@ -2726,8 +2732,37 @@ async function generateReel(){
 /* ================= 내 영상 + 후킹 문구로 릴스 만들기 ================= */
 function vrSetStatus(msg, cls){ const el = document.getElementById("vrStatus"); if(el){ el.textContent = msg; el.className = "status" + (cls ? (" " + cls) : ""); } }
 
-function vrLoad(){
-  const f = (document.getElementById("vrFile").files || [])[0];
+/* ── 타임라인 드래그 트림 바 (재사용) ── */
+let _trimActive = null;
+window.addEventListener("pointermove", e=>{ if(_trimActive) _trimActive(e.clientX); });
+window.addEventListener("pointerup", ()=>{ _trimActive = null; });
+function fmtTime(t){ t = Math.max(0, t||0); const m = Math.floor(t/60), s = t - m*60; return m + ":" + (s<10?"0":"") + s.toFixed(1); }
+function makeTrimBar(onChange, onScrub){
+  const wrap = document.createElement("div");
+  const bar = document.createElement("div"); bar.className = "trimbar";
+  const sel = document.createElement("div"); sel.className = "trim-sel";
+  const hS = document.createElement("div"); hS.className = "trim-h";
+  const hE = document.createElement("div"); hE.className = "trim-h";
+  bar.append(sel, hS, hE);
+  const lab = document.createElement("div"); lab.className = "trim-lab";
+  wrap.append(bar, lab);
+  let dur = 0, s = 0, e = 0;
+  function layout(){ if(dur<=0) return; const L=s/dur*100, R=e/dur*100; sel.style.left=L+"%"; sel.style.width=(R-L)+"%"; hS.style.left=L+"%"; hE.style.left=R+"%"; lab.textContent = "선택 구간  " + fmtTime(s) + " ~ " + fmtTime(e) + "  (길이 " + (e-s).toFixed(1) + "초) — 손잡이를 드래그하세요"; }
+  function px2t(x){ const rc=bar.getBoundingClientRect(); if(!rc.width) return 0; return Math.max(0, Math.min(1, (x-rc.left)/rc.width))*dur; }
+  function mv(which, x){ if(dur<=0) return; const t=px2t(x); if(which==="s"){ s=Math.min(t, e-0.1); if(s<0)s=0; } else { e=Math.max(t, s+0.1); if(e>dur)e=dur; } layout(); if(onScrub) onScrub(which==="s"?s:e); if(onChange) onChange(s,e); }
+  hS.addEventListener("pointerdown", ev=>{ ev.preventDefault(); _trimActive=(x)=>mv("s",x); mv("s",ev.clientX); });
+  hE.addEventListener("pointerdown", ev=>{ ev.preventDefault(); _trimActive=(x)=>mv("e",x); mv("e",ev.clientX); });
+  bar.addEventListener("pointerdown", ev=>{ if(ev.target!==bar) return; const t=px2t(ev.clientX); const which=(Math.abs(t-s)<=Math.abs(t-e))?"s":"e"; _trimActive=(x)=>mv(which,x); mv(which,ev.clientX); });
+  return {
+    el: wrap,
+    setDur(d, ns, ne){ dur=d; s=Math.max(0, ns||0); e=(ne&&ne>0)?Math.min(ne,d):d; if(e<=s) e=d; layout(); if(onChange) onChange(s,e); },
+    set(ns, ne){ s=Math.max(0,ns); e=Math.min(dur, ne); layout(); },
+    get(){ return { s, e }; }
+  };
+}
+
+function vrLoad(){ const f=(document.getElementById("vrFile").files||[])[0]; if(f) vrLoadFile(f); }
+function vrLoadFile(f){
   if(!f) return;
   const v = document.getElementById("vrVideo");
   if(v.src){ try{ URL.revokeObjectURL(v.src); }catch(e){} }
@@ -2739,9 +2774,19 @@ function vrLoad(){
     endEl.placeholder = v.duration.toFixed(1);
     endEl.max = v.duration.toFixed(1);
     document.getElementById("vrStart").max = v.duration.toFixed(1);
+    // 타임라인 트림 바 구성
+    const holder = document.getElementById("vrTrimBar");
+    if(holder){
+      holder.innerHTML = "";
+      if(!window._vrTrim) window._vrTrim = makeTrimBar((s,e)=>{ document.getElementById("vrStart").value=s.toFixed(1); document.getElementById("vrEnd").value=e.toFixed(1); }, (t)=>{ try{ v.currentTime=t; }catch(_e){} });
+      holder.appendChild(window._vrTrim.el);
+      const s0 = parseFloat(document.getElementById("vrStart").value)||0;
+      const e0 = parseFloat(document.getElementById("vrEnd").value)|| Math.min(v.duration, 90);
+      window._vrTrim.setDur(v.duration, s0, e0);
+    }
     try{ v.currentTime = Math.min(parseFloat(document.getElementById("vrStart").value) || 0, v.duration || 0); }catch(e){ vrPreview(); }
     const dur = v.duration;
-    vrSetStatus("영상 로드됨 (" + dur.toFixed(1) + "초). 후킹 문구를 입력하고 [영상 릴스 만들기]를 누르세요." + (dur > 90 ? " ※ 90초를 넘으면 릴스용으로 앞 90초만 사용됩니다." : ""), "ok");
+    vrSetStatus("영상 로드됨 (" + dur.toFixed(1) + "초). 아래 타임라인에서 넣을 구간을 드래그로 정하고 [영상 릴스 만들기]를 누르세요." + (dur > 90 ? " ※ 90초 초과분은 잘립니다." : ""), "ok");
   };
   v.onseeked = ()=>vrPreview();
   v.onerror = ()=>vrSetStatus("영상을 불러오지 못했습니다. mp4/mov 파일로 시도하세요.", "err");
@@ -2749,6 +2794,20 @@ function vrLoad(){
   vrResetTransform();
   vrBindEditor();
 }
+function vrTrimSync(){
+  if(!window._vrTrim) return;
+  const dur = (document.getElementById("vrVideo").duration) || 0;
+  const s = parseFloat(document.getElementById("vrStart").value) || 0;
+  let e = parseFloat(document.getElementById("vrEnd").value); if(!(e>0)) e = dur || (s+1);
+  window._vrTrim.set(s, Math.min(e, dur||e));
+}
+(function(){
+  const dz = document.getElementById("vrDrop");
+  if(!dz) return;
+  dz.addEventListener("dragover", e=>{ e.preventDefault(); dz.classList.add("drag"); });
+  dz.addEventListener("dragleave", ()=>dz.classList.remove("drag"));
+  dz.addEventListener("drop", e=>{ e.preventDefault(); dz.classList.remove("drag"); const f=(e.dataTransfer.files||[])[0]; if(f && /^video\//.test(f.type||"")) vrLoadFile(f); });
+})();
 
 /* 슬라이더 → 변형값 반영 */
 function vrSlider(){
@@ -3306,39 +3365,64 @@ function aiSceneRow(sub, img, url){
   const st = document.createElement("span"); st.className = "ai-prev-st hint"; st.style.cssText = "margin:0;";
   bar.append(bPrev, bRegen, st);
   const prev = document.createElement("img"); prev.className = "ai-prev"; prev.style.cssText = "display:none; margin-top:8px; width:150px; max-height:230px; object-fit:cover; border-radius:8px; border:1px solid var(--line);";
-  // ── 내 영상 첨부(이 장면을 영상으로) + 구간 선택 ──
+  // ── 내 영상 첨부(이 장면을 영상으로) + 구간 선택 + 크기·좌우·상하 ──
+  row._vtf = { x:0, y:0, scale:1 };
   const vwrap = document.createElement("div"); vwrap.style.cssText = "margin-top:10px; padding-top:8px; border-top:1px dotted var(--line);";
   const vlab = document.createElement("div"); vlab.className = "hint"; vlab.style.cssText = "margin:0 0 4px;"; vlab.textContent = "또는 내 영상 첨부 (이 장면을 영상으로 대체):";
-  const vfile = document.createElement("input"); vfile.type = "file"; vfile.accept = "video/*"; vfile.className = "ai-vfile";
+  const vdrop = document.createElement("div"); vdrop.className = "vdrop ai-vdrop"; vdrop.innerHTML = "영상을 여기로 <b>드래그&드롭</b> 하거나 눌러서 선택";
+  const vfile = document.createElement("input"); vfile.type = "file"; vfile.accept = "video/*"; vfile.className = "ai-vfile"; vfile.style.display = "none";
+  vdrop.onclick = ()=> vfile.click();
+  vdrop.addEventListener("dragover", e=>{ e.preventDefault(); vdrop.classList.add("drag"); });
+  vdrop.addEventListener("dragleave", ()=> vdrop.classList.remove("drag"));
+  vdrop.addEventListener("drop", e=>{ e.preventDefault(); vdrop.classList.remove("drag"); const f=(e.dataTransfer.files||[])[0]; if(f && /^video\//.test(f.type||"")) aiVideoAttach(row, f); });
   const vinfo = document.createElement("span"); vinfo.className = "ai-vinfo hint"; vinfo.style.cssText = "display:block; margin-top:4px;";
-  const vprev = document.createElement("video"); vprev.className = "ai-vprev"; vprev.controls = true; vprev.playsInline = true; vprev.muted = true; vprev.style.cssText = "display:none; margin-top:6px; width:180px; border-radius:8px; border:1px solid var(--line); background:#000;";
-  const vtrim = document.createElement("div"); vtrim.className = "ai-vtrim"; vtrim.style.cssText = "display:none; gap:6px; align-items:center; margin-top:6px; flex-wrap:wrap;";
-  const mk = (t)=>{ const s=document.createElement("span"); s.className="hint"; s.style.margin="0"; s.textContent=t; return s; };
-  const vs = document.createElement("input"); vs.type="number"; vs.min=0; vs.step=0.1; vs.value=0; vs.className="ai-vstart"; vs.style.width="72px";
-  const ve = document.createElement("input"); ve.type="number"; ve.min=0; ve.step=0.1; ve.className="ai-vend"; ve.style.width="72px";
-  const bS = document.createElement("button"); bS.className="btn-ghost btn-sm"; bS.textContent="현재→시작"; bS.onclick=()=>{ vs.value=(vprev.currentTime||0).toFixed(1); };
-  const bE = document.createElement("button"); bE.className="btn-ghost btn-sm"; bE.textContent="현재→끝"; bE.onclick=()=>{ ve.value=(vprev.currentTime||0).toFixed(1); };
-  const vrm = document.createElement("button"); vrm.className="btn-ghost btn-sm"; vrm.textContent="영상 제거"; vrm.style.cssText="border-color:var(--err); color:var(--err);";
-  vrm.onclick=()=>{ if(row._vurl){ try{ URL.revokeObjectURL(row._vurl); }catch(e){} } row._vfile=null; row._vurl=null; row._vdur=0; vfile.value=""; vprev.style.display="none"; vtrim.style.display="none"; vinfo.textContent=""; };
-  vtrim.append(mk("구간(초)  시작"), vs, mk("끝"), ve, bS, bE, vrm);
+  const vprev = document.createElement("video"); vprev.className = "ai-vprev"; vprev.controls = true; vprev.playsInline = true; vprev.muted = true; vprev.style.cssText = "display:none; margin-top:6px; width:200px; border-radius:8px; border:1px solid var(--line); background:#000;";
+  const vbarHolder = document.createElement("div"); vbarHolder.className = "ai-vbar";
+  const vs = document.createElement("input"); vs.type = "hidden"; vs.className = "ai-vstart"; vs.value = "0";
+  const ve = document.createElement("input"); ve.type = "hidden"; ve.className = "ai-vend"; ve.value = "0";
+  const vedit = document.createElement("div"); vedit.className = "img-edit ai-vedit"; vedit.style.cssText = "display:none; width:200px; margin-top:8px;";
+  vedit.innerHTML =
+    "<div style='font-size:12px; color:var(--muted);'>영상 편집 (크기·좌우·상하)</div>" +
+    "<div class='img-edit-row'><span class='img-edit-lab'>크기</span><input type='range' class='ai-vscale' min='1' max='4' step='0.02' value='1'></div>" +
+    "<div class='img-edit-row'><span class='img-edit-lab'>좌우</span><input type='range' class='ai-vx' min='-100' max='100' step='1' value='0'></div>" +
+    "<div class='img-edit-row'><span class='img-edit-lab'>상하</span><input type='range' class='ai-vy' min='-100' max='100' step='1' value='0'></div>";
+  vedit.querySelectorAll("input[type=range]").forEach(sl=> sl.oninput = ()=> aiVSlider(row));
+  const vrst = document.createElement("button"); vrst.className = "btn-ghost btn-sm"; vrst.textContent = "위치 초기화";
+  vrst.onclick = ()=>{ row._vtf = { x:0, y:0, scale:1 }; vedit.querySelector(".ai-vscale").value=1; vedit.querySelector(".ai-vx").value=0; vedit.querySelector(".ai-vy").value=0; };
+  vedit.appendChild(vrst);
+  const vrm = document.createElement("button"); vrm.className = "btn-ghost btn-sm"; vrm.textContent = "영상 제거"; vrm.style.cssText = "border-color:var(--err); color:var(--err); margin-top:6px;";
+  vrm.onclick = ()=>{ if(row._vurl){ try{ URL.revokeObjectURL(row._vurl); }catch(e){} } row._vfile=null; row._vurl=null; row._vdur=0; row._vtrim=null; vfile.value=""; vprev.style.display="none"; vbarHolder.innerHTML=""; vedit.style.display="none"; vrm.style.display="none"; vinfo.textContent=""; };
+  vrm.style.display = "none";
   vfile.onchange = ()=>{ const f=(vfile.files||[])[0]; if(f) aiVideoAttach(row, f); };
-  vwrap.append(vlab, vfile, vinfo, vprev, vtrim);
+  vwrap.append(vlab, vdrop, vfile, vinfo, vprev, vbarHolder, vs, ve, vedit, vrm);
   row.append(head, ta, urlin, inp, bar, prev, vwrap);
   return row;
 }
+function aiVSlider(row){
+  const g = (c)=>{ const el = row.querySelector(c); return el ? parseFloat(el.value) : null; };
+  row._vtf = { scale: g(".ai-vscale") || 1, x: g(".ai-vx") || 0, y: g(".ai-vy") || 0 };
+}
 function aiVideoAttach(row, file){
   if(row._vurl){ try{ URL.revokeObjectURL(row._vurl); }catch(e){} }
-  row._vfile = file; row._vurl = URL.createObjectURL(file); row._img = null;
-  const vprev = row.querySelector(".ai-vprev"), vinfo = row.querySelector(".ai-vinfo"), vtrim = row.querySelector(".ai-vtrim");
+  row._vfile = file; row._vurl = URL.createObjectURL(file); row._img = null; row._vtf = { x:0, y:0, scale:1 };
+  const vprev = row.querySelector(".ai-vprev"), vinfo = row.querySelector(".ai-vinfo"), vbar = row.querySelector(".ai-vbar"), vedit = row.querySelector(".ai-vedit");
   const vs = row.querySelector(".ai-vstart"), ve = row.querySelector(".ai-vend");
   const prev = row.querySelector(".ai-prev"); if(prev) prev.style.display = "none";
+  const vrm = [...row.querySelectorAll("button")].find(b=> b.textContent === "영상 제거"); if(vrm) vrm.style.display = "inline-block";
   vprev.src = row._vurl; vprev.style.display = "block";
   vprev.onloadedmetadata = ()=>{
     row._vdur = vprev.duration || 0;
-    vs.max = row._vdur.toFixed(1); ve.max = row._vdur.toFixed(1);
-    if(!(parseFloat(ve.value) > 0)) ve.value = Math.min(row._vdur, 6).toFixed(1);
-    vinfo.textContent = "영상 " + row._vdur.toFixed(1) + "초 — 미리보기를 원하는 지점에 멈춘 뒤 [현재→시작]/[현재→끝]으로 넣을 구간을 정하세요.";
-    vtrim.style.display = "flex";
+    const initEnd = Math.min(row._vdur, 6);
+    vs.value = "0"; ve.value = initEnd.toFixed(1);
+    vbar.innerHTML = "";
+    row._vtrim = makeTrimBar(
+      (s,e)=>{ vs.value = s.toFixed(1); ve.value = e.toFixed(1); },
+      (t)=>{ try{ vprev.currentTime = t; }catch(_e){} }
+    );
+    vbar.appendChild(row._vtrim.el);
+    row._vtrim.setDur(row._vdur, 0, initEnd);
+    vedit.style.display = "flex";
+    vinfo.textContent = "영상 " + row._vdur.toFixed(1) + "초 — 아래 타임라인을 드래그해 넣을 구간을 정하고, 크기·좌우·상하로 화면을 맞추세요.";
   };
 }
 async function aiPreviewScene(row){
@@ -3529,8 +3613,11 @@ async function aiRenderWithVideo(rows){
         rctx.clearRect(0,0,W,H); rctx.fillStyle = "#000"; rctx.fillRect(0,0,W,H);
         const c = clips[i];
         if(c.type === "video" && c.v.videoWidth){
-          const im = c.v, s = Math.max(W/im.videoWidth, H/im.videoHeight), dw = im.videoWidth*s, dh = im.videoHeight*s;
-          rctx.drawImage(im, (W-dw)/2, (H-dh)/2, dw, dh);
+          const im = c.v, tf = c.row._vtf || { x:0, y:0, scale:1 };
+          const base = Math.max(W/im.videoWidth, H/im.videoHeight), s = base*(tf.scale||1);
+          const dw = im.videoWidth*s, dh = im.videoHeight*s;
+          const ox = (W-dw)/2 + ((tf.x||0)/100)*W, oy = (H-dh)/2 + ((tf.y||0)/100)*H;
+          rctx.drawImage(im, ox, oy, dw, dh);
         }else if(c.type === "image" && c.img){
           const tau = Math.max(0, Math.min(c.dur, t - c.t0)), scale = 1 + 0.08*(tau/c.dur);
           const im = c.img, s = Math.max(W/im.width, H/im.height)*scale, dw = im.width*s, dh = im.height*s;
