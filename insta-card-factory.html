@@ -768,20 +768,33 @@ function extractTextFromHtml(html){
   const text = ps.join("\n\n");
   return text.length > 200 ? text : null;
 }
+/* 포털 네비게이션/서비스 안내 텍스트(본문 아님) 감지 */
+function looksLikeBoilerplate(t){
+  const s = String(t || "");
+  const markers = ["언론사가 직접", "기사배열", "구독한 언론사", "뉴스스탠드", "서비스 안내", "자동수집", "AiRS", "언론사편집", "랭킹뉴스", "기사 섹션", "종목을 선정", "스포츠 기사 분류", "전체 언론사"];
+  let hits = 0; markers.forEach(m=>{ if(s.includes(m)) hits++; });
+  return hits >= 2 && s.replace(/\s/g,"").length < 1800;
+}
 async function raceExtract(url){
   const enc = encodeURIComponent(url);
-  const attempts = [
-    { name:"Jina Reader",  fn: async()=>{ const r = await fetchWithTimeout("https://r.jina.ai/"+url, 20000); if(!r.ok) throw 0; const t = await r.text(); if(t.length<=200) throw 0; return t; } },
-    { name:"AllOrigins",   fn: async()=>{ const r = await fetchWithTimeout("https://api.allorigins.win/raw?url="+enc, 18000); if(!r.ok) throw 0; const t = extractTextFromHtml(await r.text()); if(!t) throw 0; return t; } },
-    { name:"CorsProxy",    fn: async()=>{ const r = await fetchWithTimeout("https://corsproxy.io/?url="+enc, 18000); if(!r.ok) throw 0; const t = extractTextFromHtml(await r.text()); if(!t) throw 0; return t; } },
-    { name:"CodeTabs",     fn: async()=>{ const r = await fetchWithTimeout("https://api.codetabs.com/v1/proxy?quest="+url, 18000); if(!r.ok) throw 0; const t = extractTextFromHtml(await r.text()); if(!t) throw 0; return t; } },
+  const jina = async()=>{ const r = await fetchWithTimeout("https://r.jina.ai/"+url, 22000); if(!r.ok) throw 0; const t = await r.text(); if(t.length<=200) throw 0; return t; };
+  const others = [
+    { name:"AllOrigins", fn: async()=>{ const r = await fetchWithTimeout("https://api.allorigins.win/raw?url="+enc, 18000); if(!r.ok) throw 0; const t = extractTextFromHtml(await r.text()); if(!t) throw 0; return t; } },
+    { name:"CorsProxy",  fn: async()=>{ const r = await fetchWithTimeout("https://corsproxy.io/?url="+enc, 18000); if(!r.ok) throw 0; const t = extractTextFromHtml(await r.text()); if(!t) throw 0; return t; } },
+    { name:"CodeTabs",   fn: async()=>{ const r = await fetchWithTimeout("https://api.codetabs.com/v1/proxy?quest="+url, 18000); if(!r.ok) throw 0; const t = extractTextFromHtml(await r.text()); if(!t) throw 0; return t; } },
   ];
-  const races = attempts.map(a => a.fn().then(t=>({ text:t, src:a.name })));
-  try{
-    return await Promise.any(races);
-  }catch(e){
-    return null; // 전부 실패
-  }
+  // 1순위: Jina Reader (JS 렌더 → 네이버 등 본문 정확). 품질 좋으면 즉시 채택.
+  let jinaText = null;
+  try{ jinaText = await jina(); if(jinaText && jinaText.length > 300 && !looksLikeBoilerplate(jinaText)) return { text:jinaText, src:"Jina Reader" }; }catch(e){ jinaText = null; }
+  // 2순위: 나머지 프록시 레이스. 품질(길이·비보일러플레이트) 통과분 우선.
+  let otherR = null;
+  try{ otherR = await Promise.any(others.map(a=> a.fn().then(t=>({ text:t, src:a.name })))); }catch(e){ otherR = null; }
+  const candidates = [ jinaText ? { text:jinaText, src:"Jina Reader" } : null, otherR ].filter(Boolean);
+  const clean = candidates.filter(c=> !looksLikeBoilerplate(c.text));
+  const pool = clean.length ? clean : candidates;
+  if(!pool.length) return null;
+  pool.sort((a,b)=> b.text.length - a.text.length);
+  return pool[0];
 }
 
 /* ---------- image upload ---------- */
@@ -2914,7 +2927,10 @@ async function vrGenTitle(){
       let found = null;
       try{ found = await raceExtract(src); }catch(e){ /* fall through */ }
       if(found && found.text){ src = found.text.replace(/\n{3,}/g, "\n\n").trim().slice(0, 6000); }
-      else { vrSetStatus("본문 추출이 어려워 입력한 URL 텍스트로 진행합니다. (실패 시 본문을 직접 붙여넣으세요)", "busy"); }
+      else { throw new Error("기사 본문을 가져오지 못했습니다. 기사 본문 텍스트를 복사해 붙여넣고 다시 시도하세요."); }
+      if(looksLikeBoilerplate(src) || src.replace(/\s/g,"").length < 200){
+        throw new Error("이 기사(네이버 스포츠 등)는 본문 자동 추출이 막혀 메뉴·안내 텍스트만 가져왔습니다. 기사 본문 텍스트를 복사해 붙여넣고 다시 시도하세요.");
+      }
     }
     vrSetStatus("AI가 상단 제목을 만드는 중...", "busy");
     const raw = await callClaude(buildTitlePrompt(src));
@@ -3183,7 +3199,10 @@ async function aiPlanScenes(){
       const pageUrl = src;
       let found = null; try{ found = await raceExtract(src); }catch(e){}
       if(found && found.text){ src = found.text.replace(/\n{3,}/g, "\n\n").trim().slice(0, 6000); }
-      else { aiSetStatus("본문 추출이 어려워 입력한 텍스트로 진행합니다.", "busy"); }
+      else { throw new Error("기사 본문을 가져오지 못했습니다. 기사 본문 텍스트를 복사해 위 칸에 붙여넣고 다시 시도하세요."); }
+      if(looksLikeBoilerplate(src) || src.replace(/\s/g,"").length < 200){
+        throw new Error("이 기사(네이버 스포츠 등 일부 사이트)는 본문 자동 추출이 막혀 메뉴·안내 텍스트만 가져왔습니다. 기사 본문 텍스트를 복사해 위 칸에 붙여넣고 다시 시도하세요.");
+      }
       // 기사에 실린 대표 이미지(첫 장면용) 확보
       try{ articleImg = window._pendingThumb || await findArticleImage(pageUrl) || ""; window._pendingThumb = null; }catch(e){}
     }
