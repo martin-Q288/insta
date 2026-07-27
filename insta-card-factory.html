@@ -587,15 +587,27 @@
     <div id="aiPlanWrap" style="display:none; margin-top:14px; padding-top:12px; border-top:1px dashed var(--line);">
       <div class="notice" style="margin-top:0;">아래에서 <b>제목·장면 자막·이미지 설명</b>을 직접 편집할 수 있습니다. 자막칸에서 <b>Enter로 줄바꿈</b>을 넣으면 영상에도 그대로 반영됩니다. 다 되면 <b>[2단계]</b>를 누르세요.</div>
       <label style="margin-top:10px;">상단 라벨 <small style="text-transform:none; color:var(--muted);">— 흰색 박스 (선택)</small></label>
-      <input type="text" id="aiLabel" placeholder="상단 흰 박스 문구">
+      <input type="text" id="aiLabel" placeholder="상단 흰 박스 문구" oninput="aiUpdateSubPreview()">
       <label style="margin-top:10px;">제목 <small style="text-transform:none; color:var(--muted);">— 줄바꿈 = 줄 나눔 · **강조** = 노란색</small></label>
-      <textarea id="aiTitle" class="card-edit" style="width:100%;" rows="3"></textarea>
+      <textarea id="aiTitle" class="card-edit" style="width:100%;" rows="3" oninput="aiUpdateSubPreview()"></textarea>
       <label style="margin-top:10px;">장면 (자막 · 이미지 설명) <small style="text-transform:none; color:var(--muted);">— 자막에서 Enter로 줄바꿈 편집</small></label>
       <div id="aiScenesList"></div>
       <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;">
         <button class="btn-ghost btn-sm" onclick="aiAddScene()">+ 장면 추가</button>
         <button class="btn-ghost btn-sm" style="border-color:var(--accent); color:var(--accent);" onclick="aiPreviewAll()">모든 장면 이미지 미리보기</button>
       </div>
+      <label style="margin-top:12px;">자막 스타일 <small style="text-transform:none; color:var(--muted);">— 크기·위치를 조절하세요 (아래 미리보기에 바로 반영)</small></label>
+      <div class="style-row" style="margin-top:6px;">
+        <div>
+          <label>자막 크기</label>
+          <input type="range" id="aiSubSize" min="0.8" max="1.7" step="0.05" value="1" style="width:100%;" oninput="aiUpdateSubPreview()">
+        </div>
+        <div>
+          <label>자막 위치 (위 ↔ 아래)</label>
+          <input type="range" id="aiSubPos" min="0.35" max="0.9" step="0.01" value="0.8" style="width:100%;" oninput="aiUpdateSubPreview()">
+        </div>
+      </div>
+      <canvas id="aiSubPreview" style="display:none; width:200px; margin-top:8px; border-radius:10px; border:1px solid var(--line); background:#000;"></canvas>
       <label style="margin-top:12px;">게시물 본문 (캡션)</label>
       <textarea id="aiCaption" class="card-edit" style="width:100%;" rows="6"></textarea>
       <button class="btn-ghost btn-sm" style="margin-top:6px;" onclick="aiCopyCaption()">본문 복사</button>
@@ -1035,6 +1047,7 @@ This is the "nowaythis" account. The voice is CALM, COMPOSED, and TRUSTWORTHY �
 ═══ 지적재산권 — 절대 규칙 (CRITICAL) ═══
 This is a restyling of TONE, never a reinterpretation of FACTS.
 - FACTS are free and MUST stay accurate: 이름·숫자·날짜·장소·사건은 원문 그대로 정확하게. 사실을 지어내거나 바꾸지 말 것.
+- 정확성 최우선 — '누가 누구에게' 했는지(가해자↔피해자, 주어↔목적어)를 절대 뒤바꾸지 마세요. 예: '남편이 아내를 해쳤다'를 '아내가 남편을 해쳤다'로 쓰면 심각한 오류입니다. 인물 관계(남편/아내/부모/자녀 등)와 이름·역할을 원문 그대로 유지하고, 기사에 없는 내용·추측은 넣지 마세요.
 - But NEVER reuse the source's HEADLINE, and NEVER copy the source's sentences or phrasing. 원문의 제목을 변형만 하는 것도 금지. Every sentence must be RE-EXPRESSED from scratch in nowaythis's own words and structure — different sentence order, different framing, your own hook.
 - 자가 점검: 만약 당신이 쓴 어떤 문구가 원문 기사에서 그대로 검색될 수 있다면, 그 문구는 다시 써라.
 `;
@@ -3106,8 +3119,14 @@ function aiParseTitle(label, titleText, mctx, W){
   rawLines.forEach((l, idx)=>{ const hl = /\*\*/.test(l) || (!anyHl && idx===0); wrapText(mctx, l.replace(/\*\*/g,"").trim(), maxW).forEach(t=> lines.push({ text:t, hl })); });
   return { label:(label||"").trim(), lines };
 }
+/* 자막 크기·위치 사용자 설정 (패널 6 슬라이더) */
+function aiSubStyle(){
+  const sizeMul = parseFloat((document.getElementById("aiSubSize")||{}).value) || 1;
+  const posY = parseFloat((document.getElementById("aiSubPos")||{}).value) || 0.8;
+  return { sizeMul, posY };
+}
 function aiWrapSub(mctx, text, W){
-  const size = Math.round(W*0.052); mctx.font = "700 " + size + "px " + TITLE_FONT; const maxW = W - 150; const out = [];
+  const size = Math.round(W*0.052*aiSubStyle().sizeMul); mctx.font = "700 " + size + "px " + TITLE_FONT; const maxW = W - 120; const out = [];
   String(text||"").replace(/\\n/g,"\n").split("\n").forEach(part=> wrapText(mctx, part, maxW).forEach(l=> out.push(l)));
   return out;
 }
@@ -3133,14 +3152,32 @@ function aiDrawTitle(ctx, W, title){
 }
 function aiDrawSub(ctx, W, H, lines){
   if(!lines || !lines.length) return;
-  const size = Math.round(W*0.052); ctx.font = "700 " + size + "px " + TITLE_FONT;
+  const st = aiSubStyle();
+  const size = Math.round(W*0.052*st.sizeMul); ctx.font = "700 " + size + "px " + TITLE_FONT;
   ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
-  const lh = size*1.28, blockH = lines.length*lh, centerY = H*0.8; let y = centerY - blockH/2 + size;
+  const lh = size*1.28, blockH = lines.length*lh, centerY = H*st.posY; let y = centerY - blockH/2 + size;
   const padX = 26, padY = 12;
   lines.forEach(ln=>{ const tw = ctx.measureText(ln).width; ctx.fillStyle = "rgba(0,0,0,.62)"; roundRect(ctx, W/2-tw/2-padX, y-size-padY+6, tw+padX*2, size+padY*2, 12); ctx.fill(); y += lh; });
   y = centerY - blockH/2 + size;
   lines.forEach(ln=>{ ctx.fillStyle = "#fff"; ctx.fillText(ln, W/2, y); y += lh; });
   ctx.textAlign = "left";
+}
+/* 자막 크기·위치 실시간 미리보기 (첫 장면 이미지 위에 첫 자막+제목) */
+function aiUpdateSubPreview(){
+  const cv = document.getElementById("aiSubPreview"); if(!cv) return;
+  const W = 1080, H = 1920; cv.width = W; cv.height = H; cv.style.display = "block";
+  const ctx = cv.getContext("2d");
+  const firstRow = document.querySelector("#aiScenesList .ai-scene");
+  const im = firstRow && firstRow._img;
+  ctx.clearRect(0,0,W,H);
+  if(im){ const s = Math.max(W/im.width, H/im.height), dw = im.width*s, dh = im.height*s; ctx.drawImage(im, (W-dw)/2, (H-dh)/2, dw, dh); }
+  else { const gg = ctx.createLinearGradient(0,0,W,H); gg.addColorStop(0,"#20232b"); gg.addColorStop(1,"#0e1014"); ctx.fillStyle = gg; ctx.fillRect(0,0,W,H); }
+  const g = ctx.createLinearGradient(0, H*0.58, 0, H); g.addColorStop(0,"rgba(0,0,0,0)"); g.addColorStop(1,"rgba(0,0,0,.65)"); ctx.fillStyle = g; ctx.fillRect(0, H*0.58, W, H*0.42);
+  const mctx = makeCanvas(W, 140).getContext("2d");
+  const sub = firstRow ? firstRow.querySelector(".ai-sub").value.trim() : "";
+  aiDrawSub(ctx, W, H, aiWrapSub(mctx, sub || "자막 미리보기입니다", W));
+  const title = aiParseTitle(document.getElementById("aiLabel").value, String(document.getElementById("aiTitle").value||"").replace(/\\n/g,"\n"), mctx, W);
+  aiDrawTitle(ctx, W, title);
 }
 function drawAiFrame(ctx, scenes, imgs, t, o){
   const { N, D, T, step, W, H, title } = o;
@@ -3174,9 +3211,16 @@ ${NOWAYTHIS_VOICE}
 SOURCE:
 """${source}"""
 
+═══ 정확성(최우선 · 무엇보다 중요) ═══
+- 자막·제목은 기사의 사실을 '있는 그대로' 전달합니다. 창작·추측·과장·재해석 금지.
+- '누가 누구에게' 했는지(가해자↔피해자, 주어↔목적어)를 절대 뒤바꾸지 마세요. (예: '남편이 아내를 살해'를 '아내가 남편을 살해'로 바꾸면 치명적 오류)
+- 인물 관계(남편/아내/부모/자녀 등)·이름·역할·결과를 원문 그대로 유지하세요.
+- 기사에 명시되지 않은 내용은 넣지 마세요. 불확실하면 기사에 분명히 적힌 핵심 사실만 담습니다.
+- 후킹은 사실 범위 안에서만. 임팩트를 위해 사실을 비틀지 마세요.
+
 규칙:
 - "label": 상단 흰 박스 설정 문구(짧게). "title": 큰 제목 2~3줄(줄바꿈 \\n), 핵심 한 줄만 **별표**로 감싸 강조.
-- "scenes": 정확히 ${n}개. 스토리 몰입 곡선 순서(도입 훅 → 전개 → 반전/절정 → 마무리). 각 scene:
+- "scenes": 정확히 ${n}개. 스토리 몰입 곡선 순서(도입 훅 → 전개 → 반전/절정 → 마무리) — 단, 순서·구성은 사실을 바꾸지 않는 선에서만. 각 scene:
     "img": ONE short ENGLISH image-generation prompt (5~10 words) — cinematic, photographic, atmospheric scene that visually represents this beat.
       ※ 실존 인물의 얼굴/식별 가능한 특정 인물 금지. 상징·환경·사물·실루엣·뒷모습·와이드샷·손 등으로 표현. no text, no watermark.
     "sub": 그 장면 자막 한 줄(한국어 '합니다체', 8~18자, 의미 단위, 사실 정확).
@@ -3230,6 +3274,7 @@ function aiSceneRow(sub, img, url){
   del.onclick = ()=>{ row.remove(); aiRenumber(); };
   head.append(n, del);
   const ta = document.createElement("textarea"); ta.className = "ai-sub card-edit"; ta.style.cssText = "width:100%; margin-top:6px;"; ta.rows = 2; ta.value = sub; ta.placeholder = "자막 (Enter로 줄바꿈)";
+  ta.oninput = ()=> aiUpdateSubPreview();
   const urlin = document.createElement("input"); urlin.type = "text"; urlin.className = "ai-url"; urlin.style.cssText = "width:100%; margin-top:6px;"; urlin.value = url || ""; urlin.placeholder = "이미지 URL (선택 · 넣으면 그 사진을 사용, 비우면 AI 생성)";
   const inp = document.createElement("input"); inp.type = "text"; inp.className = "ai-img"; inp.style.cssText = "width:100%; margin-top:6px;"; inp.value = img; inp.placeholder = "AI 이미지 설명 (영문 권장 · 예: dark empty film set at night)";
   urlin.oninput = ()=>{ row._img = null; };
@@ -3289,6 +3334,7 @@ async function aiPreviewScene(row){
   const im = await aiLoadImg(target);
   if(im){ row._img = im; prev.src = im.src; prev.style.display = "block"; st.textContent = "✓ 확인됨"; }
   else { row._img = null; prev.style.display = "none"; st.textContent = "실패 — 설명/URL을 바꾸거나 다시 시도하세요"; }
+  aiUpdateSubPreview();
 }
 function aiRegenScene(row){
   if(row.querySelector(".ai-url").value.trim()){ aiPreviewScene(row); return; } // URL 지정 장면은 그대로 재로드
@@ -3313,6 +3359,7 @@ function aiRenderPlan(j, firstImageUrl){
   aiRenumber();
   document.getElementById("aiPlanWrap").style.display = "block";
   document.getElementById("aiPlanWrap").scrollIntoView({ behavior:"smooth", block:"nearest" });
+  aiUpdateSubPreview();
 }
 function aiCollectScenes(){
   return [...document.querySelectorAll("#aiScenesList .ai-scene")].map(el=>({
