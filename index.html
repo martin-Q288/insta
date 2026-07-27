@@ -3387,7 +3387,10 @@ function aiSceneRow(sub, img, url){
   vdrop.addEventListener("dragleave", ()=> vdrop.classList.remove("drag"));
   vdrop.addEventListener("drop", e=>{ e.preventDefault(); vdrop.classList.remove("drag"); const f=(e.dataTransfer.files||[])[0]; if(f && /^video\//.test(f.type||"")) aiVideoAttach(row, f); });
   const vinfo = document.createElement("span"); vinfo.className = "ai-vinfo hint"; vinfo.style.cssText = "display:block; margin-top:4px;";
-  const vprev = document.createElement("video"); vprev.className = "ai-vprev"; vprev.controls = true; vprev.playsInline = true; vprev.muted = true; vprev.style.cssText = "display:none; margin-top:6px; width:200px; border-radius:8px; border:1px solid var(--line); background:#000;";
+  const vpvwrap = document.createElement("div"); vpvwrap.style.cssText = "display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap; margin-top:6px;";
+  const vprev = document.createElement("video"); vprev.className = "ai-vprev"; vprev.controls = true; vprev.playsInline = true; vprev.muted = true; vprev.style.cssText = "display:none; width:200px; border-radius:8px; border:1px solid var(--line); background:#000;";
+  const vtfprev = document.createElement("canvas"); vtfprev.className = "ai-vtfprev"; vtfprev.width = 270; vtfprev.height = 480; vtfprev.style.cssText = "display:none; width:120px; border-radius:8px; border:1px solid var(--accent2); background:#000;";
+  vpvwrap.append(vprev, vtfprev);
   const vbarHolder = document.createElement("div"); vbarHolder.className = "ai-vbar";
   const vs = document.createElement("input"); vs.type = "hidden"; vs.className = "ai-vstart"; vs.value = "0";
   const ve = document.createElement("input"); ve.type = "hidden"; ve.className = "ai-vend"; ve.value = "0";
@@ -3399,15 +3402,27 @@ function aiSceneRow(sub, img, url){
     "<div class='img-edit-row'><span class='img-edit-lab'>상하</span><input type='range' class='ai-vy' min='-100' max='100' step='1' value='0'></div>";
   vedit.querySelectorAll("input[type=range]").forEach(sl=> sl.oninput = ()=> aiVSlider(row));
   const vrst = document.createElement("button"); vrst.className = "btn-ghost btn-sm"; vrst.textContent = "위치 초기화";
-  vrst.onclick = ()=>{ row._vtf = { x:0, y:0, scale:1 }; vedit.querySelector(".ai-vscale").value=1; vedit.querySelector(".ai-vx").value=0; vedit.querySelector(".ai-vy").value=0; };
-  vedit.appendChild(vrst);
+  vrst.onclick = ()=>{ row._vtf = { x:0, y:0, scale:1 }; vedit.querySelector(".ai-vscale").value=1; vedit.querySelector(".ai-vx").value=0; vedit.querySelector(".ai-vy").value=0; aiDrawVtfPreview(row); };
+  const vhint = document.createElement("div"); vhint.className = "img-edit-hint"; vhint.textContent = "오른쪽 9:16 미리보기에 크롭/줌이 즉시 반영됩니다.";
+  vedit.appendChild(vrst); vedit.appendChild(vhint);
   const vrm = document.createElement("button"); vrm.className = "btn-ghost btn-sm"; vrm.textContent = "영상 제거"; vrm.style.cssText = "border-color:var(--err); color:var(--err); margin-top:6px;";
   vrm.onclick = ()=>{ if(row._vurl){ try{ URL.revokeObjectURL(row._vurl); }catch(e){} } row._vfile=null; row._vurl=null; row._vdur=0; row._vtrim=null; vfile.value=""; vprev.style.display="none"; vbarHolder.innerHTML=""; vedit.style.display="none"; vrm.style.display="none"; vinfo.textContent=""; };
   vrm.style.display = "none";
   vfile.onchange = ()=>{ const f=(vfile.files||[])[0]; if(f) aiVideoAttach(row, f); };
-  vwrap.append(vlab, vdrop, vfile, vinfo, vprev, vbarHolder, vs, ve, vedit, vrm);
+  vwrap.append(vlab, vdrop, vfile, vinfo, vpvwrap, vbarHolder, vs, ve, vedit, vrm);
   row.append(head, ta, urlin, inp, bar, idrop, prev, vwrap);
   return row;
+}
+function aiDrawVtfPreview(row){
+  const cv = row.querySelector(".ai-vtfprev"), v = row.querySelector(".ai-vprev");
+  if(!cv || !v || !v.videoWidth) return;
+  const W = cv.width, H = cv.height, ctx = cv.getContext("2d");
+  ctx.clearRect(0,0,W,H); ctx.fillStyle = "#000"; ctx.fillRect(0,0,W,H);
+  const tf = row._vtf || { x:0, y:0, scale:1 };
+  const base = Math.max(W/v.videoWidth, H/v.videoHeight) * (tf.scale||1);
+  const dw = v.videoWidth*base, dh = v.videoHeight*base;
+  const ox = (W-dw)/2 + ((tf.x||0)/100)*W, oy = (H-dh)/2 + ((tf.y||0)/100)*H;
+  try{ ctx.drawImage(v, ox, oy, dw, dh); }catch(e){}
 }
 function aiImageAttach(row, file){
   const st = row.querySelector(".ai-prev-st"), prev = row.querySelector(".ai-prev");
@@ -3420,6 +3435,7 @@ function aiImageAttach(row, file){
 function aiVSlider(row){
   const g = (c)=>{ const el = row.querySelector(c); return el ? parseFloat(el.value) : null; };
   row._vtf = { scale: g(".ai-vscale") || 1, x: g(".ai-vx") || 0, y: g(".ai-vy") || 0 };
+  aiDrawVtfPreview(row);
 }
 function aiVideoAttach(row, file){
   if(row._vurl){ try{ URL.revokeObjectURL(row._vurl); }catch(e){} }
@@ -3427,8 +3443,14 @@ function aiVideoAttach(row, file){
   const vprev = row.querySelector(".ai-vprev"), vinfo = row.querySelector(".ai-vinfo"), vbar = row.querySelector(".ai-vbar"), vedit = row.querySelector(".ai-vedit");
   const vs = row.querySelector(".ai-vstart"), ve = row.querySelector(".ai-vend");
   const prev = row.querySelector(".ai-prev"); if(prev) prev.style.display = "none";
+  const vtfprev = row.querySelector(".ai-vtfprev");
   const vrm = [...row.querySelectorAll("button")].find(b=> b.textContent === "영상 제거"); if(vrm) vrm.style.display = "inline-block";
+  // 편집 슬라이더 초기화
+  const sc = row.querySelector(".ai-vscale"), sx = row.querySelector(".ai-vx"), sy = row.querySelector(".ai-vy");
+  if(sc) sc.value = 1; if(sx) sx.value = 0; if(sy) sy.value = 0;
   vprev.src = row._vurl; vprev.style.display = "block";
+  if(vtfprev) vtfprev.style.display = "block";
+  ["loadeddata","seeked","timeupdate","play"].forEach(ev=> vprev.addEventListener(ev, ()=> aiDrawVtfPreview(row)));
   vprev.onloadedmetadata = ()=>{
     row._vdur = vprev.duration || 0;
     const initEnd = Math.min(row._vdur, 6);
@@ -3441,7 +3463,9 @@ function aiVideoAttach(row, file){
     vbar.appendChild(row._vtrim.el);
     row._vtrim.setDur(row._vdur, 0, initEnd);
     vedit.style.display = "flex";
-    vinfo.textContent = "영상 " + row._vdur.toFixed(1) + "초 — 아래 타임라인을 드래그해 넣을 구간을 정하고, 크기·좌우·상하로 화면을 맞추세요.";
+    try{ vprev.currentTime = 0.05; }catch(e){}
+    setTimeout(()=> aiDrawVtfPreview(row), 120);
+    vinfo.textContent = "영상 " + row._vdur.toFixed(1) + "초 — 타임라인으로 넣을 구간을 정하고, 크기·좌우·상하로 화면을 맞추세요(오른쪽 9:16 미리보기 반영).";
   };
 }
 async function aiPreviewScene(row){
