@@ -3667,7 +3667,7 @@ function aiVsubRerender(row){
     const it = document.createElement("div"); it.style.cssText = "margin-top:8px; padding-top:8px; border-top:1px dotted var(--line); display:flex; gap:12px; align-items:flex-start;";
     // 왼쪽: 이 구간(컷) 시작 시점의 9:16 프레임 — 구간 크기·좌우·상하 편집을 눈으로 보며 할 수 있게
     const prevWrap = document.createElement("div"); prevWrap.style.cssText = "flex:0 0 auto; text-align:center;";
-    const prevCv = document.createElement("canvas"); prevCv.className = "ai-vsub-prev"; prevCv.width = 216; prevCv.height = 384; prevCv.style.cssText = "width:135px; border-radius:8px; border:1px solid var(--accent2); background:#000; display:block;";
+    const prevCv = document.createElement("canvas"); prevCv.className = "ai-vsub-prev"; prevCv.width = 216; prevCv.height = 384; prevCv.style.cssText = "width:150px; height:267px; border-radius:8px; border:1px solid var(--accent2); background:#000; display:block; object-fit:contain;";
     const prevCap = document.createElement("div"); prevCap.className = "hint"; prevCap.style.cssText = "margin-top:3px; font-size:11px;"; prevCap.textContent = "컷 #"+(idx+1)+" 9:16 미리보기";
     prevWrap.append(prevCv, prevCap); s._prevCv = prevCv;
     const rightCol = document.createElement("div"); rightCol.style.cssText = "flex:1; min-width:0;";
@@ -3750,27 +3750,39 @@ function aiVsubDrawSegPrev(row, s, cv){
 function aiVsubGrabOne(row, s, force){
   return new Promise(res=>{
     const v = row.querySelector(".ai-vprev");
-    if(!v || !v.videoWidth){ res(); return; }
+    if(!v){ res(); return; }
     if(s._raw && s._raw.width && !force){ if(s._prevCv) aiVsubDrawSegPrev(row, s, s._prevCv); res(); return; }
-    const onSeek = ()=>{
-      v.removeEventListener("seeked", onSeek);
+    let done = false; const finish = ()=>{ if(done) return; done = true; res(); };
+    const capture = ()=>{
+      if(!v.videoWidth){ finish(); return; }
       const cap = 540, sc = Math.min(1, cap / v.videoWidth);
       if(!s._raw) s._raw = document.createElement("canvas");
       s._raw.width = Math.max(2, Math.round(v.videoWidth * sc));
       s._raw.height = Math.max(2, Math.round(v.videoHeight * sc));
       try{ s._raw.getContext("2d").drawImage(v, 0, 0, s._raw.width, s._raw.height); }catch(e){}
       if(s._prevCv) aiVsubDrawSegPrev(row, s, s._prevCv);
-      res();
+      finish();
     };
-    const tt = Math.max(0, Math.min(s.t0, (row._vdur || s.t0)));
-    v.addEventListener("seeked", onSeek);
-    if(Math.abs((v.currentTime||0) - tt) < 0.02){ onSeek(); }
-    else { try{ v.currentTime = tt; }catch(e){ v.removeEventListener("seeked", onSeek); res(); } }
+    // seeked 직후 바로 그리면 검은 프레임이 잡힐 수 있어 → 프레임이 실제로 페인트될 때까지 대기
+    const afterSeek = ()=>{
+      v.removeEventListener("seeked", afterSeek);
+      if(v.requestVideoFrameCallback){ v.requestVideoFrameCallback(()=> capture()); setTimeout(capture, 200); }
+      else { requestAnimationFrame(()=> requestAnimationFrame(capture)); }
+    };
+    const go = ()=>{
+      const tt = Math.max(0, Math.min(s.t0, (row._vdur || s.t0)));
+      v.addEventListener("seeked", afterSeek);
+      if(Math.abs((v.currentTime||0) - tt) < 0.05){ v.removeEventListener("seeked", afterSeek); requestAnimationFrame(()=> requestAnimationFrame(capture)); }
+      else { try{ v.currentTime = tt; }catch(e){ v.removeEventListener("seeked", afterSeek); finish(); } }
+    };
+    if(v.readyState >= 2 && v.videoWidth){ go(); }
+    else { const onl = ()=>{ v.removeEventListener("loadeddata", onl); go(); }; v.addEventListener("loadeddata", onl); setTimeout(()=>{ v.removeEventListener("loadeddata", onl); if(!done) go(); }, 1500); }
+    setTimeout(finish, 4000); // 안전장치
   });
 }
 // 캐시가 없는 구간들의 프레임을 순차 캡처하고, 끝나면 재생 위치를 원복
 async function aiVsubRefreshFrames(row){
-  const v = row.querySelector(".ai-vprev"); if(!v || !v.videoWidth) return;
+  const v = row.querySelector(".ai-vprev"); if(!v) return;
   if(row._vGrabbing) return; row._vGrabbing = true;
   const subs = row._vsubs || []; const prevT = v.currentTime;
   try{ v.pause(); }catch(e){}
