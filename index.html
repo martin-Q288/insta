@@ -3252,12 +3252,15 @@ function aiUpdateSubPreview(){
   const ctx = cv.getContext("2d");
   const firstRow = document.querySelector("#aiScenesList .ai-scene");
   const im = firstRow && firstRow._img;
+  const vid = firstRow && firstRow._vfile ? firstRow.querySelector(".ai-vprev") : null;
   ctx.clearRect(0,0,W,H);
   if(im){ const tf = firstRow._itf || {x:0,y:0,scale:1}; const s = Math.max(W/im.width, H/im.height)*(tf.scale||1), dw = im.width*s, dh = im.height*s; const ox=(W-dw)/2+((tf.x||0)/100)*W, oy=(H-dh)/2+((tf.y||0)/100)*H; ctx.drawImage(im, ox, oy, dw, dh); }
+  else if(vid && vid.videoWidth){ const tf = firstRow._vtf || {x:0,y:0,scale:1}; const s = Math.max(W/vid.videoWidth, H/vid.videoHeight)*(tf.scale||1), dw = vid.videoWidth*s, dh = vid.videoHeight*s; const ox=(W-dw)/2+((tf.x||0)/100)*W, oy=(H-dh)/2+((tf.y||0)/100)*H; try{ ctx.drawImage(vid, ox, oy, dw, dh); }catch(e){} }
   else { const gg = ctx.createLinearGradient(0,0,W,H); gg.addColorStop(0,"#20232b"); gg.addColorStop(1,"#0e1014"); ctx.fillStyle = gg; ctx.fillRect(0,0,W,H); }
   const g = ctx.createLinearGradient(0, H*0.58, 0, H); g.addColorStop(0,"rgba(0,0,0,0)"); g.addColorStop(1,"rgba(0,0,0,.65)"); ctx.fillStyle = g; ctx.fillRect(0, H*0.58, W, H*0.42);
   const mctx = makeCanvas(W, 140).getContext("2d");
-  const sub = firstRow ? firstRow.querySelector(".ai-sub").value.trim() : "";
+  let sub = firstRow ? firstRow.querySelector(".ai-sub").value.trim() : "";
+  if(!sub && firstRow && firstRow._vsubs && firstRow._vsubs.length){ const s0 = firstRow._vsubs.find(x=> String(x.text||"").trim()); if(s0) sub = s0.text.trim(); }
   aiDrawSub(ctx, W, H, aiWrapSub(mctx, sub || "자막 미리보기입니다", W));
   const title = aiParseTitle(document.getElementById("aiLabel").value, String(document.getElementById("aiTitle").value||"").replace(/\\n/g,"\n"), mctx, W);
   aiDrawTitle(ctx, W, title);
@@ -3501,10 +3504,18 @@ function aiSceneRow(sub, img, url){
   vdrop.addEventListener("dragleave", ()=> vdrop.classList.remove("drag"));
   vdrop.addEventListener("drop", e=>{ e.preventDefault(); vdrop.classList.remove("drag"); const f=(e.dataTransfer.files||[])[0]; if(f && /^video\//.test(f.type||"")) aiVideoAttach(row, f); });
   const vinfo = document.createElement("span"); vinfo.className = "ai-vinfo hint"; vinfo.style.cssText = "display:block; margin-top:4px;";
-  const vpvwrap = document.createElement("div"); vpvwrap.style.cssText = "display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap; margin-top:6px;";
-  const vprev = document.createElement("video"); vprev.className = "ai-vprev"; vprev.controls = true; vprev.playsInline = true; vprev.muted = true; vprev.style.cssText = "display:none; width:200px; border-radius:8px; border:1px solid var(--line); background:#000;";
-  const vtfprev = document.createElement("canvas"); vtfprev.className = "ai-vtfprev"; vtfprev.width = 270; vtfprev.height = 480; vtfprev.style.cssText = "display:none; width:120px; border-radius:8px; border:1px solid var(--accent2); background:#000;";
-  vpvwrap.append(vprev, vtfprev);
+  const vpvwrap = document.createElement("div"); vpvwrap.style.cssText = "display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap; margin-top:6px;";
+  // ① 인스타 9:16 크롭 미리보기 — 실제 출력 화면(크게, 대표)
+  const vtfCol = document.createElement("div"); vtfCol.className = "ai-vtfcol"; vtfCol.style.cssText = "flex:0 0 auto; display:none;";
+  const vtfLab = document.createElement("div"); vtfLab.className = "hint"; vtfLab.style.cssText = "margin:0 0 4px;"; vtfLab.innerHTML = "<b style='color:var(--accent2)'>인스타 9:16 미리보기 (실제 출력)</b>";
+  const vtfprev = document.createElement("canvas"); vtfprev.className = "ai-vtfprev"; vtfprev.width = 270; vtfprev.height = 480; vtfprev.style.cssText = "display:none; width:180px; border-radius:10px; border:1px solid var(--accent2); background:#000;";
+  vtfCol.append(vtfLab, vtfprev);
+  // ② 원본 영상 — 재생·소리·구간 확인용(작게)
+  const vrawCol = document.createElement("div"); vrawCol.className = "ai-vrawcol"; vrawCol.style.cssText = "flex:0 0 auto; display:none;";
+  const vrawLab = document.createElement("div"); vrawLab.className = "hint"; vrawLab.style.cssText = "margin:0 0 4px;"; vrawLab.textContent = "원본 (재생·소리 확인용)";
+  const vprev = document.createElement("video"); vprev.className = "ai-vprev"; vprev.controls = true; vprev.playsInline = true; vprev.muted = true; vprev.style.cssText = "display:none; width:150px; border-radius:8px; border:1px solid var(--line); background:#000;";
+  vrawCol.append(vrawLab, vprev);
+  vpvwrap.append(vtfCol, vrawCol);
   const vbarHolder = document.createElement("div"); vbarHolder.className = "ai-vbar";
   const vs = document.createElement("input"); vs.type = "hidden"; vs.className = "ai-vstart"; vs.value = "0";
   const ve = document.createElement("input"); ve.type = "hidden"; ve.className = "ai-vend"; ve.value = "0";
@@ -3521,7 +3532,7 @@ function aiSceneRow(sub, img, url){
   vedit.appendChild(vrst); vedit.appendChild(vhint);
   const vsubsWrap = document.createElement("div"); vsubsWrap.className = "ai-vsubs"; vsubsWrap.style.cssText = "display:none; margin-top:10px; padding:8px 10px; border:1px dashed var(--accent2); border-radius:8px;";
   const vrm = document.createElement("button"); vrm.className = "btn-ghost btn-sm"; vrm.textContent = "영상 제거"; vrm.style.cssText = "border-color:var(--err); color:var(--err); margin-top:6px;";
-  vrm.onclick = ()=>{ if(row._vurl){ try{ URL.revokeObjectURL(row._vurl); }catch(e){} } row._vfile=null; row._vurl=null; row._vdur=0; row._vtrim=null; row._vsubs=null; vfile.value=""; vprev.style.display="none"; vbarHolder.innerHTML=""; vedit.style.display="none"; vsubsWrap.style.display="none"; vsubsWrap.innerHTML=""; vrm.style.display="none"; vinfo.textContent=""; };
+  vrm.onclick = ()=>{ if(row._vurl){ try{ URL.revokeObjectURL(row._vurl); }catch(e){} } row._vfile=null; row._vurl=null; row._vdur=0; row._vtrim=null; row._vsubs=null; vfile.value=""; vprev.style.display="none"; const vtc=row.querySelector(".ai-vtfcol"), vrc=row.querySelector(".ai-vrawcol"); if(vtc) vtc.style.display="none"; if(vrc) vrc.style.display="none"; vbarHolder.innerHTML=""; vedit.style.display="none"; vsubsWrap.style.display="none"; vsubsWrap.innerHTML=""; vrm.style.display="none"; vinfo.textContent=""; aiUpdateSubPreview(); };
   vrm.style.display = "none";
   vfile.onchange = ()=>{ const f=(vfile.files||[])[0]; if(f) aiVideoAttach(row, f); };
   vwrap.append(vlab, vdrop, vfile, vinfo, vpvwrap, vbarHolder, vsubsWrap, vs, ve, vedit, vrm);
@@ -3586,7 +3597,10 @@ function aiVideoAttach(row, file){
   if(sc) sc.value = 1; if(sx) sx.value = 0; if(sy) sy.value = 0;
   vprev.src = row._vurl; vprev.style.display = "block";
   if(vtfprev) vtfprev.style.display = "block";
-  ["loadeddata","seeked","timeupdate","play"].forEach(ev=> vprev.addEventListener(ev, ()=> aiDrawVtfPreview(row)));
+  const vtfCol = row.querySelector(".ai-vtfcol"), vrawCol = row.querySelector(".ai-vrawcol");
+  if(vtfCol) vtfCol.style.display = "block"; if(vrawCol) vrawCol.style.display = "block";
+  const isFirst = row === document.querySelector("#aiScenesList .ai-scene");
+  ["loadeddata","seeked","timeupdate","play"].forEach(ev=> vprev.addEventListener(ev, ()=>{ aiDrawVtfPreview(row); if(isFirst) aiUpdateSubPreview(); }));
   vprev.onloadedmetadata = ()=>{
     row._vdur = vprev.duration || 0;
     const initEnd = Math.min(row._vdur, 6);
