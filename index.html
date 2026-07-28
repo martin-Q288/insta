@@ -3195,8 +3195,17 @@ function aiSubStyle(){
   const posY = parseFloat((document.getElementById("aiSubPos")||{}).value) || 0.8;
   return { sizeMul, posY };
 }
-function aiWrapSub(mctx, text, W){
-  const size = Math.round(W*0.052*aiSubStyle().sizeMul); mctx.font = "700 " + size + "px " + TITLE_FONT; const maxW = W - 120; const out = [];
+// 전역 자막 스타일에 구간별 오버라이드(o)를 병합해 유효 스타일을 반환
+function aiSubStyleOf(o){
+  const g = aiSubStyle();
+  return {
+    sizeMul: (o && o.sizeMul != null) ? o.sizeMul : g.sizeMul,
+    posY: (o && o.posY != null) ? o.posY : g.posY,
+    x: (o && o.x != null) ? o.x : 0
+  };
+}
+function aiWrapSub(mctx, text, W, o){
+  const size = Math.round(W*0.052*aiSubStyleOf(o).sizeMul); mctx.font = "700 " + size + "px " + TITLE_FONT; const maxW = W - 120; const out = [];
   String(text||"").replace(/\\n/g,"\n").split("\n").forEach(part=> wrapText(mctx, part, maxW).forEach(l=> out.push(l)));
   return out;
 }
@@ -3233,16 +3242,17 @@ function aiDrawTitle(ctx, W, title, H){
   });
   ctx.textAlign = "left";
 }
-function aiDrawSub(ctx, W, H, lines){
+function aiDrawSub(ctx, W, H, lines, o){
   if(!lines || !lines.length) return;
-  const st = aiSubStyle();
+  const st = aiSubStyleOf(o);
   const size = Math.round(W*0.052*st.sizeMul); ctx.font = "700 " + size + "px " + TITLE_FONT;
   ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  const cx = W/2 + (st.x||0)*W;
   const lh = size*1.28, blockH = lines.length*lh, centerY = H*st.posY; let y = centerY - blockH/2 + size;
   const padX = 26, padY = 12;
-  lines.forEach(ln=>{ const tw = ctx.measureText(ln).width; ctx.fillStyle = "rgba(0,0,0,.62)"; roundRect(ctx, W/2-tw/2-padX, y-size-padY+6, tw+padX*2, size+padY*2, 12); ctx.fill(); y += lh; });
+  lines.forEach(ln=>{ const tw = ctx.measureText(ln).width; ctx.fillStyle = "rgba(0,0,0,.62)"; roundRect(ctx, cx-tw/2-padX, y-size-padY+6, tw+padX*2, size+padY*2, 12); ctx.fill(); y += lh; });
   y = centerY - blockH/2 + size;
-  lines.forEach(ln=>{ ctx.fillStyle = "#fff"; ctx.fillText(ln, W/2, y); y += lh; });
+  lines.forEach(ln=>{ ctx.fillStyle = "#fff"; ctx.fillText(ln, cx, y); y += lh; });
   ctx.textAlign = "left";
 }
 /* 자막 크기·위치 실시간 미리보기 (첫 장면 이미지 위에 첫 자막+제목) */
@@ -3649,12 +3659,12 @@ function aiVsubRerender(row){
     const it = document.createElement("div"); it.style.cssText = "margin-top:8px; padding-top:8px; border-top:1px dotted var(--line); display:flex; gap:12px; align-items:flex-start;";
     // 왼쪽: 이 구간(컷) 시작 시점의 9:16 프레임 — 구간 크기·좌우·상하 편집을 눈으로 보며 할 수 있게
     const prevWrap = document.createElement("div"); prevWrap.style.cssText = "flex:0 0 auto; text-align:center;";
-    const prevCv = document.createElement("canvas"); prevCv.className = "ai-vsub-prev"; prevCv.width = 135; prevCv.height = 240; prevCv.style.cssText = "width:104px; border-radius:8px; border:1px solid var(--accent2); background:#000; display:block;";
-    const prevCap = document.createElement("div"); prevCap.className = "hint"; prevCap.style.cssText = "margin-top:3px; font-size:11px;"; prevCap.textContent = "컷 #"+(idx+1)+" 화면";
+    const prevCv = document.createElement("canvas"); prevCv.className = "ai-vsub-prev"; prevCv.width = 216; prevCv.height = 384; prevCv.style.cssText = "width:135px; border-radius:8px; border:1px solid var(--accent2); background:#000; display:block;";
+    const prevCap = document.createElement("div"); prevCap.className = "hint"; prevCap.style.cssText = "margin-top:3px; font-size:11px;"; prevCap.textContent = "컷 #"+(idx+1)+" 9:16 미리보기";
     prevWrap.append(prevCv, prevCap); s._prevCv = prevCv;
     const rightCol = document.createElement("div"); rightCol.style.cssText = "flex:1; min-width:0;";
     const ta = document.createElement("textarea"); ta.className = "card-edit"; ta.rows = 2; ta.style.cssText = "width:100%;"; ta.value = s.text; ta.placeholder = "자막 문구 (Enter=줄바꿈)";
-    ta.oninput = ()=>{ s.text = ta.value; };
+    ta.oninput = ()=>{ s.text = ta.value; aiVsubDrawSegPrev(row, s, prevCv); };
     const ctr = document.createElement("div"); ctr.style.cssText = "display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:4px; font-size:12px; color:var(--muted);";
     const mkNum = (val, on)=>{ const n = document.createElement("input"); n.type = "number"; n.step = "0.1"; n.min = "0"; n.value = val.toFixed(1); n.style.cssText = "width:62px;"; n.oninput = ()=> on(parseFloat(n.value)||0); return n; };
     const t0n = mkNum(s.t0, v=>{ s.t0 = v; aiVsubGrabOne(row, s, true); }), t1n = mkNum(s.t1, v=>{ s.t1 = v; });
@@ -3675,24 +3685,52 @@ function aiVsubRerender(row){
     const rX  = mkRng(-100,100,1, base.x||0, v=>{ ensureTf().x = v; applyTf(); });
     const rY  = mkRng(-100,100,1, base.y||0, v=>{ ensureTf().y = v; applyTf(); });
     const rRst = document.createElement("button"); rRst.className = "btn-ghost btn-sm"; rRst.textContent = "구간초기화"; rRst.title = "이 구간만의 프레이밍을 지우고 전체 영상 프레이밍을 따릅니다."; rRst.onclick = ()=>{ s.tf = null; const g = row._vtf || { x:0, y:0, scale:1 }; rSc.value = g.scale||1; rX.value = g.x||0; rY.value = g.y||0; aiVsubDrawSegPrev(row, s, prevCv); };
-    vedit.append(document.createTextNode("이 구간 화면 크기"), rSc, document.createTextNode("좌우"), rX, document.createTextNode("상하"), rY, rRst);
-    rightCol.append(ta, ctr, vedit);
+    vedit.append(document.createTextNode("🎥 이 컷 화면 크기"), rSc, document.createTextNode("좌우"), rX, document.createTextNode("상하"), rY, rRst);
+    // 구간별 자막 편집(크기·좌우·상하) — 위 썸네일에 즉시 반영. s.subTf가 없으면 전역 자막 스타일을 따름.
+    const gsub = aiSubStyle();
+    const sbase = s.subTf || { sizeMul: gsub.sizeMul, posY: gsub.posY, x: 0 };
+    const sedit = document.createElement("div"); sedit.style.cssText = "margin-top:6px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:12px; color:var(--muted);";
+    const ensureSub = ()=>{ if(!s.subTf){ const g = aiSubStyle(); s.subTf = { sizeMul: g.sizeMul, posY: g.posY, x: 0 }; } return s.subTf; };
+    const applySub = ()=> aiVsubDrawSegPrev(row, s, prevCv);
+    const sSc = mkRng(0.6, 2, 0.05, sbase.sizeMul||1, v=>{ ensureSub().sizeMul = v; applySub(); });
+    const sX  = mkRng(-0.4, 0.4, 0.01, sbase.x||0, v=>{ ensureSub().x = v; applySub(); });
+    const sY  = mkRng(0.3, 0.92, 0.01, sbase.posY||0.8, v=>{ ensureSub().posY = v; applySub(); });
+    const sRst = document.createElement("button"); sRst.className = "btn-ghost btn-sm"; sRst.textContent = "자막초기화"; sRst.title = "이 구간만의 자막 스타일을 지우고 전역 자막 설정을 따릅니다."; sRst.onclick = ()=>{ s.subTf = null; const g = aiSubStyle(); sSc.value = g.sizeMul; sX.value = 0; sY.value = g.posY; aiVsubDrawSegPrev(row, s, prevCv); };
+    sedit.append(document.createTextNode("💬 이 컷 자막 크기"), sSc, document.createTextNode("좌우"), sX, document.createTextNode("상하"), sY, sRst);
+    rightCol.append(ta, ctr, vedit, sedit);
     it.append(prevWrap, rightCol); wrap.appendChild(it);
     aiVsubDrawSegPrev(row, s, prevCv);   // 캐시된 프레임이 있으면 즉시 표시
   });
   aiVsubRefreshFrames(row);              // 없는 프레임은 순차적으로 캡처
 }
-// 이 구간의 캐시된 프레임(s._raw)을 9:16으로 크롭해 썸네일에 그림 (seek 불필요, 즉시)
+// 이 구간을 실제 출력과 동일하게 1080×1920로 합성(프레임+자막)한 뒤 썸네일로 축소.
+// → 9:16 비율·자막 줄바꿈·크기·위치가 최종 결과와 정확히 일치.
 function aiVsubDrawSegPrev(row, s, cv){
-  if(!cv) return; const W = cv.width, H = cv.height, ctx = cv.getContext("2d");
-  ctx.clearRect(0,0,W,H); ctx.fillStyle = "#000"; ctx.fillRect(0,0,W,H);
+  if(!cv) return;
+  const RW = 1080, RH = 1920;
+  const off = aiVsubDrawSegPrev._c || (aiVsubDrawSegPrev._c = document.createElement("canvas"));
+  off.width = RW; off.height = RH; const octx = off.getContext("2d");
+  octx.clearRect(0,0,RW,RH); octx.fillStyle = "#000"; octx.fillRect(0,0,RW,RH);
   const src = s._raw;
-  if(!src || !src.width){ ctx.fillStyle = "rgba(255,255,255,.35)"; ctx.font = "600 16px sans-serif"; ctx.textAlign = "center"; ctx.fillText("프레임", W/2, H/2 - 8); ctx.fillText("불러오는 중", W/2, H/2 + 14); ctx.textAlign = "left"; return; }
-  const tf = s.tf || row._vtf || { x:0, y:0, scale:1 };
-  const bs = Math.max(W/src.width, H/src.height) * (tf.scale||1);
-  const dw = src.width*bs, dh = src.height*bs;
-  const ox = (W-dw)/2 + ((tf.x||0)/100)*W, oy = (H-dh)/2 + ((tf.y||0)/100)*H;
-  try{ ctx.drawImage(src, ox, oy, dw, dh); }catch(e){}
+  if(src && src.width){
+    const tf = s.tf || row._vtf || { x:0, y:0, scale:1 };
+    const bs = Math.max(RW/src.width, RH/src.height) * (tf.scale||1);
+    const dw = src.width*bs, dh = src.height*bs;
+    const ox = (RW-dw)/2 + ((tf.x||0)/100)*RW, oy = (RH-dh)/2 + ((tf.y||0)/100)*RH;
+    try{ octx.drawImage(src, ox, oy, dw, dh); }catch(e){}
+  } else {
+    octx.fillStyle = "rgba(255,255,255,.16)"; octx.font = "600 56px sans-serif"; octx.textAlign = "center";
+    octx.fillText("프레임 불러오는 중", RW/2, RH/2); octx.textAlign = "left";
+  }
+  // 하단 그라데이션 + 자막(구간별 스타일)
+  const g = octx.createLinearGradient(0, RH*0.58, 0, RH); g.addColorStop(0,"rgba(0,0,0,0)"); g.addColorStop(1,"rgba(0,0,0,.55)");
+  octx.fillStyle = g; octx.fillRect(0, RH*0.58, RW, RH*0.42);
+  const mctx = makeCanvas(RW, 140).getContext("2d");
+  const lines = aiWrapSub(mctx, s.text || "", RW, s.subTf);
+  aiDrawSub(octx, RW, RH, lines, s.subTf);
+  // 썸네일로 축소
+  const ctx = cv.getContext("2d"); ctx.clearRect(0,0,cv.width,cv.height);
+  try{ ctx.drawImage(off, 0, 0, cv.width, cv.height); }catch(e){}
 }
 // 한 구간의 시작 프레임을 캡처(seek 후 오프스크린 캔버스에 저장). force=false면 이미 있으면 건너뜀.
 function aiVsubGrabOne(row, s, force){
@@ -3925,7 +3963,7 @@ async function aiRenderWithVideo(rows){
         const tl = (c.row._vsubs || []).filter(s=> String(s.text||"").trim());
         if(tl.length){
           c.subsTimeline = true;
-          c.subs = tl.map(s=>({ lines: aiWrapSub(mctx, s.text, W), t0: s.t0 - c.vs, t1: s.t1 - c.vs, tf: s.tf || null }))
+          c.subs = tl.map(s=>({ lines: aiWrapSub(mctx, s.text, W, s.subTf), t0: s.t0 - c.vs, t1: s.t1 - c.vs, tf: s.tf || null, subTf: s.subTf || null }))
                      .sort((a,b)=> a.t0 - b.t0);
         } else {
           c.subs = aiParseVideoSubs(c.row.querySelector(".ai-sub").value, c.dur, mctx, W);
@@ -3985,7 +4023,7 @@ async function aiRenderWithVideo(rows){
           const cur = vSeg || (c.subsTimeline ? null : c.subs[c.subs.length-1]);
           subLines = cur ? cur.lines : null;
         }
-        aiDrawSub(rctx, W, H, subLines);
+        aiDrawSub(rctx, W, H, subLines, (c.type === "video" && vSeg) ? vSeg.subTf : null);
         aiDrawTitle(rctx, W, title);
         if(t < total){ aiSetStatus("영상 녹화 중... " + Math.min(100, Math.round(t/total*100)) + "%", "busy"); requestAnimationFrame(frame); }
         else resolve();
