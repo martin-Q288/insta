@@ -3955,17 +3955,17 @@ async function aiRenderWithVideo(rows){
       }
     });
 
-    if(AC){ actx = new AC(); dest = actx.createMediaStreamDestination(); }
-    // 준비: 영상 엘리먼트/오디오 그래프 + 이미지 로드
+    // 출력은 무음 — 첨부 영상의 원본 소리/BGM은 넣지 않습니다(인스타 앱에서 인기 음원을 얹는 용도).
+    // 준비: 영상 엘리먼트 + 이미지 로드
     aiSetStatus("영상·이미지 준비 중...", "busy");
     for(const c of clips){
       if(c.type === "video"){
-        const v = document.createElement("video"); v.src = c.url; v.playsInline = true; v.muted = false; v.preload = "auto";
+        const v = document.createElement("video"); v.src = c.url; v.playsInline = true; v.muted = true; v.preload = "auto";
         c.v = v;
         await new Promise((res, rej)=>{ v.onloadedmetadata = res; v.onerror = ()=>rej(new Error("첨부 영상을 불러오지 못했습니다.")); });
-        try{ await v.play(); v.pause(); }catch(e){}   // iOS 재생 잠금 해제 시도
-        try{ v.currentTime = c.vs; }catch(e){}
-        if(actx){ try{ const sn = actx.createMediaElementSource(v); const g = actx.createGain(); g.gain.value = 0; sn.connect(g); g.connect(dest); c.gain = g; }catch(e){} }
+        try{ await v.play(); v.pause(); }catch(e){}   // iOS 재생 잠금 해제
+        // 컷 시작 프레임으로 미리 seek해 대기 → 컷 전환 시 검은/멈춘 프레임(뚝뚝 끊김) 제거
+        await new Promise(res=>{ let done=false; const on=()=>{ if(done) return; done=true; v.removeEventListener("seeked", on); res(); }; v.addEventListener("seeked", on); try{ v.currentTime = c.vs; }catch(e){ on(); } setTimeout(on, 1500); });
       }else{
         if(!c.row._img){
           const url = c.row.querySelector(".ai-url").value.trim();
@@ -3982,8 +3982,7 @@ async function aiRenderWithVideo(rows){
     let acc = 0; clips.forEach(c=>{ c.t0 = acc; acc += c.dur; }); const total = +acc.toFixed(3);
 
     const rec = makeCanvas(W, H), rctx = rec.getContext("2d");
-    const stream = rec.captureStream(30);
-    if(actx){ try{ await actx.resume(); }catch(e){} dest.stream.getAudioTracks().forEach(tr=> stream.addTrack(tr)); }
+    const stream = rec.captureStream(30);   // 무음(오디오 트랙 없음)
     const { mime, ext } = pickReelMime();
     const recOpts = { videoBitsPerSecond: 12e6, audioBitsPerSecond: 192000 }; if(mime) recOpts.mimeType = mime;
     const recorder = new MediaRecorder(stream, recOpts); const chunks = [];
@@ -3997,9 +3996,10 @@ async function aiRenderWithVideo(rows){
         let i = clips.findIndex(c=> t >= c.t0 && t < c.t0 + c.dur);
         if(i < 0) i = (t >= total) ? clips.length-1 : 0;
         if(i !== cur){
-          if(cur >= 0 && clips[cur].type === "video"){ try{ clips[cur].v.pause(); }catch(e){} if(clips[cur].gain) clips[cur].gain.gain.value = 0; }
+          if(cur >= 0 && clips[cur].type === "video"){ try{ clips[cur].v.pause(); }catch(e){} }
           cur = i;
-          if(clips[i].type === "video"){ try{ clips[i].v.currentTime = clips[i].vs; }catch(e){} const pr = clips[i].v.play(); if(pr && pr.catch) pr.catch(()=>{}); if(clips[i].gain) clips[i].gain.gain.value = 1; }
+          // 이미 vs로 사전 seek되어 있으므로 재-seek 없이 바로 재생 → 첫 프레임이 즉시 표시되어 끊김 없음
+          if(clips[i].type === "video"){ const pr = clips[i].v.play(); if(pr && pr.catch) pr.catch(()=>{}); }
         }
         rctx.clearRect(0,0,W,H); rctx.fillStyle = "#000"; rctx.fillRect(0,0,W,H);
         const c = clips[i];
