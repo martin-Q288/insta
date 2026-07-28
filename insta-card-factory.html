@@ -3619,12 +3619,16 @@ function aiVsubRerender(row){
   wrap.innerHTML = "";
   const head = document.createElement("div"); head.style.cssText = "display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;";
   head.innerHTML = "<b style='color:var(--accent2); font-size:13px;'>🎬 자막 타임라인 (영상 하나 · 자막 여러 개)</b>";
+  const btns = document.createElement("div"); btns.style.cssText = "display:flex; gap:6px; flex-wrap:wrap;";
+  const importBtn = document.createElement("button"); importBtn.className = "btn-ghost btn-sm"; importBtn.style.cssText = "border-color:var(--accent); color:var(--accent);"; importBtn.textContent = "📥 모든 장면 자막 가져오기";
+  importBtn.title = "모든 장면의 자막을 이 영상 하나의 타임라인으로 (트림 구간에 맞춰) 자동 분배합니다.";
+  importBtn.onclick = ()=> aiVsubImportAll(row);
   const addBtn = document.createElement("button"); addBtn.className = "btn-ghost btn-sm"; addBtn.textContent = "+ 현재 위치에 자막";
   addBtn.onclick = ()=>{ const t = aiVsubCur(row); subs.push({ text:"", t0:+t.toFixed(2), t1:+Math.min(dur || t+3, t+3).toFixed(2) }); subs.sort((a,b)=>a.t0-b.t0); aiVsubRerender(row); };
-  head.appendChild(addBtn); wrap.appendChild(head);
+  btns.append(importBtn, addBtn); head.appendChild(btns); wrap.appendChild(head);
   if(!subs.length){
     const e = document.createElement("div"); e.className = "hint"; e.style.marginTop = "6px";
-    e.textContent = "영상을 재생하다 원하는 순간에 '+ 현재 위치에 자막'을 누르세요. 각 자막의 시작·끝 시간과 문구를 자유롭게 편집할 수 있습니다.";
+    e.innerHTML = "<b style='color:var(--accent)'>영상 1개에 모든 자막을 넣으려면</b> 위 <b>‘📥 모든 장면 자막 가져오기’</b>를 누르세요 — 모든 장면의 자막이 이 영상의 트림 구간에 맞춰 시간대별로 자동 배치됩니다. 이후 각 자막의 시작·끝·문구를 미세조정하거나, 재생 중 ‘+ 현재 위치에 자막’으로 직접 추가할 수 있습니다.";
     wrap.appendChild(e); return;
   }
   subs.forEach((s, idx)=>{
@@ -3641,6 +3645,30 @@ function aiVsubRerender(row){
     ctr.append(document.createTextNode("#"+(idx+1)+" 시작"), t0n, document.createTextNode("초"), gS, document.createTextNode("끝"), t1n, document.createTextNode("초"), gE, pB, del);
     it.append(ta, ctr); wrap.appendChild(it);
   });
+}
+// 모든 장면의 자막을 이 영상 하나의 타임라인으로 (트림 구간에 맞춰) 자동 분배
+function aiVsubImportAll(row){
+  const dur = row._vdur || 0;
+  const vs = parseFloat((row.querySelector(".ai-vstart")||{}).value) || 0;
+  let ve = parseFloat((row.querySelector(".ai-vend")||{}).value); if(!(ve > vs)) ve = dur || (vs + 6);
+  const span = Math.max(1, ve - vs);
+  const segs = [];
+  document.querySelectorAll("#aiScenesList .ai-scene").forEach(r=>{
+    const t = ((r.querySelector(".ai-sub")||{}).value || "").replace(/\\n/g,"\n");
+    t.split(/\n\s*\n/).map(s=>s.trim()).filter(Boolean).forEach(s=> segs.push(s));
+  });
+  if(!segs.length){ alert("가져올 자막이 없습니다. 각 장면의 자막칸을 먼저 채워주세요."); return; }
+  if(row._vsubs && row._vsubs.length && !confirm("기존 타임라인 자막을 덮어씁니다. 계속할까요?")) return;
+  const perChar = 0.18, minDur = 1.2;
+  const raw = segs.map(s=> Math.max(minDur, s.replace(/\n/g,"").length * perChar));
+  const sum = raw.reduce((a,b)=>a+b, 0), k = span / sum;
+  const subs = []; let t = vs;
+  segs.forEach((s, i)=>{ const d = raw[i]*k; const end = (i === segs.length-1) ? ve : (t + d); subs.push({ text:s, t0:+t.toFixed(2), t1:+end.toFixed(2) }); t = end; });
+  row._vsubs = subs; aiVsubRerender(row);
+  const others = [...document.querySelectorAll("#aiScenesList .ai-scene")].filter(r=> r !== row);
+  if(others.length && confirm(segs.length + "개 자막을 이 영상에 넣었습니다.\n이 영상 하나만 사용하도록 나머지 " + others.length + "개 장면을 삭제할까요?\n(취소하면 다른 장면은 별도 클립으로 뒤에 붙습니다)")){
+    others.forEach(r=> r.remove()); aiRenumber();
+  }
 }
 function aiVsubPlay(row, s){
   const v = row.querySelector(".ai-vprev"); if(!v) return;
