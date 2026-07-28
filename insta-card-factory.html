@@ -3519,11 +3519,12 @@ function aiSceneRow(sub, img, url){
   vrst.onclick = ()=>{ row._vtf = { x:0, y:0, scale:1 }; vedit.querySelector(".ai-vscale").value=1; vedit.querySelector(".ai-vx").value=0; vedit.querySelector(".ai-vy").value=0; aiDrawVtfPreview(row); };
   const vhint = document.createElement("div"); vhint.className = "img-edit-hint"; vhint.textContent = "오른쪽 9:16 미리보기에 크롭/줌이 즉시 반영됩니다.";
   vedit.appendChild(vrst); vedit.appendChild(vhint);
+  const vsubsWrap = document.createElement("div"); vsubsWrap.className = "ai-vsubs"; vsubsWrap.style.cssText = "display:none; margin-top:10px; padding:8px 10px; border:1px dashed var(--accent2); border-radius:8px;";
   const vrm = document.createElement("button"); vrm.className = "btn-ghost btn-sm"; vrm.textContent = "영상 제거"; vrm.style.cssText = "border-color:var(--err); color:var(--err); margin-top:6px;";
-  vrm.onclick = ()=>{ if(row._vurl){ try{ URL.revokeObjectURL(row._vurl); }catch(e){} } row._vfile=null; row._vurl=null; row._vdur=0; row._vtrim=null; vfile.value=""; vprev.style.display="none"; vbarHolder.innerHTML=""; vedit.style.display="none"; vrm.style.display="none"; vinfo.textContent=""; };
+  vrm.onclick = ()=>{ if(row._vurl){ try{ URL.revokeObjectURL(row._vurl); }catch(e){} } row._vfile=null; row._vurl=null; row._vdur=0; row._vtrim=null; row._vsubs=null; vfile.value=""; vprev.style.display="none"; vbarHolder.innerHTML=""; vedit.style.display="none"; vsubsWrap.style.display="none"; vsubsWrap.innerHTML=""; vrm.style.display="none"; vinfo.textContent=""; };
   vrm.style.display = "none";
   vfile.onchange = ()=>{ const f=(vfile.files||[])[0]; if(f) aiVideoAttach(row, f); };
-  vwrap.append(vlab, vdrop, vfile, vinfo, vpvwrap, vbarHolder, vs, ve, vedit, vrm);
+  vwrap.append(vlab, vdrop, vfile, vinfo, vpvwrap, vbarHolder, vsubsWrap, vs, ve, vedit, vrm);
   row.append(head, ta, urlin, inp, bar, idrop, prev, ipwrap, vwrap);
   return row;
 }
@@ -3600,9 +3601,53 @@ function aiVideoAttach(row, file){
     vedit.style.display = "flex";
     try{ vprev.currentTime = 0.05; }catch(e){}
     setTimeout(()=> aiDrawVtfPreview(row), 120);
-    vinfo.innerHTML = "영상 " + row._vdur.toFixed(1) + "초 — 타임라인으로 넣을 구간을 정하고, 크기·좌우·상하로 화면을 맞추세요(오른쪽 9:16 미리보기 반영).<br><b style='color:var(--accent2)'>긴 영상이면 자막칸에 여러 자막을 '빈 줄'로 구분해 넣으세요 — 영상 길이에 맞춰 순서대로 표시됩니다.</b>";
-    const ta = row.querySelector(".ai-sub"); if(ta){ ta.rows = 5; ta.placeholder = "자막 (Enter=줄바꿈). 영상엔 여러 자막을 빈 줄로 구분해 넣으면 순서대로 표시됩니다."; }
+    vinfo.innerHTML = "영상 " + row._vdur.toFixed(1) + "초 — 타임라인으로 넣을 구간을 정하고, 크기·좌우·상하로 화면을 맞추세요(오른쪽 9:16 미리보기 반영).<br><b style='color:var(--accent2)'>아래 '자막 타임라인'에서 이 영상 하나에 자막을 시간대별로 여러 개 넣고 각각 시작·끝·문구를 편집하세요.</b>";
+    const ta = row.querySelector(".ai-sub"); if(ta){ ta.rows = 3; ta.placeholder = "(선택) 기본 자막 — 타임라인 자막이 없을 때만 사용됩니다."; }
+    aiVsubInit(row);
   };
+}
+// ── 단일 영상 자막 타임라인 편집기: 영상 하나에 자막 여러 개(각자 시작·끝·문구) ──
+function aiVsubCur(row){ const v = row.querySelector(".ai-vprev"); return v ? (v.currentTime||0) : 0; }
+function aiVsubInit(row){
+  const wrap = row.querySelector(".ai-vsubs"); if(!wrap) return;
+  if(!Array.isArray(row._vsubs)) row._vsubs = [];
+  wrap.style.display = "block"; aiVsubRerender(row);
+}
+function aiVsubRerender(row){
+  const wrap = row.querySelector(".ai-vsubs"); if(!wrap) return;
+  const dur = row._vdur || 0, subs = row._vsubs || (row._vsubs = []);
+  wrap.innerHTML = "";
+  const head = document.createElement("div"); head.style.cssText = "display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;";
+  head.innerHTML = "<b style='color:var(--accent2); font-size:13px;'>🎬 자막 타임라인 (영상 하나 · 자막 여러 개)</b>";
+  const addBtn = document.createElement("button"); addBtn.className = "btn-ghost btn-sm"; addBtn.textContent = "+ 현재 위치에 자막";
+  addBtn.onclick = ()=>{ const t = aiVsubCur(row); subs.push({ text:"", t0:+t.toFixed(2), t1:+Math.min(dur || t+3, t+3).toFixed(2) }); subs.sort((a,b)=>a.t0-b.t0); aiVsubRerender(row); };
+  head.appendChild(addBtn); wrap.appendChild(head);
+  if(!subs.length){
+    const e = document.createElement("div"); e.className = "hint"; e.style.marginTop = "6px";
+    e.textContent = "영상을 재생하다 원하는 순간에 '+ 현재 위치에 자막'을 누르세요. 각 자막의 시작·끝 시간과 문구를 자유롭게 편집할 수 있습니다.";
+    wrap.appendChild(e); return;
+  }
+  subs.forEach((s, idx)=>{
+    const it = document.createElement("div"); it.style.cssText = "margin-top:8px; padding-top:8px; border-top:1px dotted var(--line);";
+    const ta = document.createElement("textarea"); ta.className = "card-edit"; ta.rows = 2; ta.style.cssText = "width:100%;"; ta.value = s.text; ta.placeholder = "자막 문구 (Enter=줄바꿈)";
+    ta.oninput = ()=>{ s.text = ta.value; };
+    const ctr = document.createElement("div"); ctr.style.cssText = "display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:4px; font-size:12px; color:var(--muted);";
+    const mkNum = (val, on)=>{ const n = document.createElement("input"); n.type = "number"; n.step = "0.1"; n.min = "0"; n.value = val.toFixed(1); n.style.cssText = "width:62px;"; n.oninput = ()=> on(parseFloat(n.value)||0); return n; };
+    const t0n = mkNum(s.t0, v=>{ s.t0 = v; }), t1n = mkNum(s.t1, v=>{ s.t1 = v; });
+    const gS = document.createElement("button"); gS.className = "btn-ghost btn-sm"; gS.textContent = "시작=현재"; gS.onclick = ()=>{ s.t0 = +aiVsubCur(row).toFixed(2); t0n.value = s.t0.toFixed(1); };
+    const gE = document.createElement("button"); gE.className = "btn-ghost btn-sm"; gE.textContent = "끝=현재"; gE.onclick = ()=>{ s.t1 = +aiVsubCur(row).toFixed(2); t1n.value = s.t1.toFixed(1); };
+    const pB = document.createElement("button"); pB.className = "btn-ghost btn-sm"; pB.textContent = "▶ 구간"; pB.onclick = ()=> aiVsubPlay(row, s);
+    const del = document.createElement("button"); del.className = "btn-ghost btn-sm"; del.style.cssText = "border-color:var(--err); color:var(--err);"; del.textContent = "삭제"; del.onclick = ()=>{ subs.splice(idx,1); aiVsubRerender(row); };
+    ctr.append(document.createTextNode("#"+(idx+1)+" 시작"), t0n, document.createTextNode("초"), gS, document.createTextNode("끝"), t1n, document.createTextNode("초"), gE, pB, del);
+    it.append(ta, ctr); wrap.appendChild(it);
+  });
+}
+function aiVsubPlay(row, s){
+  const v = row.querySelector(".ai-vprev"); if(!v) return;
+  try{ v.currentTime = s.t0; }catch(e){}
+  const stop = ()=>{ if(v.currentTime >= s.t1){ v.pause(); v.removeEventListener("timeupdate", stop); } };
+  v.addEventListener("timeupdate", stop);
+  const pr = v.play(); if(pr && pr.catch) pr.catch(()=>{});
 }
 async function aiPreviewScene(row){
   const url = row.querySelector(".ai-url").value.trim();
@@ -3768,8 +3813,17 @@ async function aiRenderWithVideo(rows){
     const title = aiParseTitle(label, String(titleText||"").replace(/\\n/g,"\n"), mctx, W);
     clips.forEach(c=>{
       c._lines = aiWrapSub(mctx, c.sub || "", W);
-      // 영상 장면: 자막칸의 여러 자막(빈 줄 구분)을 영상 길이에 맞춰 타이밍 배분
-      if(c.type === "video"){ c.subs = aiParseVideoSubs(c.row.querySelector(".ai-sub").value, c.dur, mctx, W); }
+      // 영상 장면: 사용자가 편집한 자막 타임라인이 있으면 그 시간대로, 없으면 자막칸(빈 줄 구분)을 균등 배분
+      if(c.type === "video"){
+        const tl = (c.row._vsubs || []).filter(s=> String(s.text||"").trim());
+        if(tl.length){
+          c.subsTimeline = true;
+          c.subs = tl.map(s=>({ lines: aiWrapSub(mctx, s.text, W), t0: s.t0 - c.vs, t1: s.t1 - c.vs }))
+                     .sort((a,b)=> a.t0 - b.t0);
+        } else {
+          c.subs = aiParseVideoSubs(c.row.querySelector(".ai-sub").value, c.dur, mctx, W);
+        }
+      }
     });
     let acc = 0; clips.forEach(c=>{ c.t0 = acc; acc += c.dur; }); const total = +acc.toFixed(3);
 
@@ -3816,7 +3870,8 @@ async function aiRenderWithVideo(rows){
         let subLines = c._lines;
         if(c.type === "video" && c.subs && c.subs.length){
           const lt = t - c.t0;
-          const cur = c.subs.find(sx=> lt >= sx.t0 && lt < sx.t1) || c.subs[c.subs.length-1];
+          const found = c.subs.find(sx=> lt >= sx.t0 && lt < sx.t1);
+          const cur = found || (c.subsTimeline ? null : c.subs[c.subs.length-1]);
           subLines = cur ? cur.lines : null;
         }
         aiDrawSub(rctx, W, H, subLines);
