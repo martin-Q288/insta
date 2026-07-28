@@ -598,11 +598,14 @@
       <textarea id="aiTitle" class="card-edit" style="width:100%;" rows="3" oninput="aiUpdateSubPreview()"></textarea>
       <label style="margin-top:10px;">제목·자막 스타일 &amp; 미리보기 <small style="text-transform:none; color:var(--muted);">— 슬라이더를 움직이면 옆 미리보기에 바로 반영됩니다</small></label>
       <div id="aiStyleBox" style="margin-top:6px; display:flex; gap:14px; flex-wrap:wrap; align-items:flex-start;">
-        <canvas id="aiSubPreview" style="width:150px; border-radius:10px; border:1px solid var(--accent2); background:#000; flex:0 0 auto;"></canvas>
+        <div style="flex:0 0 auto;">
+          <canvas id="aiSubPreview" style="width:232px; border-radius:12px; border:1px solid var(--accent2); background:#000; display:block;"></canvas>
+          <div class="img-edit-hint" style="max-width:232px; margin-top:6px; line-height:1.5;">🔴 상단 붉은 띠 = 다이나믹 아일랜드 가림<br>⚪ 흰 점선 = 피드(4:5) 노출 영역 · 밖은 잘림<br>👻 흐린 아이콘 = 인스타 UI(댓글·공유·프로필)</div>
+        </div>
         <div style="flex:1; min-width:210px;">
           <div class="style-row">
             <div><label>제목 크기</label><input type="range" id="aiTitleSize" min="0.7" max="1.5" step="0.05" value="1" style="width:100%;" oninput="aiUpdateSubPreview()"></div>
-            <div><label>제목 위치</label><input type="range" id="aiTitlePos" min="0.02" max="0.5" step="0.01" value="0.03" style="width:100%;" oninput="aiUpdateSubPreview()"></div>
+            <div><label>제목 위치</label><input type="range" id="aiTitlePos" min="0.02" max="0.5" step="0.01" value="0.09" style="width:100%;" oninput="aiUpdateSubPreview()"></div>
           </div>
           <div class="style-row" style="margin-top:6px;">
             <div><label>자막 크기</label><input type="range" id="aiSubSize" min="0.8" max="1.7" step="0.05" value="1" style="width:100%;" oninput="aiUpdateSubPreview()"></div>
@@ -3175,7 +3178,7 @@ function aiLoadImg(url){
 /* 제목 크기·위치 사용자 설정 (패널 6 슬라이더) */
 function aiTitleStyle(){
   const sizeMul = parseFloat((document.getElementById("aiTitleSize")||{}).value) || 1;
-  const posY = parseFloat((document.getElementById("aiTitlePos")||{}).value) || 0.03;
+  const posY = parseFloat((document.getElementById("aiTitlePos")||{}).value) || 0.09;
   return { sizeMul, posY };
 }
 function aiParseTitle(label, titleText, mctx, W){
@@ -3258,6 +3261,96 @@ function aiUpdateSubPreview(){
   aiDrawSub(ctx, W, H, aiWrapSub(mctx, sub || "자막 미리보기입니다", W));
   const title = aiParseTitle(document.getElementById("aiLabel").value, String(document.getElementById("aiTitle").value||"").replace(/\\n/g,"\n"), mctx, W);
   aiDrawTitle(ctx, W, title);
+  aiDrawIGChrome(ctx, W, H);
+}
+// 미리보기 위에 실제 인스타 릴스 UI(반투명) + 안전영역 가이드를 그립니다.
+// 목적: 제목/자막 위치·크기를 인스타 실환경 기준으로 잡을 수 있게 함.
+function aiDrawIGChrome(ctx, W, H){
+  ctx.save();
+  // ── 1) 피드(4:5) 노출 영역: 릴스는 9:16지만 피드 썸네일은 세로 4:5로 중앙 크롭됩니다.
+  //     위/아래 각각 (H - W*5/4)/2 만큼 잘려나갑니다(1080×1920 기준 285px).
+  const cropCut = Math.round((H - W*5/4)/2);           // 285
+  const cropTop = cropCut, cropBot = H - cropCut;
+  // 잘려나가는 위/아래 영역을 어둡게 → "이 밖은 피드에서 안 보임"
+  ctx.fillStyle = "rgba(0,0,0,.34)";
+  ctx.fillRect(0, 0, W, cropTop);
+  ctx.fillRect(0, cropBot, W, H - cropBot);
+  // 피드 노출 경계 점선
+  ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.lineWidth = 3; ctx.setLineDash([18, 14]);
+  ctx.beginPath(); ctx.moveTo(0, cropTop); ctx.lineTo(W, cropTop);
+  ctx.moveTo(0, cropBot); ctx.lineTo(W, cropBot); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.font = "800 26px " + TITLE_FONT; ctx.fillStyle = "rgba(255,255,255,.92)";
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.fillText("↑ 피드(4:5)에선 잘려요", 24, cropTop - 16);
+  ctx.fillText("피드 노출 영역 (4:5)", 24, cropTop + 40);
+
+  // ── 2) 아이폰 다이나믹 아일랜드 안전영역: 상단 약 150px는 상태바/알약에 가림.
+  const diBand = 150;
+  ctx.fillStyle = "rgba(0,0,0,.30)";
+  ctx.fillRect(0, 0, W, diBand);
+  ctx.strokeStyle = "rgba(255,80,80,.9)"; ctx.lineWidth = 3; ctx.setLineDash([12, 10]);
+  ctx.beginPath(); ctx.moveTo(0, diBand); ctx.lineTo(W, diBand); ctx.stroke();
+  ctx.setLineDash([]);
+  // 다이나믹 아일랜드 알약
+  const pillW = 300, pillH = 74, pillX = (W - pillW)/2, pillY = 34;
+  ctx.fillStyle = "rgba(0,0,0,.85)";
+  roundRect(ctx, pillX, pillY, pillW, pillH, pillH/2); ctx.fill();
+  ctx.font = "700 24px " + TITLE_FONT; ctx.fillStyle = "rgba(255,120,120,.95)";
+  ctx.fillText("다이나믹 아일랜드 가림 영역", 24, diBand - 14);
+
+  // ── 3) 우측 액션 버튼(좋아요·댓글·공유·더보기·음원) 고스트
+  ctx.globalAlpha = 0.5;
+  const rx = W - 92; let ry = H*0.60; const gap = 150;
+  const ghostIcon = (cx, cy, label)=>{
+    ctx.beginPath(); ctx.arc(cx, cy, 40, 0, Math.PI*2);
+    ctx.fillStyle = "rgba(255,255,255,.16)"; ctx.fill();
+    ctx.lineWidth = 4; ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.stroke();
+    ctx.font = "800 40px " + TITLE_FONT; ctx.fillStyle = "rgba(255,255,255,.95)";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(label, cx, cy+2);
+    ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  };
+  ghostIcon(rx, ry, "♡");          ry += gap;   // 좋아요
+  ghostIcon(rx, ry, "💬");         ry += gap;   // 댓글
+  ghostIcon(rx, ry, "➤");          ry += gap;   // 공유
+  ghostIcon(rx, ry, "⋯");          ry += gap;   // 더보기
+  // 음원(사각) 아이콘
+  roundRect(ctx, rx-40, ry-40, 80, 80, 16);
+  ctx.fillStyle = "rgba(255,255,255,.16)"; ctx.fill();
+  ctx.lineWidth = 4; ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.stroke();
+  ctx.font = "800 38px " + TITLE_FONT; ctx.fillStyle = "rgba(255,255,255,.95)";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText("♪", rx, ry+2);
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+
+  // ── 4) 하단 좌측: 프로필·닉네임·본문 캡션·음원바 고스트
+  const bx = 40; let by = H - 300;
+  // 프로필 원
+  ctx.beginPath(); ctx.arc(bx+36, by, 36, 0, Math.PI*2);
+  ctx.fillStyle = "rgba(255,255,255,.20)"; ctx.fill();
+  ctx.lineWidth = 4; ctx.strokeStyle = "rgba(255,255,255,.9)"; ctx.stroke();
+  // 닉네임 (고정 핸들)
+  ctx.font = "800 34px " + TITLE_FONT; ctx.fillStyle = "rgba(255,255,255,.95)";
+  ctx.fillText("no.way.this", bx+90, by+8);
+  // 팔로우 버튼
+  roundRect(ctx, bx+330, by-26, 128, 52, 10);
+  ctx.lineWidth = 3; ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.stroke();
+  ctx.font = "700 26px " + TITLE_FONT; ctx.fillStyle = "rgba(255,255,255,.9)";
+  ctx.textAlign = "center"; ctx.fillText("팔로우", bx+394, by+8);
+  ctx.textAlign = "left";
+  // 본문 캡션 2줄 고스트
+  by += 70;
+  ctx.fillStyle = "rgba(255,255,255,.28)";
+  roundRect(ctx, bx, by, W*0.66, 26, 8); ctx.fill();
+  roundRect(ctx, bx, by+42, W*0.44, 26, 8); ctx.fill();
+  // 음원 바
+  by += 96;
+  ctx.beginPath(); ctx.arc(bx+16, by+12, 16, 0, Math.PI*2);
+  ctx.fillStyle = "rgba(255,255,255,.4)"; ctx.fill();
+  ctx.font = "700 28px " + TITLE_FONT; ctx.fillStyle = "rgba(255,255,255,.85)";
+  ctx.fillText("♪ 원본 오디오 · no.way.this", bx+44, by+22);
+  ctx.restore();
 }
 function drawAiFrame(ctx, scenes, imgs, t, o){
   const { N, D, T, step, W, H, title } = o;
