@@ -632,7 +632,11 @@
         <div style="flex-direction:column; gap:8px; min-width:230px; display:flex;">
           <button class="btn-primary" style="margin-top:0;" onclick="aiPlayOutput()">▶ 재생하여 확인</button>
           <button class="btn-ghost btn-sm" onclick="document.getElementById('aiPlanWrap').scrollIntoView({behavior:'smooth'})">✎ 편집 계속하기</button>
-          <button class="btn-primary" style="border-color:var(--ok); background:var(--ok);" onclick="vrSave()">확인 완료 · 저장 (앨범)</button>
+          <label style="display:flex; gap:8px; align-items:flex-start; font-size:13px; color:var(--text); cursor:pointer; margin-top:2px; text-transform:none; letter-spacing:0;">
+            <input type="checkbox" id="aiKeepAudio" style="margin-top:3px; flex:0 0 auto;">
+            <span>다운로드에 <b>원본 영상 소리 포함</b><br><span class="hint" style="display:block; margin-top:2px;">체크 해제 = 무음(인스타 앱에서 인기 음원 얹기 권장). 설정을 바꾸면 저장 시 자동으로 다시 생성됩니다.</span></span>
+          </label>
+          <button class="btn-primary" style="border-color:var(--ok); background:var(--ok);" onclick="aiSaveReel()">확인 완료 · 저장 (앨범)</button>
           <div class="hint" style="margin-top:-2px;">저장 후 인스타 앱에서 릴스로 올리며 <b>인기 음원</b> 선택 = 도달 최대화</div>
         </div>
       </div>
@@ -3927,6 +3931,7 @@ async function aiRenderWithVideo(rows){
   const W = 1080, H = 1920;
   const btn = document.getElementById("aiRenderBtn"); btn.disabled = true;
   const AC = window.AudioContext || window.webkitAudioContext;
+  const keepAudio = !!(document.getElementById("aiKeepAudio") && document.getElementById("aiKeepAudio").checked);
   let actx = null, dest = null;
   try{
     // 클립 구성 — 영상 행은 각 컷(자막)을 독립 클립으로 잘라 순서대로 이어붙임
@@ -3955,17 +3960,19 @@ async function aiRenderWithVideo(rows){
       }
     });
 
-    // 출력은 무음 — 첨부 영상의 원본 소리/BGM은 넣지 않습니다(인스타 앱에서 인기 음원을 얹는 용도).
-    // 준비: 영상 엘리먼트 + 이미지 로드
+    // 오디오: 체크박스가 켜져 있으면 원본 영상 소리를 구간별로 믹싱, 아니면 무음.
+    if(keepAudio && AC){ actx = new AC(); dest = actx.createMediaStreamDestination(); }
+    // 준비: 영상 엘리먼트(+오디오 그래프) + 이미지 로드
     aiSetStatus("영상·이미지 준비 중...", "busy");
     for(const c of clips){
       if(c.type === "video"){
-        const v = document.createElement("video"); v.src = c.url; v.playsInline = true; v.muted = true; v.preload = "auto";
+        const v = document.createElement("video"); v.src = c.url; v.playsInline = true; v.muted = !keepAudio; v.preload = "auto";
         c.v = v;
         await new Promise((res, rej)=>{ v.onloadedmetadata = res; v.onerror = ()=>rej(new Error("첨부 영상을 불러오지 못했습니다.")); });
         try{ await v.play(); v.pause(); }catch(e){}   // iOS 재생 잠금 해제
         // 컷 시작 프레임으로 미리 seek해 대기 → 컷 전환 시 검은/멈춘 프레임(뚝뚝 끊김) 제거
         await new Promise(res=>{ let done=false; const on=()=>{ if(done) return; done=true; v.removeEventListener("seeked", on); res(); }; v.addEventListener("seeked", on); try{ v.currentTime = c.vs; }catch(e){ on(); } setTimeout(on, 1500); });
+        if(keepAudio && actx){ try{ const sn = actx.createMediaElementSource(v); const g = actx.createGain(); g.gain.value = 0; sn.connect(g); g.connect(dest); c.gain = g; }catch(e){} }
       }else{
         if(!c.row._img){
           const url = c.row.querySelector(".ai-url").value.trim();
@@ -3982,7 +3989,8 @@ async function aiRenderWithVideo(rows){
     let acc = 0; clips.forEach(c=>{ c.t0 = acc; acc += c.dur; }); const total = +acc.toFixed(3);
 
     const rec = makeCanvas(W, H), rctx = rec.getContext("2d");
-    const stream = rec.captureStream(30);   // 무음(오디오 트랙 없음)
+    const stream = rec.captureStream(30);
+    if(keepAudio && actx){ try{ await actx.resume(); }catch(e){} dest.stream.getAudioTracks().forEach(tr=> stream.addTrack(tr)); }
     const { mime, ext } = pickReelMime();
     const recOpts = { videoBitsPerSecond: 12e6, audioBitsPerSecond: 192000 }; if(mime) recOpts.mimeType = mime;
     const recorder = new MediaRecorder(stream, recOpts); const chunks = [];
@@ -3996,10 +4004,10 @@ async function aiRenderWithVideo(rows){
         let i = clips.findIndex(c=> t >= c.t0 && t < c.t0 + c.dur);
         if(i < 0) i = (t >= total) ? clips.length-1 : 0;
         if(i !== cur){
-          if(cur >= 0 && clips[cur].type === "video"){ try{ clips[cur].v.pause(); }catch(e){} }
+          if(cur >= 0 && clips[cur].type === "video"){ try{ clips[cur].v.pause(); }catch(e){} if(clips[cur].gain) clips[cur].gain.gain.value = 0; }
           cur = i;
           // 이미 vs로 사전 seek되어 있으므로 재-seek 없이 바로 재생 → 첫 프레임이 즉시 표시되어 끊김 없음
-          if(clips[i].type === "video"){ const pr = clips[i].v.play(); if(pr && pr.catch) pr.catch(()=>{}); }
+          if(clips[i].type === "video"){ const pr = clips[i].v.play(); if(pr && pr.catch) pr.catch(()=>{}); if(clips[i].gain) clips[i].gain.gain.value = 1; }
         }
         rctx.clearRect(0,0,W,H); rctx.fillStyle = "#000"; rctx.fillRect(0,0,W,H);
         const c = clips[i];
@@ -4033,10 +4041,11 @@ async function aiRenderWithVideo(rows){
     const blob = new Blob(chunks, { type: mime || "video/webm" });
     if(window._reelUrl) URL.revokeObjectURL(window._reelUrl);
     window._reelBlob = blob; window._reelExt = ext; window._reelUrl = URL.createObjectURL(blob);
+    window._reelAudioMode = keepAudio ? "orig" : "mute";
     const out = document.getElementById("aiOut"); out.src = window._reelUrl; out.load();
     document.getElementById("aiOutWrap").style.display = "block";
     document.getElementById("aiOutWrap").scrollIntoView({ behavior:"smooth", block:"nearest" });
-    aiSetStatus("완성! " + total.toFixed(1) + "초 · " + (blob.size/1e6).toFixed(1) + "MB (영상+이미지 혼합). 재생해 확인 후 저장하세요.", "ok");
+    aiSetStatus("완성! " + total.toFixed(1) + "초 · " + (blob.size/1e6).toFixed(1) + "MB (영상+이미지 혼합, " + (keepAudio ? "원본 소리 포함" : "무음") + "). 재생해 확인 후 저장하세요.", "ok");
     toast("AI 영상이 생성되었습니다");
   }catch(e){ console.error(e); if(actx){ try{ actx.close(); }catch(_e){} } aiSetStatus("생성 실패: " + e.message, "err"); }
   finally{ btn.disabled = false; }
@@ -4203,6 +4212,21 @@ function vrCopyCaption(){
 
 async function vrSave(){
   if(!window._reelBlob){ vrSetStatus("먼저 영상 릴스를 만드세요.", "err"); return; }
+  await downloadReel();
+}
+// 6번(AI 영상) 저장 — 체크박스(원본 소리 포함/무음) 선택과 현재 영상이 다르면 그 설정으로 다시 생성 후 다운로드
+async function aiSaveReel(){
+  if(!window._reelBlob){ aiSetStatus("먼저 영상을 만드세요.", "err"); return; }
+  const want = (document.getElementById("aiKeepAudio") && document.getElementById("aiKeepAudio").checked) ? "orig" : "mute";
+  const rows = [...document.querySelectorAll("#aiScenesList .ai-scene")].filter(r=>{
+    return r._vfile || r._img || r.querySelector(".ai-sub").value.trim() || r.querySelector(".ai-img").value.trim() || r.querySelector(".ai-url").value.trim();
+  });
+  const hasVideo = rows.some(r=> r._vfile);
+  // 첨부 영상이 있고, 현재 영상의 소리 설정이 선택과 다르면 다시 생성
+  if(hasVideo && window._reelAudioMode !== want){
+    aiSetStatus((want === "orig" ? "원본 소리 포함으로" : "무음으로") + " 다시 생성 중... (잠시만요)", "busy");
+    await aiRenderWithVideo(rows);
+  }
   await downloadReel();
 }
 
