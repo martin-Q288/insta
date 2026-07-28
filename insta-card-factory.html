@@ -3646,32 +3646,84 @@ function aiVsubRerender(row){
     wrap.appendChild(e); return;
   }
   subs.forEach((s, idx)=>{
-    const it = document.createElement("div"); it.style.cssText = "margin-top:8px; padding-top:8px; border-top:1px dotted var(--line);";
+    const it = document.createElement("div"); it.style.cssText = "margin-top:8px; padding-top:8px; border-top:1px dotted var(--line); display:flex; gap:12px; align-items:flex-start;";
+    // 왼쪽: 이 구간(컷) 시작 시점의 9:16 프레임 — 구간 크기·좌우·상하 편집을 눈으로 보며 할 수 있게
+    const prevWrap = document.createElement("div"); prevWrap.style.cssText = "flex:0 0 auto; text-align:center;";
+    const prevCv = document.createElement("canvas"); prevCv.className = "ai-vsub-prev"; prevCv.width = 135; prevCv.height = 240; prevCv.style.cssText = "width:104px; border-radius:8px; border:1px solid var(--accent2); background:#000; display:block;";
+    const prevCap = document.createElement("div"); prevCap.className = "hint"; prevCap.style.cssText = "margin-top:3px; font-size:11px;"; prevCap.textContent = "컷 #"+(idx+1)+" 화면";
+    prevWrap.append(prevCv, prevCap); s._prevCv = prevCv;
+    const rightCol = document.createElement("div"); rightCol.style.cssText = "flex:1; min-width:0;";
     const ta = document.createElement("textarea"); ta.className = "card-edit"; ta.rows = 2; ta.style.cssText = "width:100%;"; ta.value = s.text; ta.placeholder = "자막 문구 (Enter=줄바꿈)";
     ta.oninput = ()=>{ s.text = ta.value; };
     const ctr = document.createElement("div"); ctr.style.cssText = "display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:4px; font-size:12px; color:var(--muted);";
     const mkNum = (val, on)=>{ const n = document.createElement("input"); n.type = "number"; n.step = "0.1"; n.min = "0"; n.value = val.toFixed(1); n.style.cssText = "width:62px;"; n.oninput = ()=> on(parseFloat(n.value)||0); return n; };
-    const t0n = mkNum(s.t0, v=>{ s.t0 = v; }), t1n = mkNum(s.t1, v=>{ s.t1 = v; });
-    const gS = document.createElement("button"); gS.className = "btn-ghost btn-sm"; gS.textContent = "시작=현재"; gS.onclick = ()=>{ s.t0 = +aiVsubCur(row).toFixed(2); t0n.value = s.t0.toFixed(1); };
+    const t0n = mkNum(s.t0, v=>{ s.t0 = v; aiVsubGrabOne(row, s, true); }), t1n = mkNum(s.t1, v=>{ s.t1 = v; });
+    const gS = document.createElement("button"); gS.className = "btn-ghost btn-sm"; gS.textContent = "시작=현재"; gS.onclick = ()=>{ s.t0 = +aiVsubCur(row).toFixed(2); t0n.value = s.t0.toFixed(1); aiVsubGrabOne(row, s, true); };
     const gE = document.createElement("button"); gE.className = "btn-ghost btn-sm"; gE.textContent = "끝=현재"; gE.onclick = ()=>{ s.t1 = +aiVsubCur(row).toFixed(2); t1n.value = s.t1.toFixed(1); };
     const d22 = document.createElement("button"); d22.className = "btn-ghost btn-sm"; d22.style.cssText = "border-color:var(--accent); color:var(--accent);"; d22.textContent = "끝 = 시작+2.2초"; d22.title = "이 자막의 끝을 시작 시간 + 2.2초로 맞춥니다."; d22.onclick = ()=>{ s.t1 = +(s.t0 + 2.2).toFixed(2); t1n.value = s.t1.toFixed(1); };
     const pB = document.createElement("button"); pB.className = "btn-ghost btn-sm"; pB.textContent = "▶ 구간"; pB.onclick = ()=> aiVsubPlay(row, s);
     const del = document.createElement("button"); del.className = "btn-ghost btn-sm"; del.style.cssText = "border-color:var(--err); color:var(--err);"; del.textContent = "삭제"; del.onclick = ()=>{ subs.splice(idx,1); aiVsubRerender(row); };
     ctr.append(document.createTextNode("#"+(idx+1)+" 시작"), t0n, document.createTextNode("초"), gS, document.createTextNode("끝"), t1n, document.createTextNode("초"), gE, d22, pB, del);
-    // 구간별 영상 편집(크기·좌우·상하) — 이 자막이 나오는 동안의 화면 프레이밍.
+    // 구간별 영상 편집(크기·좌우·상하) — 위 썸네일에 즉시 반영(seek 없이 캐시된 프레임으로).
     // s.tf가 없으면 전체 영상 프레이밍(row._vtf)을 그대로 따르고, 슬라이더를 움직이는 순간부터 이 구간만의 값으로 분리됩니다.
     const base = s.tf || row._vtf || { x:0, y:0, scale:1 };
     const vedit = document.createElement("div"); vedit.style.cssText = "margin-top:6px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:12px; color:var(--muted);";
     const mkRng = (min,max,step,val,on)=>{ const r = document.createElement("input"); r.type = "range"; r.min = min; r.max = max; r.step = step; r.value = val; r.style.cssText = "width:110px; vertical-align:middle;"; r.oninput = ()=> on(parseFloat(r.value)); return r; };
     const ensureTf = ()=>{ if(!s.tf){ const g = row._vtf || { x:0, y:0, scale:1 }; s.tf = { x:g.x||0, y:g.y||0, scale:g.scale||1 }; } return s.tf; };
-    const applyTf = ()=>{ try{ const v = row.querySelector(".ai-vprev"); if(v && Math.abs((v.currentTime||0) - s.t0) > 0.05){ v.currentTime = s.t0; } }catch(e){} aiDrawVtfPreview(row, s.tf); };
+    const applyTf = ()=> aiVsubDrawSegPrev(row, s, prevCv);
     const rSc = mkRng(1,4,0.02, base.scale||1, v=>{ ensureTf().scale = v; applyTf(); });
     const rX  = mkRng(-100,100,1, base.x||0, v=>{ ensureTf().x = v; applyTf(); });
     const rY  = mkRng(-100,100,1, base.y||0, v=>{ ensureTf().y = v; applyTf(); });
-    const rRst = document.createElement("button"); rRst.className = "btn-ghost btn-sm"; rRst.textContent = "구간초기화"; rRst.title = "이 구간만의 프레이밍을 지우고 전체 영상 프레이밍을 따릅니다."; rRst.onclick = ()=>{ s.tf = null; const g = row._vtf || { x:0, y:0, scale:1 }; rSc.value = g.scale||1; rX.value = g.x||0; rY.value = g.y||0; aiDrawVtfPreview(row); };
+    const rRst = document.createElement("button"); rRst.className = "btn-ghost btn-sm"; rRst.textContent = "구간초기화"; rRst.title = "이 구간만의 프레이밍을 지우고 전체 영상 프레이밍을 따릅니다."; rRst.onclick = ()=>{ s.tf = null; const g = row._vtf || { x:0, y:0, scale:1 }; rSc.value = g.scale||1; rX.value = g.x||0; rY.value = g.y||0; aiVsubDrawSegPrev(row, s, prevCv); };
     vedit.append(document.createTextNode("이 구간 화면 크기"), rSc, document.createTextNode("좌우"), rX, document.createTextNode("상하"), rY, rRst);
-    it.append(ta, ctr, vedit); wrap.appendChild(it);
+    rightCol.append(ta, ctr, vedit);
+    it.append(prevWrap, rightCol); wrap.appendChild(it);
+    aiVsubDrawSegPrev(row, s, prevCv);   // 캐시된 프레임이 있으면 즉시 표시
   });
+  aiVsubRefreshFrames(row);              // 없는 프레임은 순차적으로 캡처
+}
+// 이 구간의 캐시된 프레임(s._raw)을 9:16으로 크롭해 썸네일에 그림 (seek 불필요, 즉시)
+function aiVsubDrawSegPrev(row, s, cv){
+  if(!cv) return; const W = cv.width, H = cv.height, ctx = cv.getContext("2d");
+  ctx.clearRect(0,0,W,H); ctx.fillStyle = "#000"; ctx.fillRect(0,0,W,H);
+  const src = s._raw;
+  if(!src || !src.width){ ctx.fillStyle = "rgba(255,255,255,.35)"; ctx.font = "600 16px sans-serif"; ctx.textAlign = "center"; ctx.fillText("프레임", W/2, H/2 - 8); ctx.fillText("불러오는 중", W/2, H/2 + 14); ctx.textAlign = "left"; return; }
+  const tf = s.tf || row._vtf || { x:0, y:0, scale:1 };
+  const bs = Math.max(W/src.width, H/src.height) * (tf.scale||1);
+  const dw = src.width*bs, dh = src.height*bs;
+  const ox = (W-dw)/2 + ((tf.x||0)/100)*W, oy = (H-dh)/2 + ((tf.y||0)/100)*H;
+  try{ ctx.drawImage(src, ox, oy, dw, dh); }catch(e){}
+}
+// 한 구간의 시작 프레임을 캡처(seek 후 오프스크린 캔버스에 저장). force=false면 이미 있으면 건너뜀.
+function aiVsubGrabOne(row, s, force){
+  return new Promise(res=>{
+    const v = row.querySelector(".ai-vprev");
+    if(!v || !v.videoWidth){ res(); return; }
+    if(s._raw && s._raw.width && !force){ if(s._prevCv) aiVsubDrawSegPrev(row, s, s._prevCv); res(); return; }
+    const onSeek = ()=>{
+      v.removeEventListener("seeked", onSeek);
+      const cap = 540, sc = Math.min(1, cap / v.videoWidth);
+      if(!s._raw) s._raw = document.createElement("canvas");
+      s._raw.width = Math.max(2, Math.round(v.videoWidth * sc));
+      s._raw.height = Math.max(2, Math.round(v.videoHeight * sc));
+      try{ s._raw.getContext("2d").drawImage(v, 0, 0, s._raw.width, s._raw.height); }catch(e){}
+      if(s._prevCv) aiVsubDrawSegPrev(row, s, s._prevCv);
+      res();
+    };
+    const tt = Math.max(0, Math.min(s.t0, (row._vdur || s.t0)));
+    v.addEventListener("seeked", onSeek);
+    if(Math.abs((v.currentTime||0) - tt) < 0.02){ onSeek(); }
+    else { try{ v.currentTime = tt; }catch(e){ v.removeEventListener("seeked", onSeek); res(); } }
+  });
+}
+// 캐시가 없는 구간들의 프레임을 순차 캡처하고, 끝나면 재생 위치를 원복
+async function aiVsubRefreshFrames(row){
+  const v = row.querySelector(".ai-vprev"); if(!v || !v.videoWidth) return;
+  if(row._vGrabbing) return; row._vGrabbing = true;
+  const subs = row._vsubs || []; const prevT = v.currentTime;
+  try{ v.pause(); }catch(e){}
+  try{ for(const s of subs){ if(!(s._raw && s._raw.width)) await aiVsubGrabOne(row, s, false); } }
+  finally{ try{ v.currentTime = prevT; }catch(e){} row._vGrabbing = false; }
 }
 // 모든 장면의 자막을 이 영상 하나의 타임라인으로 (트림 구간에 맞춰) 자동 분배
 function aiVsubImportAll(row){
