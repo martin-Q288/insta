@@ -3569,11 +3569,14 @@ function aiSceneRow(sub, img, url){
   const ve = document.createElement("input"); ve.type = "hidden"; ve.className = "ai-vend"; ve.value = "0";
   const vedit = document.createElement("div"); vedit.className = "img-edit ai-vedit"; vedit.style.cssText = "display:none; width:200px; margin-top:8px;";
   vedit.innerHTML =
-    "<div style='font-size:12px; color:var(--muted);'>영상 편집 (크기·좌우·상하)</div>" +
+    "<div style='font-size:12px; color:var(--muted);'>영상 편집 (크기·좌우·상하·소리)</div>" +
     "<div class='img-edit-row'><span class='img-edit-lab'>크기</span><input type='range' class='ai-vscale' min='1' max='4' step='0.02' value='1'></div>" +
     "<div class='img-edit-row'><span class='img-edit-lab'>좌우</span><input type='range' class='ai-vx' min='-200' max='200' step='1' value='0'></div>" +
-    "<div class='img-edit-row'><span class='img-edit-lab'>상하</span><input type='range' class='ai-vy' min='-200' max='200' step='1' value='0'></div>";
-  vedit.querySelectorAll("input[type=range]").forEach(sl=> sl.oninput = ()=> aiVSlider(row));
+    "<div class='img-edit-row'><span class='img-edit-lab'>상하</span><input type='range' class='ai-vy' min='-200' max='200' step='1' value='0'></div>" +
+    "<div class='img-edit-row'><span class='img-edit-lab'>🔊 소리</span><input type='range' class='ai-vvol' min='0' max='1.5' step='0.05' value='1'><span class='ai-vvol-lab' style='font-size:11px; color:var(--muted); min-width:34px;'>100%</span></div>";
+  vedit.querySelectorAll("input[type=range]:not(.ai-vvol)").forEach(sl=> sl.oninput = ()=> aiVSlider(row));
+  const vvolEl = vedit.querySelector(".ai-vvol"), vvolLab = vedit.querySelector(".ai-vvol-lab");
+  if(vvolEl) vvolEl.oninput = ()=>{ row._vvol = parseFloat(vvolEl.value); if(vvolLab) vvolLab.textContent = Math.round(row._vvol*100) + "%"; const vv = row.querySelector(".ai-vprev"); if(vv) vv.volume = Math.min(1, row._vvol); };
   const vrst = document.createElement("button"); vrst.className = "btn-ghost btn-sm"; vrst.textContent = "위치 초기화";
   vrst.onclick = ()=>{ row._vtf = { x:0, y:0, scale:1 }; vedit.querySelector(".ai-vscale").value=1; vedit.querySelector(".ai-vx").value=0; vedit.querySelector(".ai-vy").value=0; aiDrawVtfPreview(row); };
   const vhint = document.createElement("div"); vhint.className = "img-edit-hint"; vhint.textContent = "오른쪽 9:16 미리보기에 크롭/줌이 즉시 반영됩니다.";
@@ -3641,6 +3644,7 @@ function aiScenePlay(row){
   let ve = parseFloat((row.querySelector(".ai-vend")||{}).value); if(!(ve > vs)) ve = row._vdur || (vs + 3);
   const go = ()=>{
     v.muted = false;
+    try{ v.volume = Math.max(0, Math.min(1, row._vvol != null ? row._vvol : 1)); }catch(e){}
     try{ v.currentTime = vs; }catch(e){}
     const pr = v.play(); if(pr && pr.catch) pr.catch(()=>{});
     const stop = ()=>{ if(v.currentTime >= ve || v.paused){ if(v.currentTime >= ve){ try{ v.pause(); }catch(e){} } v.removeEventListener("timeupdate", stop); } };
@@ -3882,7 +3886,8 @@ function aiVsubImportAll(row){
   const raw = segs.map(s=> Math.max(minDur, s.replace(/\n/g,"").length * perChar));
   const sum = raw.reduce((a,b)=>a+b, 0), k = span / sum;
   const subs = []; let t = vs;
-  segs.forEach((s, i)=>{ const d = raw[i]*k; const end = (i === segs.length-1) ? ve : (t + d); subs.push({ text:s, t0:+t.toFixed(2), t1:+end.toFixed(2) }); t = end; });
+  const baseVol = (row._vvol != null ? row._vvol : 1);
+  segs.forEach((s, i)=>{ const d = raw[i]*k; const end = (i === segs.length-1) ? ve : (t + d); subs.push({ text:s, t0:+t.toFixed(2), t1:+end.toFixed(2), vol:baseVol }); t = end; });
   row._vsubs = subs; aiVsubRerender(row);
   const others = [...document.querySelectorAll("#aiScenesList .ai-scene")].filter(r=> r !== row);
   if(others.length && confirm(segs.length + "개 자막을 이 영상에 넣었습니다.\n이 영상 하나만 사용하도록 나머지 " + others.length + "개 장면을 삭제할까요?\n(취소하면 다른 장면은 별도 클립으로 뒤에 붙습니다)")){
@@ -4061,7 +4066,7 @@ async function aiRenderWithVideo(rows){
           let veIn = parseFloat(r.querySelector(".ai-vend").value);
           if(!(veIn > vsIn)) veIn = vdur || (vsIn + 3);
           veIn = Math.min(veIn, vdur || veIn, vsIn + 30);
-          clips.push({ type:"video", url:r._vurl, vs:vsIn, ve:veIn, dur:Math.max(0.3, veIn - vsIn), sub, tf:null, subTf:null, row:r });
+          clips.push({ type:"video", url:r._vurl, vs:vsIn, ve:veIn, dur:Math.max(0.3, veIn - vsIn), sub, tf:null, subTf:null, vol:(r._vvol!=null?r._vvol:1), row:r });
         }
       } else {
         clips.push({ type:"image", row:r, sub, dur:D });
