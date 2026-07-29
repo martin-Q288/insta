@@ -3556,7 +3556,8 @@ function aiSceneRow(sub, img, url){
   const vtfCol = document.createElement("div"); vtfCol.className = "ai-vtfcol"; vtfCol.style.cssText = "flex:0 0 auto; display:none;";
   const vtfLab = document.createElement("div"); vtfLab.className = "hint"; vtfLab.style.cssText = "margin:0 0 4px;"; vtfLab.innerHTML = "<b style='color:var(--accent2)'>인스타 9:16 미리보기 (실제 출력)</b>";
   const vtfprev = document.createElement("canvas"); vtfprev.className = "ai-vtfprev"; vtfprev.width = 270; vtfprev.height = 480; vtfprev.style.cssText = "display:none; width:180px; height:320px; border-radius:10px; border:1px solid var(--accent2); background:#000;";
-  vtfCol.append(vtfLab, vtfprev);
+  const vplay = document.createElement("button"); vplay.className = "btn-ghost btn-sm ai-vplay"; vplay.textContent = "▶ 선택 구간 재생"; vplay.style.cssText = "margin-top:6px; width:180px;"; vplay.onclick = ()=> aiScenePlay(row);
+  vtfCol.append(vtfLab, vtfprev, vplay);
   // ② 원본 영상 — 재생·소리·구간 확인용(작게)
   const vrawCol = document.createElement("div"); vrawCol.className = "ai-vrawcol"; vrawCol.style.cssText = "flex:0 0 auto; display:none;";
   const vrawLab = document.createElement("div"); vrawLab.className = "hint"; vrawLab.style.cssText = "margin:0 0 4px;"; vrawLab.textContent = "원본 (재생·소리 확인용)";
@@ -3607,16 +3608,45 @@ function aiShowImageEditor(row){
   if(sc) sc.value = row._itf ? row._itf.scale : 1; if(sx) sx.value = row._itf ? row._itf.x : 0; if(sy) sy.value = row._itf ? row._itf.y : 0;
   aiDrawIPreview(row);
 }
+// 장면 9:16 미리보기(실제 출력) — 영상 프레임 + 자막(장면 자막칸) + 제목(전역)을 1080×1920로 합성 후 축소
 function aiDrawVtfPreview(row, tfOverride){
   const cv = row.querySelector(".ai-vtfprev"), v = row.querySelector(".ai-vprev");
-  if(!cv || !v || !v.videoWidth) return;
-  const W = cv.width, H = cv.height, ctx = cv.getContext("2d");
-  ctx.clearRect(0,0,W,H); ctx.fillStyle = "#000"; ctx.fillRect(0,0,W,H);
+  if(!cv || !v) return;
+  const RW = 1080, RH = 1920;
+  const off = aiDrawVtfPreview._c || (aiDrawVtfPreview._c = document.createElement("canvas"));
+  off.width = RW; off.height = RH; const octx = off.getContext("2d");
+  octx.clearRect(0,0,RW,RH); octx.fillStyle = "#000"; octx.fillRect(0,0,RW,RH);
   const tf = tfOverride || row._vtf || { x:0, y:0, scale:1 };
-  const base = Math.max(W/v.videoWidth, H/v.videoHeight) * (tf.scale||1);
-  const dw = v.videoWidth*base, dh = v.videoHeight*base;
-  const ox = (W-dw)/2 + ((tf.x||0)/100)*W, oy = (H-dh)/2 + ((tf.y||0)/100)*H;
-  try{ ctx.drawImage(v, ox, oy, dw, dh); }catch(e){}
+  if(v.videoWidth){
+    const base = Math.max(RW/v.videoWidth, RH/v.videoHeight) * (tf.scale||1);
+    const dw = v.videoWidth*base, dh = v.videoHeight*base;
+    const ox = (RW-dw)/2 + ((tf.x||0)/100)*RW, oy = (RH-dh)/2 + ((tf.y||0)/100)*RH;
+    try{ octx.drawImage(v, ox, oy, dw, dh); }catch(e){}
+  }
+  const g = octx.createLinearGradient(0, RH*0.58, 0, RH); g.addColorStop(0,"rgba(0,0,0,0)"); g.addColorStop(1,"rgba(0,0,0,.55)");
+  octx.fillStyle = g; octx.fillRect(0, RH*0.58, RW, RH*0.42);
+  const mctx = makeCanvas(RW, 140).getContext("2d");
+  const subTxt = ((row.querySelector(".ai-sub")||{}).value || "").trim();
+  if(subTxt) aiDrawSub(octx, RW, RH, aiWrapSub(mctx, subTxt, RW));
+  const lab = (document.getElementById("aiLabel")||{}).value || "";
+  const ttl = String((document.getElementById("aiTitle")||{}).value || "").replace(/\\n/g,"\n");
+  aiDrawTitle(octx, RW, aiParseTitle(lab, ttl, mctx, RW), RH);
+  const ctx = cv.getContext("2d"); ctx.clearRect(0,0,cv.width,cv.height);
+  try{ ctx.drawImage(off, 0, 0, cv.width, cv.height); }catch(e){}
+}
+// 장면의 선택 구간(트림 vstart~vend)을 재생 — 9:16 미리보기에 자막·제목과 함께 실시간 표시
+function aiScenePlay(row){
+  const v = row.querySelector(".ai-vprev"); if(!v || !row._vfile) return;
+  const vs = parseFloat((row.querySelector(".ai-vstart")||{}).value) || 0;
+  let ve = parseFloat((row.querySelector(".ai-vend")||{}).value); if(!(ve > vs)) ve = row._vdur || (vs + 3);
+  const go = ()=>{
+    v.muted = false;
+    try{ v.currentTime = vs; }catch(e){}
+    const pr = v.play(); if(pr && pr.catch) pr.catch(()=>{});
+    const stop = ()=>{ if(v.currentTime >= ve || v.paused){ if(v.currentTime >= ve){ try{ v.pause(); }catch(e){} } v.removeEventListener("timeupdate", stop); } };
+    v.addEventListener("timeupdate", stop);
+  };
+  if(v.readyState >= 1){ go(); } else { const on = ()=>{ v.removeEventListener("loadedmetadata", on); go(); }; v.addEventListener("loadedmetadata", on); setTimeout(go, 1000); }
 }
 function aiImageAttach(row, file){
   const st = row.querySelector(".ai-prev-st");
