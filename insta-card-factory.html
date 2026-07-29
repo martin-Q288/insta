@@ -3744,7 +3744,15 @@ function aiVsubRerender(row){
     const sY  = mkRng(0.3, 0.92, 0.01, sbase.posY||0.8, v=>{ ensureSub().posY = v; applySub(); });
     const sRst = document.createElement("button"); sRst.className = "btn-ghost btn-sm"; sRst.textContent = "자막초기화"; sRst.title = "이 구간만의 자막 스타일을 지우고 전역 자막 설정을 따릅니다."; sRst.onclick = ()=>{ s.subTf = null; const g = aiSubStyle(); sSc.value = g.sizeMul; sX.value = 0; sY.value = g.posY; aiVsubDrawSegPrev(row, s, prevCv); };
     sedit.append(document.createTextNode("💬 이 컷 자막 크기"), sSc, document.createTextNode("좌우"), sX, document.createTextNode("상하"), sY, sRst);
-    rightCol.append(ta, cutHead, tbHolder, ctr, vedit, sedit);
+    // 구간별 소리 볼륨 (최종 영상에 '원본 소리 포함'일 때 적용)
+    const aedit = document.createElement("div"); aedit.style.cssText = "margin-top:6px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:12px; color:var(--muted);";
+    const volVal = document.createElement("span"); volVal.style.cssText = "min-width:38px;";
+    const setVolLab = ()=>{ volVal.textContent = Math.round((s.vol != null ? s.vol : 1) * 100) + "%"; };
+    const aVol = mkRng(0, 1.5, 0.05, (s.vol != null ? s.vol : 1), v=>{ s.vol = v; setVolLab(); const vv = row.querySelector(".ai-vprev"); if(vv) vv.volume = Math.min(1, v); });
+    setVolLab();
+    const aHint = document.createElement("span"); aHint.className = "hint"; aHint.style.cssText = "font-size:11px;"; aHint.textContent = "(0% = 이 컷 무음 · 저장 시 '원본 소리 포함' 체크해야 반영)";
+    aedit.append(document.createTextNode("🔊 이 컷 소리 볼륨"), aVol, volVal, aHint);
+    rightCol.append(ta, cutHead, tbHolder, ctr, vedit, sedit, aedit);
     it.append(prevWrap, rightCol); wrap.appendChild(it);
     aiVsubDrawSegPrev(row, s, prevCv);   // 캐시된 프레임이 있으면 즉시 표시
   });
@@ -3775,6 +3783,11 @@ function aiVsubDrawSegPrev(row, s, cv){
   const mctx = makeCanvas(RW, 140).getContext("2d");
   const lines = aiWrapSub(mctx, s.text || "", RW, s.subTf);
   aiDrawSub(octx, RW, RH, lines, s.subTf);
+  // 제목(전역 라벨/제목)도 각 컷 미리보기에 표시 — 최종 출력과 동일
+  const lab = (document.getElementById("aiLabel")||{}).value || "";
+  const titleTxt = String((document.getElementById("aiTitle")||{}).value || "").replace(/\\n/g,"\n");
+  const title = aiParseTitle(lab, titleTxt, mctx, RW);
+  aiDrawTitle(octx, RW, title, RH);
   // 썸네일로 축소
   const ctx = cv.getContext("2d"); ctx.clearRect(0,0,cv.width,cv.height);
   try{ ctx.drawImage(off, 0, 0, cv.width, cv.height); }catch(e){}
@@ -3853,6 +3866,7 @@ function aiVsubPlay(row, s){
   const t0 = Math.max(0, s.t0 || 0), t1 = Math.max(t0 + 0.1, s.t1 || t0 + 2);
   const start = ()=>{
     v.muted = false;   // 재생 확인용 — 소리도 함께
+    try{ v.volume = Math.max(0, Math.min(1, s.vol != null ? s.vol : 1)); }catch(e){}
     try{ v.currentTime = t0; }catch(e){}
     const pr = v.play(); if(pr && pr.catch) pr.catch(()=>{});
     const draw = ()=>{
@@ -4009,7 +4023,7 @@ async function aiRenderWithVideo(rows){
           cuts.slice().sort((a,b)=> a.t0 - b.t0).forEach(cut=>{
             let vs = Math.max(0, cut.t0), ve = Math.min(vdur || cut.t1, cut.t1);
             if(!(ve > vs)) ve = Math.min(vdur || vs+2, vs + 2);
-            clips.push({ type:"video", url:r._vurl, vs, ve, dur:Math.max(0.3, ve - vs), sub:String(cut.text||"").trim(), tf:cut.tf||null, subTf:cut.subTf||null, row:r });
+            clips.push({ type:"video", url:r._vurl, vs, ve, dur:Math.max(0.3, ve - vs), sub:String(cut.text||"").trim(), tf:cut.tf||null, subTf:cut.subTf||null, vol:(cut.vol!=null?cut.vol:1), row:r });
           });
         } else {
           // 컷이 없으면 트림 구간 전체를 한 클립으로(폴백)
@@ -4071,7 +4085,7 @@ async function aiRenderWithVideo(rows){
           if(cur >= 0 && clips[cur].type === "video"){ try{ clips[cur].v.pause(); }catch(e){} if(clips[cur].gain) clips[cur].gain.gain.value = 0; }
           cur = i;
           // 이미 vs로 사전 seek되어 있으므로 재-seek 없이 바로 재생 → 첫 프레임이 즉시 표시되어 끊김 없음
-          if(clips[i].type === "video"){ const pr = clips[i].v.play(); if(pr && pr.catch) pr.catch(()=>{}); if(clips[i].gain) clips[i].gain.gain.value = 1; }
+          if(clips[i].type === "video"){ const pr = clips[i].v.play(); if(pr && pr.catch) pr.catch(()=>{}); if(clips[i].gain) clips[i].gain.gain.value = (clips[i].vol != null ? clips[i].vol : 1); }
         }
         rctx.clearRect(0,0,W,H); rctx.fillStyle = "#000"; rctx.fillRect(0,0,W,H);
         const c = clips[i];
