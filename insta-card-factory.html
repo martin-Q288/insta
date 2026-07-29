@@ -600,7 +600,7 @@
       <label style="margin-top:10px;">제목·자막 스타일 &amp; 미리보기 <small style="text-transform:none; color:var(--muted);">— 슬라이더를 움직이면 옆 미리보기에 바로 반영됩니다</small></label>
       <div id="aiStyleBox" style="margin-top:6px; display:flex; gap:14px; flex-wrap:wrap; align-items:flex-start;">
         <div style="flex:0 0 auto;">
-          <canvas id="aiSubPreview" style="width:232px; border-radius:12px; border:1px solid var(--accent2); background:#000; display:block;"></canvas>
+          <canvas id="aiSubPreview" style="width:232px; height:412px; border-radius:12px; border:1px solid var(--accent2); background:#000; display:block;"></canvas>
           <div class="img-edit-hint" style="max-width:232px; margin-top:6px; line-height:1.5;">🔴 상단 붉은 띠 = 다이나믹 아일랜드 가림<br>⚪ 흰 점선 = 피드(4:5) 노출 영역 · 밖은 잘림<br>👻 흐린 아이콘 = 인스타 UI(댓글·공유·프로필)</div>
         </div>
         <div style="flex:1; min-width:210px;">
@@ -3527,13 +3527,13 @@ function aiSceneRow(sub, img, url){
   // 이미지 9:16 미리보기 + 크기·좌우·상하 편집
   row._itf = { x:0, y:0, scale:1 };
   const ipwrap = document.createElement("div"); ipwrap.style.cssText = "display:none; gap:10px; align-items:flex-start; flex-wrap:wrap; margin-top:8px;"; ipwrap.className = "ai-ipwrap";
-  const iprev = document.createElement("canvas"); iprev.className = "ai-iprev"; iprev.width = 270; iprev.height = 480; iprev.style.cssText = "width:120px; border-radius:8px; border:1px solid var(--accent2); background:#000;";
+  const iprev = document.createElement("canvas"); iprev.className = "ai-iprev"; iprev.width = 270; iprev.height = 480; iprev.style.cssText = "width:120px; height:213px; border-radius:8px; border:1px solid var(--accent2); background:#000;";
   const iedit = document.createElement("div"); iedit.className = "img-edit ai-iedit"; iedit.style.cssText = "width:200px; margin-top:0;";
   iedit.innerHTML =
     "<div style='font-size:12px; color:var(--muted);'>이미지 편집 (크기·좌우·상하)</div>" +
     "<div class='img-edit-row'><span class='img-edit-lab'>크기</span><input type='range' class='ai-iscale' min='1' max='4' step='0.02' value='1'></div>" +
-    "<div class='img-edit-row'><span class='img-edit-lab'>좌우</span><input type='range' class='ai-ix' min='-100' max='100' step='1' value='0'></div>" +
-    "<div class='img-edit-row'><span class='img-edit-lab'>상하</span><input type='range' class='ai-iy' min='-100' max='100' step='1' value='0'></div>";
+    "<div class='img-edit-row'><span class='img-edit-lab'>좌우</span><input type='range' class='ai-ix' min='-200' max='200' step='1' value='0'></div>" +
+    "<div class='img-edit-row'><span class='img-edit-lab'>상하</span><input type='range' class='ai-iy' min='-200' max='200' step='1' value='0'></div>";
   iedit.querySelectorAll("input[type=range]").forEach(sl=> sl.oninput = ()=> aiISlider(row));
   const irst = document.createElement("button"); irst.className = "btn-ghost btn-sm"; irst.textContent = "위치 초기화";
   irst.onclick = ()=>{ row._itf = { x:0, y:0, scale:1 }; iedit.querySelector(".ai-iscale").value=1; iedit.querySelector(".ai-ix").value=0; iedit.querySelector(".ai-iy").value=0; aiDrawIPreview(row); aiUpdateSubPreview(); };
@@ -3555,7 +3555,7 @@ function aiSceneRow(sub, img, url){
   // ① 인스타 9:16 크롭 미리보기 — 실제 출력 화면(크게, 대표)
   const vtfCol = document.createElement("div"); vtfCol.className = "ai-vtfcol"; vtfCol.style.cssText = "flex:0 0 auto; display:none;";
   const vtfLab = document.createElement("div"); vtfLab.className = "hint"; vtfLab.style.cssText = "margin:0 0 4px;"; vtfLab.innerHTML = "<b style='color:var(--accent2)'>인스타 9:16 미리보기 (실제 출력)</b>";
-  const vtfprev = document.createElement("canvas"); vtfprev.className = "ai-vtfprev"; vtfprev.width = 270; vtfprev.height = 480; vtfprev.style.cssText = "display:none; width:180px; border-radius:10px; border:1px solid var(--accent2); background:#000;";
+  const vtfprev = document.createElement("canvas"); vtfprev.className = "ai-vtfprev"; vtfprev.width = 270; vtfprev.height = 480; vtfprev.style.cssText = "display:none; width:180px; height:320px; border-radius:10px; border:1px solid var(--accent2); background:#000;";
   vtfCol.append(vtfLab, vtfprev);
   // ② 원본 영상 — 재생·소리·구간 확인용(작게)
   const vrawCol = document.createElement("div"); vrawCol.className = "ai-vrawcol"; vrawCol.style.cssText = "flex:0 0 auto; display:none;";
@@ -3570,8 +3570,8 @@ function aiSceneRow(sub, img, url){
   vedit.innerHTML =
     "<div style='font-size:12px; color:var(--muted);'>영상 편집 (크기·좌우·상하)</div>" +
     "<div class='img-edit-row'><span class='img-edit-lab'>크기</span><input type='range' class='ai-vscale' min='1' max='4' step='0.02' value='1'></div>" +
-    "<div class='img-edit-row'><span class='img-edit-lab'>좌우</span><input type='range' class='ai-vx' min='-100' max='100' step='1' value='0'></div>" +
-    "<div class='img-edit-row'><span class='img-edit-lab'>상하</span><input type='range' class='ai-vy' min='-100' max='100' step='1' value='0'></div>";
+    "<div class='img-edit-row'><span class='img-edit-lab'>좌우</span><input type='range' class='ai-vx' min='-200' max='200' step='1' value='0'></div>" +
+    "<div class='img-edit-row'><span class='img-edit-lab'>상하</span><input type='range' class='ai-vy' min='-200' max='200' step='1' value='0'></div>";
   vedit.querySelectorAll("input[type=range]").forEach(sl=> sl.oninput = ()=> aiVSlider(row));
   const vrst = document.createElement("button"); vrst.className = "btn-ghost btn-sm"; vrst.textContent = "위치 초기화";
   vrst.onclick = ()=>{ row._vtf = { x:0, y:0, scale:1 }; vedit.querySelector(".ai-vscale").value=1; vedit.querySelector(".ai-vx").value=0; vedit.querySelector(".ai-vy").value=0; aiDrawVtfPreview(row); };
@@ -3729,8 +3729,8 @@ function aiVsubRerender(row){
     const ensureTf = ()=>{ if(!s.tf){ const g = row._vtf || { x:0, y:0, scale:1 }; s.tf = { x:g.x||0, y:g.y||0, scale:g.scale||1 }; } return s.tf; };
     const applyTf = ()=> aiVsubDrawSegPrev(row, s, prevCv);
     const rSc = mkRng(1,4,0.02, base.scale||1, v=>{ ensureTf().scale = v; applyTf(); });
-    const rX  = mkRng(-100,100,1, base.x||0, v=>{ ensureTf().x = v; applyTf(); });
-    const rY  = mkRng(-100,100,1, base.y||0, v=>{ ensureTf().y = v; applyTf(); });
+    const rX  = mkRng(-200,200,1, base.x||0, v=>{ ensureTf().x = v; applyTf(); });
+    const rY  = mkRng(-200,200,1, base.y||0, v=>{ ensureTf().y = v; applyTf(); });
     const rRst = document.createElement("button"); rRst.className = "btn-ghost btn-sm"; rRst.textContent = "구간초기화"; rRst.title = "이 구간만의 프레이밍을 지우고 전체 영상 프레이밍을 따릅니다."; rRst.onclick = ()=>{ s.tf = null; const g = row._vtf || { x:0, y:0, scale:1 }; rSc.value = g.scale||1; rX.value = g.x||0; rY.value = g.y||0; aiVsubDrawSegPrev(row, s, prevCv); };
     vedit.append(document.createTextNode("🎥 이 컷 화면 크기"), rSc, document.createTextNode("좌우"), rX, document.createTextNode("상하"), rY, rRst);
     // 구간별 자막 편집(크기·좌우·상하) — 위 썸네일에 즉시 반영. s.subTf가 없으면 전역 자막 스타일을 따름.
