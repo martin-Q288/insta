@@ -291,10 +291,14 @@ test("실제 posts.md: 길이 제한 · 일차 배분 · 오퍼 글 위치", () 
     "1일차 글에 가격이 등장하면 안 된다",
   );
 
-  // 미기입 자리는 자기소개에만 있어야 한다 (본인 계정 핸들)
+  // 미기입 자리가 남아 있으면 안 된다 — 남아 있으면 publish 가 거기서 멈춘다
   const withHoles = posts.filter((p) => findPlaceholders(p.text).length);
   assert.deepEqual(
     withHoles.map((p) => p.id),
-    ["00-intro"],
+    [],
+    "「」 를 채우거나 문장을 다시 쓰세요",
   );
+
+  // 자기소개는 없는 실적을 있는 척하지 않는다
+  assert.match(posts[0].text, /실적은 아직 없습니다/);
 });
