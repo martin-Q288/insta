@@ -3,7 +3,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { join } from "node:path";
-import { loadConfig, loadPosts, ROOT } from "../lib/config.mjs";
+import { loadConfig, loadPosts, findPlaceholders, ROOT } from "../lib/config.mjs";
 import { ThreadsClient, postLength, MAX_POST_LENGTH } from "../lib/threads-api.mjs";
 import { Store } from "../lib/state.mjs";
 
@@ -40,6 +40,8 @@ try {
   for (const p of posts) {
     const n = postLength(p.text);
     if (n > MAX_POST_LENGTH) bad(`${p.id}: ${n}자 > ${MAX_POST_LENGTH}자`);
+    const holes = findPlaceholders(p.text);
+    if (holes.length) bad(`${p.id}: 미기입 자리 — ${holes.join(", ")}`);
   }
   const byDay = posts.reduce((m, p) => ((m[p.day] = (m[p.day] ?? 0) + 1), m), {});
   ok(

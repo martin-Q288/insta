@@ -4,7 +4,7 @@
 // 사용: node bin/publish.mjs [--dry]
 
 import { join } from "node:path";
-import { loadConfig, loadPosts, ROOT } from "../lib/config.mjs";
+import { loadConfig, loadPosts, findPlaceholders, ROOT } from "../lib/config.mjs";
 import { ThreadsClient, postLength, MAX_POST_LENGTH } from "../lib/threads-api.mjs";
 import { Store } from "../lib/state.mjs";
 
@@ -45,10 +45,18 @@ export async function publishDuePosts({ cfg, posts, store, client, dry = false }
       log(`일일 한도 도달 — ${post.id} 부터 다음 실행으로 넘김`);
       break;
     }
+    // 미기입 자리가 남았으면 건너뛰지 않고 멈춘다. 건너뛰면 뒤 글이 먼저
+    // 올라가서 순서가 무너지는데, 그게 미기입 상태로 올라가는 것보다 나쁘다.
+    const holes = findPlaceholders(post.text);
+    if (holes.length) {
+      log(`중단 — ${post.id} 에 미기입 자리가 있습니다: ${holes.join(", ")}`);
+      log("  posts.md 에서 「」 를 채운 뒤 다시 실행하세요.");
+      break;
+    }
     const len = postLength(post.text);
     if (len > MAX_POST_LENGTH) {
-      log(`건너뜀 ${post.id}: ${len}자 > ${MAX_POST_LENGTH}자`);
-      continue;
+      log(`중단 — ${post.id}: ${len}자 > ${MAX_POST_LENGTH}자`);
+      break;
     }
     if (dry) {
       log(`[dry] ${post.id} (${len}자) 발행 예정`);

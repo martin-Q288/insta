@@ -9,7 +9,7 @@ import { join } from "node:path";
 
 import { ThreadsClient, postLength, MAX_POST_LENGTH } from "../lib/threads-api.mjs";
 import { Store } from "../lib/state.mjs";
-import { loadPosts } from "../lib/config.mjs";
+import { loadPosts, findPlaceholders } from "../lib/config.mjs";
 
 /** 요청을 기록하는 최소 목 서버. routes: {"METHOD /path": handler} */
 async function mockServer(routes) {
@@ -245,12 +245,56 @@ test("posts.md 파싱: id 중복과 day 오류를 잡는다", () => {
   }
 });
 
-test("실제 posts.md 는 전부 길이 제한 안에 있다", () => {
+test("posts.md: # 주석 줄은 본문에 들어가지 않는다", () => {
+  const dir = mkdtempSync(join(tmpdir(), "threads-comment-"));
+  try {
+    const f = join(dir, "p.md");
+    writeFileSync(f, "# id: a\n# day: 1\n# 이건 주석이다\n실제 본문\n");
+    const [post] = loadPosts(f);
+    assert.equal(post.text, "실제 본문");
+    assert.equal(post.day, 1);
+
+    // 본문 중간의 # 는 본문이다 (헤더 영역만 소비한다)
+    writeFileSync(f, "# id: b\n첫 줄\n# 이건 본문 속 샵\n");
+    assert.equal(loadPosts(f)[0].text, "첫 줄\n# 이건 본문 속 샵");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("미기입 자리「」를 찾아낸다", () => {
+  assert.deepEqual(findPlaceholders("운영 계정은 「핸들」 입니다"), ["핸들"]);
+  assert.deepEqual(findPlaceholders("「」"), ["(빈 자리)"]);
+  assert.deepEqual(findPlaceholders("「a」와 「b」"), ["a", "b"]);
+  assert.deepEqual(findPlaceholders("전부 채워진 글"), []);
+});
+
+test("실제 posts.md: 길이 제한 · 일차 배분 · 오퍼 글 위치", () => {
   const posts = loadPosts();
-  assert.ok(posts.length >= 8);
+  assert.ok(posts.length >= 9);
   for (const p of posts)
     assert.ok(
       postLength(p.text) <= MAX_POST_LENGTH,
       `${p.id}: ${postLength(p.text)}자`,
     );
+
+  // 자기소개가 1일차 첫 글이어야 한다 — 신규 계정에서 결과물 자랑이 먼저면
+  // 팔이 계정으로 읽힌다.
+  assert.equal(posts[0].id, "00-intro");
+  assert.equal(posts[0].day, 1);
+
+  // 판매 글은 3일차에만. 이게 무너지면 계정이 죽는다.
+  const offer = posts.find((p) => p.id === "07-offer");
+  assert.equal(offer.day, 3);
+  assert.ok(
+    posts.filter((p) => p.day === 1).every((p) => !/만원/.test(p.text)),
+    "1일차 글에 가격이 등장하면 안 된다",
+  );
+
+  // 미기입 자리는 자기소개에만 있어야 한다 (본인 계정 핸들)
+  const withHoles = posts.filter((p) => findPlaceholders(p.text).length);
+  assert.deepEqual(
+    withHoles.map((p) => p.id),
+    ["00-intro"],
+  );
 });

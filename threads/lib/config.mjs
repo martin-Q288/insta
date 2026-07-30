@@ -55,7 +55,15 @@ export function loadConfig(path = join(ROOT, "config.json")) {
  * `day` 는 첫 발행일로부터의 상대 일차(1부터). 이걸로 순서를 강제해서
  * 판매 글이 1일차에 나가는 사고를 막는다. 없으면 1로 본다.
  * `at` 은 선택 — 절대 시각이 필요할 때만. 있으면 그 시각 이후에만 발행된다.
+ *
+ * 본문 앞의 `#` 로 시작하는 줄은 헤더 아니면 주석으로 취급해 본문에서 빼낸다.
+ * 「」 로 감싼 부분은 미기입 자리로 보고 발행을 막는다.
  */
+
+/** 본문에 남아 있는 「미기입 자리」 목록. 비어 있어야 발행 가능. */
+export function findPlaceholders(text) {
+  return [...text.matchAll(/「([^」]*)」/g)].map((m) => m[1] || "(빈 자리)");
+}
 export function loadPosts(path = join(ROOT, "posts.md")) {
   const src = readFileSync(path, "utf8");
   const blocks = src
@@ -70,9 +78,10 @@ export function loadPosts(path = join(ROOT, "posts.md")) {
     const meta = {};
     let i = 0;
     for (; i < lines.length; i++) {
+      if (!lines[i].startsWith("#")) break; // 여기부터 본문
       const m = /^#\s*([a-zA-Z_]+)\s*:\s*(.+?)\s*$/.exec(lines[i]);
-      if (!m) break;
-      meta[m[1]] = m[2];
+      if (m) meta[m[1]] = m[2]; // 헤더
+      // 그 외 `#` 줄은 주석 — 본문에 넣지 않는다
     }
     const text = lines.slice(i).join("\n").trim();
     if (!meta.id) throw new Error(`posts.md: id 없는 블록\n${block.slice(0, 80)}`);
