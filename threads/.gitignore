@@ -1,0 +1,7 @@
+node_modules/
+
+# 토큰과 API 키가 들어간다 — 절대 커밋하지 않는다
+config.json
+
+# 발행·답글 이력. 지우면 전부 다시 발행된다
+state/

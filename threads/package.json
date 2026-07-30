@@ -1,0 +1,18 @@
+{
+  "name": "threads-autopilot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Publishes a queued set of Threads posts and auto-answers replies to them via the official Threads API.",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test test/api.test.mjs",
+    "check": "node bin/check.mjs",
+    "publish": "node bin/publish.mjs",
+    "reply": "node bin/reply.mjs",
+    "loop": "node bin/loop.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.70.0"
+  }
+}
