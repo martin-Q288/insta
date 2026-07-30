@@ -279,6 +279,17 @@ td.d{color:var(--steel); font-size:15px;}
 .note .k{font-family:var(--f-mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--machine); font-weight:600;}
 .note p{font-size:14.5px; line-height:1.68; color:var(--steel);}
 
+/* 레퍼런스 — 확인 가능한 증거 */
+.proofs{display:grid; gap:1px; background:var(--rule); border:1px solid var(--rule); border-radius:6px; overflow:hidden;}
+@media(min-width:880px){ .proofs{grid-template-columns:repeat(3,1fr);} }
+.proof{background:var(--panel); padding:24px 21px 26px; display:flex; flex-direction:column; gap:10px;}
+.proof .lb{
+  font-family:var(--f-mono); font-size:10.5px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--accent); font-weight:600;
+}
+.proof p{font-size:14.5px; line-height:1.66; color:var(--steel);}
+.proof p b{color:var(--ink);}
+
 /* FAQ */
 .faq{border:1px solid var(--rule); border-radius:6px; background:var(--panel); overflow:hidden;}
 details{border-bottom:1px solid var(--rule);}
@@ -529,6 +540,51 @@ mark.todo{
           이 도구는 기사의 <b>사실</b>을 가져와 문장을 새로 씁니다. 남의 게시물을 캡처해 그대로 올리는
           용도가 아닙니다. 그런 식의 재업로드는 메타 원본 콘텐츠 정책 위반이라 노출이 줄고 계정이
           제재를 받습니다. 이미지도 라이선스가 확보된 것만 쓰셔야 합니다. 도구 안에도 같은 안내가 들어 있습니다.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 레퍼런스 ================= -->
+  <section>
+    <div class="shell">
+      <div class="sec-hd">
+        <p class="tag">레퍼런스</p>
+        <h2>후기가 없습니다.<br>대신 이걸 확인하십시오.</h2>
+        <p class="lede">
+          파는 사람이 내놓는 후기는 사는 사람이 진짜인지 확인할 방법이 없습니다.
+          그래서 이 페이지에는 후기를 넣지 않았습니다. 대신 <b>직접 확인할 수 있는 것</b>만 놓겠습니다.
+        </p>
+      </div>
+      <div class="proofs">
+        <div class="proof">
+          <p class="lb">즉석 확인</p>
+          <h3>당신이 준 링크로 돌립니다</h3>
+          <p>미리 준비한 예시가 아니라, 그 자리에서 주시는 기사 링크로 돌려서 결과물을 보여드립니다.
+             <b>미리 만들어 둘 수 없으니 조작이 불가능합니다.</b> 후기보다 이게 확실합니다.</p>
+        </div>
+        <div class="proof">
+          <p class="lb">자체 운영 실측</p>
+          <h3>제 계정에 먼저 돌렸습니다</h3>
+          <p>이 도구로만 운영한 제 계정의 인사이트를 그대로 보여드립니다 — 기간, 발행 수, 도달, 저장.
+             <mark class="todo">실제 수치 · 기간 입력</mark>
+             부풀린 숫자는 어차피 검증되니 있는 대로만 씁니다.</p>
+        </div>
+        <div class="proof">
+          <p class="lb">위험 부담</p>
+          <h3>안 되면 안 받습니다</h3>
+          <p>세팅이 포함된 등급은 <b>첫 게시물이 계정에 올라가는 것까지</b> 확인하고 끝냅니다.
+             원하시면 선금 30% · 세팅 확인 후 잔금 70%로 나눠 진행합니다.</p>
+        </div>
+      </div>
+
+      <div class="note" style="margin-top:22px;">
+        <p class="k">지금이 레퍼런스를 쌓는 단계입니다</p>
+        <p>
+          숨길 이유가 없어서 그대로 적습니다. 아직 공개할 수 있는 고객 사례가 없고, 그래서
+          <b>초기 몇 건은 정가보다 낮게</b> 드립니다. 대신 결과가 나오면 수치 공개와 후기를 부탁드립니다.
+          부담되시면 안 하셔도 되고, 그 조건으로 가격이 되돌아가지도 않습니다.
+          <mark class="todo">적용 여부 · 할인가 · 남은 건수 결정</mark>
         </p>
       </div>
     </div>
