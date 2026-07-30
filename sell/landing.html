@@ -1,0 +1,751 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>인스타 카드 팩토리 — 기사 링크 하나로 콘텐츠 20개</title>
+<meta name="description" content="기사 URL을 넣으면 AI가 재작성해 인스타 카드뉴스·릴스·캡션을 10개 언어로 만들어 계정에 바로 게시합니다. 설치 없는 단일 파일 도구.">
+<style>
+/* ============================================================
+   TOKENS — 출고 명세서 팔레트
+   ground: 청색 기운 도는 산업용 종이 / 잉크
+   accent: 산업 주황 (기계 라벨·출고 스티커)
+   ============================================================ */
+:root{
+  --paper:#F1F4F7;
+  --panel:#FFFFFF;
+  --panel-2:#E9EEF3;
+  --ink:#13181D;
+  --steel:#57646F;
+  --steel-2:#8996A3;
+  --rule:#D3DBE3;
+  --rule-strong:#B6C2CD;
+  --accent:#C8410A;
+  --accent-soft:#FBE7DC;
+  --machine:#1C4A72;
+  --ok:#1D6B4F;
+
+  --f-sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Malgun Gothic","맑은 고딕","Noto Sans KR",sans-serif;
+  --f-mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+
+  --shell:1140px;
+  --gutter:clamp(18px,4vw,40px);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --paper:#0D1116;
+    --panel:#151B21;
+    --panel-2:#1D242B;
+    --ink:#E3E9EE;
+    --steel:#93A0AC;
+    --steel-2:#6C7883;
+    --rule:#262F37;
+    --rule-strong:#37424C;
+    --accent:#FF6D33;
+    --accent-soft:#33180C;
+    --machine:#6FA8D8;
+    --ok:#4FBE90;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0D1116;
+  --panel:#151B21;
+  --panel-2:#1D242B;
+  --ink:#E3E9EE;
+  --steel:#93A0AC;
+  --steel-2:#6C7883;
+  --rule:#262F37;
+  --rule-strong:#37424C;
+  --accent:#FF6D33;
+  --accent-soft:#33180C;
+  --machine:#6FA8D8;
+  --ok:#4FBE90;
+}
+:root[data-theme="light"]{
+  --paper:#F1F4F7;
+  --panel:#FFFFFF;
+  --panel-2:#E9EEF3;
+  --ink:#13181D;
+  --steel:#57646F;
+  --steel-2:#8996A3;
+  --rule:#D3DBE3;
+  --rule-strong:#B6C2CD;
+  --accent:#C8410A;
+  --accent-soft:#FBE7DC;
+  --machine:#1C4A72;
+  --ok:#1D6B4F;
+}
+
+*,*::before,*::after{box-sizing:border-box;}
+html{-webkit-text-size-adjust:100%;}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--f-sans);
+  font-size:17px;
+  line-height:1.72;
+  letter-spacing:-.011em;
+  word-break:keep-all;
+}
+:focus-visible{outline:2px solid var(--accent); outline-offset:3px;}
+
+.shell{max-width:var(--shell); margin:0 auto; padding-inline:var(--gutter);}
+
+/* ---- 명세 라벨 (모노) ---- */
+.tag{
+  font-family:var(--f-mono);
+  font-size:11px;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+  color:var(--steel-2);
+  display:flex; align-items:center; gap:10px;
+}
+.tag::after{content:""; flex:1; height:1px; background:var(--rule);}
+.tag b{color:var(--accent); font-weight:600;}
+
+h1,h2,h3{margin:0; text-wrap:balance; letter-spacing:-.035em; line-height:1.16; font-weight:800;}
+h1{font-size:clamp(34px,6.2vw,64px);}
+h2{font-size:clamp(25px,3.4vw,38px);}
+h3{font-size:18px; letter-spacing:-.02em; line-height:1.4;}
+p{margin:0;}
+.lede{font-size:clamp(17px,1.9vw,20px); color:var(--steel); max-width:62ch;}
+.fine{font-size:13.5px; line-height:1.6; color:var(--steel-2);}
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+.top{
+  border-bottom:1px solid var(--rule);
+  background:color-mix(in srgb, var(--paper) 88%, transparent);
+  position:sticky; top:0; z-index:20;
+  backdrop-filter:blur(10px);
+}
+.top-in{display:flex; align-items:center; justify-content:space-between; gap:16px; height:60px;}
+.brand{display:flex; align-items:center; gap:11px; font-weight:800; letter-spacing:-.03em;}
+.stamp{
+  width:29px; height:29px; flex:none;
+  display:grid; place-items:center;
+  background:var(--accent); color:#fff;
+  font-family:var(--f-mono); font-size:12px; font-weight:700;
+  border-radius:3px;
+}
+.top .fine{display:none;}
+@media(min-width:760px){ .top .fine{display:block;} }
+
+/* ============================================================
+   HERO — 생산 명세
+   ============================================================ */
+.hero{padding:clamp(48px,8vw,96px) 0 clamp(40px,6vw,68px);}
+.hero h1 em{font-style:normal; color:var(--accent);}
+.hero .lede{margin-top:22px;}
+
+.cta-row{display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-top:34px;}
+.btn{
+  display:inline-flex; align-items:center; gap:9px;
+  padding:14px 24px; border-radius:4px;
+  font-size:16px; font-weight:700; letter-spacing:-.02em;
+  text-decoration:none; border:1px solid transparent;
+  transition:transform .12s ease, background-color .12s ease, border-color .12s ease;
+}
+.btn:active{transform:translateY(1px);}
+.btn-a{background:var(--accent); color:#fff;}
+.btn-a:hover{background:color-mix(in srgb, var(--accent) 86%, #000);}
+.btn-b{border-color:var(--rule-strong); color:var(--ink);}
+.btn-b:hover{border-color:var(--ink); background:var(--panel);}
+
+/* 출력 계산판 */
+.readout{
+  margin-top:clamp(38px,6vw,60px);
+  border:1px solid var(--rule); border-radius:6px;
+  background:var(--panel);
+  overflow:hidden;
+}
+.readout-hd{
+  display:flex; justify-content:space-between; align-items:center; gap:12px;
+  padding:11px 16px; border-bottom:1px solid var(--rule);
+  background:var(--panel-2);
+  font-family:var(--f-mono); font-size:11px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--steel);
+}
+.readout-hd .dot{
+  width:7px; height:7px; border-radius:50%; background:var(--ok);
+  display:inline-block; margin-right:7px;
+}
+.calc{
+  display:grid; gap:1px; background:var(--rule);
+  grid-template-columns:1fr;
+}
+@media(min-width:720px){ .calc{grid-template-columns:1fr 1fr 1fr auto;} }
+.cell{background:var(--panel); padding:22px 18px;}
+.cell .k{
+  font-family:var(--f-mono); font-size:10.5px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--steel-2);
+}
+.cell .v{
+  font-size:clamp(30px,4.4vw,42px); font-weight:800; letter-spacing:-.04em;
+  line-height:1.1; margin-top:8px; font-variant-numeric:tabular-nums;
+}
+.cell .u{font-size:15px; font-weight:600; color:var(--steel); margin-left:5px; letter-spacing:-.02em;}
+.cell.out{background:var(--accent-soft);}
+.cell.out .v{color:var(--accent);}
+.cell.out{border-left:none;}
+@media(min-width:720px){ .cell.out{min-width:210px;} }
+
+/* ============================================================
+   섹션 공통
+   ============================================================ */
+section{padding:clamp(46px,7vw,86px) 0; border-top:1px solid var(--rule);}
+.sec-hd{display:flex; flex-direction:column; gap:16px; margin-bottom:clamp(30px,4vw,46px);}
+
+/* 문제 — 시간 비교 */
+.bars{display:flex; flex-direction:column; gap:20px; max-width:760px;}
+.bar-row .bar-lb{
+  display:flex; justify-content:space-between; align-items:baseline; gap:12px;
+  margin-bottom:9px; font-weight:700; letter-spacing:-.02em;
+}
+.bar-row .bar-lb span{
+  font-family:var(--f-mono); font-size:13px; font-weight:600;
+  color:var(--steel); font-variant-numeric:tabular-nums;
+}
+.track{height:14px; background:var(--panel-2); border-radius:2px; overflow:hidden;}
+.fill{height:100%; width:0; background:var(--rule-strong); border-radius:2px; transition:width 1s cubic-bezier(.2,.7,.2,1);}
+.fill.hot{background:var(--accent);}
+@media (prefers-reduced-motion: reduce){ .fill{transition:none;} }
+
+/* 4단계 — 실제 순서라 번호를 씀 */
+.steps{display:grid; gap:1px; background:var(--rule); border:1px solid var(--rule); border-radius:6px; overflow:hidden;}
+@media(min-width:860px){ .steps{grid-template-columns:repeat(4,1fr);} }
+.step{background:var(--panel); padding:24px 20px 26px; display:flex; flex-direction:column; gap:11px;}
+.step .n{
+  font-family:var(--f-mono); font-size:11px; letter-spacing:.14em;
+  color:var(--accent); font-weight:600;
+}
+.step p{font-size:14.5px; line-height:1.66; color:var(--steel);}
+
+/* 명세 테이블 */
+.tbl-wrap{overflow-x:auto; border:1px solid var(--rule); border-radius:6px; background:var(--panel);}
+table{width:100%; border-collapse:collapse; min-width:560px;}
+th,td{text-align:left; padding:15px 18px; border-bottom:1px solid var(--rule); vertical-align:top;}
+thead th{
+  font-family:var(--f-mono); font-size:10.5px; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--steel-2); font-weight:600; background:var(--panel-2); white-space:nowrap;
+}
+tbody tr:last-child td{border-bottom:none;}
+td.f{font-weight:700; letter-spacing:-.02em; white-space:nowrap;}
+td.d{color:var(--steel); font-size:15px;}
+.chip{
+  display:inline-block; font-family:var(--f-mono); font-size:11px; font-weight:600;
+  letter-spacing:.06em; padding:3px 8px; border-radius:3px;
+  background:var(--accent-soft); color:var(--accent); white-space:nowrap;
+}
+
+/* 가격 */
+.tiers{display:grid; gap:18px;}
+@media(min-width:900px){ .tiers{grid-template-columns:repeat(3,1fr); align-items:start;} }
+.tier{
+  border:1px solid var(--rule); border-radius:6px; background:var(--panel);
+  padding:26px 24px 28px; display:flex; flex-direction:column; gap:18px;
+}
+.tier.pick{border-color:var(--accent); border-width:2px; padding:25px 23px 27px;}
+.tier-hd{display:flex; flex-direction:column; gap:7px;}
+.tier-nm{font-family:var(--f-mono); font-size:11.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--steel-2); font-weight:600;}
+.tier.pick .tier-nm{color:var(--accent);}
+.price{font-size:38px; font-weight:800; letter-spacing:-.045em; line-height:1; font-variant-numeric:tabular-nums;}
+.price small{font-size:16px; font-weight:600; color:var(--steel); letter-spacing:-.02em; margin-left:3px;}
+.tier ul{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:11px;}
+.tier li{
+  display:flex; gap:10px; font-size:14.5px; line-height:1.6; color:var(--steel);
+}
+.tier li::before{
+  content:"—"; color:var(--accent); flex:none; font-family:var(--f-mono); font-size:13px; padding-top:2px;
+}
+.tier li b{color:var(--ink); font-weight:700;}
+.tier .btn{justify-content:center; margin-top:auto;}
+
+/* 준비물 · 정직 고지 */
+.needs{display:grid; gap:1px; background:var(--rule); border:1px solid var(--rule); border-radius:6px; overflow:hidden;}
+@media(min-width:760px){ .needs{grid-template-columns:1fr 1fr;} }
+.need{background:var(--panel); padding:20px; display:flex; flex-direction:column; gap:6px;}
+.need .k{font-weight:700; letter-spacing:-.02em; font-size:15.5px;}
+.need .v{font-size:14px; color:var(--steel); line-height:1.62;}
+
+.note{
+  border-left:3px solid var(--machine); background:var(--panel);
+  border-top:1px solid var(--rule); border-right:1px solid var(--rule); border-bottom:1px solid var(--rule);
+  border-radius:0 6px 6px 0; padding:20px 22px;
+  display:flex; flex-direction:column; gap:9px;
+}
+.note .k{font-family:var(--f-mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--machine); font-weight:600;}
+.note p{font-size:14.5px; line-height:1.68; color:var(--steel);}
+
+/* FAQ */
+.faq{border:1px solid var(--rule); border-radius:6px; background:var(--panel); overflow:hidden;}
+details{border-bottom:1px solid var(--rule);}
+details:last-child{border-bottom:none;}
+summary{
+  cursor:pointer; padding:18px 20px; font-weight:700; letter-spacing:-.02em;
+  display:flex; gap:14px; align-items:baseline; list-style:none;
+}
+summary::-webkit-details-marker{display:none;}
+summary::before{
+  content:"+"; font-family:var(--f-mono); color:var(--accent); font-weight:600; flex:none;
+}
+details[open] summary::before{content:"−";}
+details[open] summary{padding-bottom:8px;}
+details .body{padding:0 20px 20px 48px; font-size:15px; line-height:1.7; color:var(--steel);}
+
+/* 마감 */
+.close{
+  border:1px solid var(--rule-strong); border-radius:6px; background:var(--panel);
+  padding:clamp(30px,5vw,50px); display:flex; flex-direction:column; gap:20px; align-items:flex-start;
+}
+footer{border-top:1px solid var(--rule); padding:30px 0 46px;}
+footer .fine{max-width:70ch;}
+
+/* 판매자 채움 표시 — 그대로 배포되면 안 되는 자리 */
+mark.todo{
+  background:transparent; color:var(--accent);
+  border:1px dashed var(--accent); border-radius:3px;
+  padding:1px 7px; font-family:var(--f-mono); font-size:.82em; font-weight:600;
+  letter-spacing:.02em;
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="shell top-in">
+    <div class="brand"><span class="stamp" aria-hidden="true">CF</span>인스타 카드 팩토리</div>
+    <p class="fine">단일 HTML 파일 · 설치 없음 · 브라우저에서 실행</p>
+  </div>
+</header>
+
+<main>
+
+  <!-- ================= HERO ================= -->
+  <div class="shell hero">
+    <p class="tag"><b>제품 명세</b> 콘텐츠 생산 도구</p>
+    <h1 style="margin-top:20px;">기사 링크 하나를<br><em>발행물 20개</em>로 찍어냅니다.</h1>
+    <p class="lede">
+      URL을 붙여넣으면 AI가 사실만 남기고 문장을 새로 씁니다. 카드뉴스·릴스 영상·캡션·해시태그가
+      10개 언어로 한 번에 나오고, 연결해둔 인스타그램 계정에 그대로 게시됩니다.
+      서버도 설치도 없습니다 — HTML 파일 하나입니다.
+    </p>
+    <div class="cta-row">
+      <a class="btn btn-a" href="#가격">가격 보기</a>
+      <a class="btn btn-b" href="#명세">들어있는 기능</a>
+    </div>
+
+    <div class="readout" role="group" aria-label="1회 생산량 계산">
+      <div class="readout-hd">
+        <span><span class="dot" aria-hidden="true"></span>1회 생산량</span>
+        <span>소요 시간 약 3~6분</span>
+      </div>
+      <div class="calc">
+        <div class="cell">
+          <p class="k">투입 / input</p>
+          <p class="v" data-count="1">1<span class="u">개 기사 URL</span></p>
+        </div>
+        <div class="cell">
+          <p class="k">언어 / lang</p>
+          <p class="v" data-count="10">10<span class="u">개 언어</span></p>
+        </div>
+        <div class="cell">
+          <p class="k">포맷 / format</p>
+          <p class="v" data-count="2">2<span class="u">카드 + 릴스</span></p>
+        </div>
+        <div class="cell out">
+          <p class="k">출고 / output</p>
+          <p class="v" data-count="20">20<span class="u">개까지</span></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 문제 ================= -->
+  <section>
+    <div class="shell">
+      <div class="sec-hd">
+        <p class="tag">병목</p>
+        <h2>계정이 안 크는 이유는 전략이 아니라<br>생산량입니다.</h2>
+        <p class="lede">
+          카드뉴스 한 세트를 손으로 만들면 소재 찾기, 문장 쓰기, 이미지 고르기, 자르기, 캡션과
+          해시태그까지 보통 한두 시간이 걸립니다. 그래서 주 2~3회에서 멈추고, 다국어는 아예 손을 못 댑니다.
+          같은 두 시간을 놓고 비교해보면 이렇게 됩니다.
+        </p>
+      </div>
+      <div class="bars">
+        <div class="bar-row">
+          <p class="bar-lb">손으로 <span>2시간 → 1~2개</span></p>
+          <div class="track"><div class="fill" data-w="5"></div></div>
+        </div>
+        <div class="bar-row">
+          <p class="bar-lb">카드 팩토리로 <span>2시간 → 40개</span></p>
+          <div class="track"><div class="fill hot" data-w="100"></div></div>
+        </div>
+      </div>
+      <p class="fine" style="margin-top:22px; max-width:64ch;">
+        소재 4개를 10개 언어로 돌린 기준입니다(생성 1회 3~6분). 다만 <b>생성 시간이고 검수 시간은 별도</b>입니다 —
+        그 시간은 꼭 남겨두시는 걸 권합니다. AI가 쓴 문장을 그대로 올리는 것보다 한 번 읽고 고친 쪽이
+        항상 성적이 좋습니다.
+      </p>
+    </div>
+  </section>
+
+  <!-- ================= 작동 순서 ================= -->
+  <section>
+    <div class="shell">
+      <div class="sec-hd">
+        <p class="tag">작동 순서</p>
+        <h2>네 단계로 끝납니다.</h2>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <p class="n">STEP 01</p>
+          <h3>기사 URL 붙여넣기</h3>
+          <p>링크를 넣고 [가져오기]를 누르면 본문을 자동으로 추출합니다. 소재가 없으면 내장된 발굴 기능으로
+             해외 매체에서 후보를 긁어옵니다.</p>
+        </div>
+        <div class="step">
+          <p class="n">STEP 02</p>
+          <h3>AI가 새로 씁니다</h3>
+          <p>사실만 남기고 문장을 다시 씁니다. 니치를 고르면 후킹 방식과 캡션 구조가 그에 맞게 바뀝니다.</p>
+        </div>
+        <div class="step">
+          <p class="n">STEP 03</p>
+          <h3>카드와 릴스 생성</h3>
+          <p>표지 스타일·폰트·강조색·배지를 고르면 9:16 카드가 렌더링되고, 영상 자료를 넣으면 자막이 붙은
+             릴스로 녹화됩니다.</p>
+        </div>
+        <div class="step">
+          <p class="n">STEP 04</p>
+          <h3>계정으로 바로 게시</h3>
+          <p>언어별로 계정을 매핑해두면 [게시] 한 번으로 올라갑니다. 다운로드해서 직접 올려도 됩니다.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 명세 ================= -->
+  <section id="명세">
+    <div class="shell">
+      <div class="sec-hd">
+        <p class="tag">기능 명세</p>
+        <h2>들어있는 것 전부.</h2>
+        <p class="lede">과장 없이, 실제로 동작하는 것만 적었습니다.</p>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr><th>항목</th><th>내용</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="f">출력 언어</td>
+              <td class="d">한국어 · 영어 · 일본어 · 독일어 · 스페인어 · 프랑스어 · 포르투갈어 · 베트남어 ·
+                  인도네시아어 · 아랍어 <span class="chip">10</span><br>
+                  언어마다 카드·캡션·해시태그를 각각 생성합니다. 번역이 아니라 언어별로 새로 씁니다.</td>
+            </tr>
+            <tr>
+              <td class="f">콘텐츠 니치</td>
+              <td class="d">일반 바이럴 · 의학·건강 실화 · 마인드셋·자기계발 · 연예 소식 <span class="chip">4</span><br>
+                  니치를 바꾸면 후킹 문장 구조와 소재 발굴 소스가 함께 전환됩니다.</td>
+            </tr>
+            <tr>
+              <td class="f">발행 포맷</td>
+              <td class="d">썸네일 1장 + 캡션 본문 / 멀티 카드뉴스 캐러셀 — 카드 수는 내용량에 맞춰 자동 결정</td>
+            </tr>
+            <tr>
+              <td class="f">릴스 영상</td>
+              <td class="d">영상 업로드 후 컷별로 구간을 자르고 자막·상단 제목·음량을 따로 지정. 9:16로
+                  브라우저에서 직접 녹화해 파일로 저장합니다.</td>
+            </tr>
+            <tr>
+              <td class="f">표지 디자인</td>
+              <td class="d">표지 스타일 6종, 헤드라인 폰트 3종, 강조색 4종, 배지·핸들·정렬·위치 지정.
+                  PNG 또는 JPEG로 저장</td>
+            </tr>
+            <tr>
+              <td class="f">자동 게시</td>
+              <td class="d">인스타그램 공식 Graph API 연동. 언어별로 계정을 매핑해 캐러셀과 릴스를 바로 발행</td>
+            </tr>
+            <tr>
+              <td class="f">이미지 소스</td>
+              <td class="d">AI 생성(무료, 키 불필요) 또는 Pexels 스톡 사진. 직접 촬영·업로드도 가능</td>
+            </tr>
+            <tr>
+              <td class="f">소재 발굴</td>
+              <td class="d">해외 주요 매체 위주로 후보 기사를 수집하고, 이미 본 소재는 자동으로 걸러줍니다</td>
+            </tr>
+            <tr>
+              <td class="f">실행 환경</td>
+              <td class="d">HTML 파일 하나. 서버·설치·구독 없음. API 키는 본인 브라우저 저장소에만 남고
+                  외부로 나가지 않습니다</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 준비물 ================= -->
+  <section>
+    <div class="shell">
+      <div class="sec-hd">
+        <p class="tag">시작 전 준비물</p>
+        <h2>이건 미리 아셔야 합니다.</h2>
+        <p class="lede">
+          구매 후에 알게 되면 서로 곤란한 것들입니다. 사서 열자마자 되는 물건이 아니라,
+          아래 세팅을 한 번 해두면 그 다음부터 계속 되는 물건입니다.
+        </p>
+      </div>
+      <div class="needs">
+        <div class="need">
+          <p class="k">Anthropic API 키 (필수)</p>
+          <p class="v">문장 생성에 씁니다. 사용한 만큼 내는 종량제이고 <b>구매 금액에 포함되지 않습니다.</b>
+             권장 모델 기준으로 콘텐츠 1건당 수십 원 수준입니다.</p>
+        </div>
+        <div class="need">
+          <p class="k">인스타그램 프로페셔널 계정</p>
+          <p class="v">자동 게시를 쓰려면 크리에이터/비즈니스 계정과 액세스 토큰이 필요합니다.
+             수동으로 다운로드해 올릴 거면 없어도 됩니다.</p>
+        </div>
+        <div class="need">
+          <p class="k">ImgBB 또는 Cloudinary 키</p>
+          <p class="v">자동 게시는 이미지가 공개 URL이어야 해서 호스팅이 필요합니다. ImgBB는 무료 가입 후
+             키 하나 발급받으면 끝입니다.</p>
+        </div>
+        <div class="need">
+          <p class="k">최신 크롬 또는 사파리</p>
+          <p class="v">릴스 녹화가 브라우저 기능을 씁니다. 인터넷 익스플로러나 오래된 브라우저에서는
+             영상 기능이 동작하지 않습니다.</p>
+        </div>
+      </div>
+
+      <div class="note" style="margin-top:22px;">
+        <p class="k">원본성에 대해</p>
+        <p>
+          이 도구는 기사의 <b>사실</b>을 가져와 문장을 새로 씁니다. 남의 게시물을 캡처해 그대로 올리는
+          용도가 아닙니다. 그런 식의 재업로드는 메타 원본 콘텐츠 정책 위반이라 노출이 줄고 계정이
+          제재를 받습니다. 이미지도 라이선스가 확보된 것만 쓰셔야 합니다. 도구 안에도 같은 안내가 들어 있습니다.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 가격 ================= -->
+  <section id="가격">
+    <div class="shell">
+      <div class="sec-hd">
+        <p class="tag">가격</p>
+        <h2>세 가지 중에 고르시면 됩니다.</h2>
+        <p class="lede">전부 1회 결제입니다. 월 구독료는 없습니다.</p>
+      </div>
+      <div class="tiers">
+
+        <div class="tier">
+          <div class="tier-hd">
+            <p class="tier-nm">Basic / 셀프</p>
+            <p class="price">19<small>만원</small></p>
+          </div>
+          <ul>
+            <li>도구 파일 <b>전체</b> (기능 제한 없음)</li>
+            <li>세팅 가이드 문서 — API 키 발급부터 첫 발행까지 화면 그대로 따라가는 순서</li>
+            <li>니치 4종 · 언어 10종 전부 사용</li>
+            <li>이메일 질문 <b>7일</b></li>
+          </ul>
+          <a class="btn btn-b" href="#문의">이걸로 시작하기</a>
+        </div>
+
+        <div class="tier pick">
+          <div class="tier-hd">
+            <p class="tier-nm">Pro / 세팅 대행</p>
+            <p class="price">49<small>만원</small></p>
+          </div>
+          <ul>
+            <li>Basic에 포함된 것 <b>전부</b></li>
+            <li><b>1:1 세팅 대행</b> — 화면 공유로 API 키·계정 토큰·이미지 호스팅까지 붙여서 첫 발행까지 확인</li>
+            <li>계정 <b>1개</b> 자동 게시 연결</li>
+            <li>니치 문구 톤을 업종에 맞게 <b>1회 조정</b></li>
+            <li>질문 <b>30일</b></li>
+          </ul>
+          <a class="btn btn-a" href="#문의">Pro로 문의하기</a>
+        </div>
+
+        <div class="tier">
+          <div class="tier-hd">
+            <p class="tier-nm">Studio / 브랜드 전용</p>
+            <p class="price">149<small>만원</small></p>
+          </div>
+          <ul>
+            <li>Pro에 포함된 것 <b>전부</b></li>
+            <li><b>브랜드 전용 커스터마이징</b> — 로고·폰트·컬러·배지·핸들을 고정해 브랜드 톤으로 출력</li>
+            <li>계정 <b>3개</b>까지 연결 (다국어 운영 가능)</li>
+            <li>업종 전용 니치 <b>1종 신규 제작</b> — 후킹 구조와 캡션 틀을 새로 설계</li>
+            <li>질문 <b>60일</b></li>
+          </ul>
+          <a class="btn btn-b" href="#문의">Studio 상담하기</a>
+        </div>
+      </div>
+
+      <p class="fine" style="margin-top:24px; max-width:64ch;">
+        Anthropic API 사용료는 어느 등급에도 포함되지 않습니다 (본인 키로 종량제 결제).
+        세금계산서·현금영수증 발행 가능합니다.
+      </p>
+    </div>
+  </section>
+
+  <!-- ================= FAQ ================= -->
+  <section>
+    <div class="shell">
+      <div class="sec-hd">
+        <p class="tag">자주 나오는 질문</p>
+        <h2>미리 답해두겠습니다.</h2>
+      </div>
+      <div class="faq">
+
+        <details open>
+          <summary>이거 쓰면 얼마나 벌 수 있나요?</summary>
+          <div class="body">
+            모릅니다. 그리고 수익을 보장하지 않습니다. 이 도구가 줄여주는 건 <b>콘텐츠 제작 시간</b>이고,
+            그게 이 제품이 파는 전부입니다. 조회수와 수익은 소재 선택, 니치, 발행 빈도, 계정 상태,
+            플랫폼 알고리즘에 달려 있고 그중 어느 것도 제가 통제할 수 없습니다.
+            수익을 약속하는 판매자는 피하시는 게 좋습니다.
+          </div>
+        </details>
+
+        <details>
+          <summary>인스타그램 게시물 보너스를 받게 해주는 건가요?</summary>
+          <div class="body">
+            아닙니다. 보너스는 메타가 계정별 조건(연령·거주국·프로페셔널 계정·최근 3개월 누적 조회수 등)을
+            보고 앱 안에서 직접 열어주는 프로그램이고, 이 도구로 신청하는 게 아닙니다.
+            도구 안에는 그 조건을 정리한 <b>체크리스트</b>가 들어 있을 뿐입니다.
+            저는 메타와 아무 관계가 없고, 조건 충족이나 승인을 대행하거나 보장하지 않습니다.
+          </div>
+        </details>
+
+        <details>
+          <summary>월 구독료가 정말 없나요?</summary>
+          <div class="body">
+            없습니다. 파일을 받아 본인 컴퓨터에서 여는 방식이라 제 서버를 쓰지 않고, 그래서 받을 이유가
+            없습니다. 다만 문장 생성에 쓰는 Anthropic API는 본인 키로 쓴 만큼 결제됩니다 — 이건 제게 오는 돈이 아닙니다.
+          </div>
+        </details>
+
+        <details>
+          <summary>코딩을 전혀 못 하는데 쓸 수 있나요?</summary>
+          <div class="body">
+            파일을 더블클릭해서 여는 것과, 웹사이트에서 키를 발급받아 복사·붙여넣기 하는 것까지 하실 수 있으면 됩니다.
+            그게 부담스러우면 Pro 등급의 1:1 세팅 대행을 쓰시는 게 낫습니다 — 그 단계를 제가 대신 붙여드립니다.
+          </div>
+        </details>
+
+        <details>
+          <summary>환불되나요?</summary>
+          <div class="body">
+            <mark class="todo">판매 채널 정책에 맞춰 직접 작성</mark>
+            디지털 파일은 전달 즉시 복제가 가능해서 일반적으로 전달 후 환불이 어렵습니다.
+            대신 구매 전에 화면 시연을 요청하실 수 있고, 세팅 대행 등급은 <b>첫 발행이 성공할 때까지</b>
+            책임지고 붙여드립니다. 정확한 환불 규정은 결제하시는 채널의 정책을 따릅니다.
+          </div>
+        </details>
+
+        <details>
+          <summary>실제로 돌아가는 걸 볼 수 있나요?</summary>
+          <div class="body">
+            네. 구매 전에 화면 공유로 기사 URL을 넣는 것부터 카드가 나오는 것까지 그대로 보여드립니다.
+            원하시면 <b>그 자리에서 원하는 기사 링크를 주시면</b> 그걸로 돌려서 결과물을 보여드립니다.
+            <mark class="todo">연락 방법 · 가능 시간대 입력</mark>
+          </div>
+        </details>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 마감 ================= -->
+  <section id="문의">
+    <div class="shell">
+      <div class="close">
+        <p class="tag">문의</p>
+        <h2 style="max-width:24ch;">기사 링크 하나 주시면,<br>그걸로 돌려서 보여드립니다.</h2>
+        <p class="lede">
+          설명을 더 듣는 것보다 본인이 올릴 소재로 결과물을 직접 보는 게 빠릅니다.
+          시연은 10분이면 끝납니다.
+        </p>
+        <div class="cta-row" style="margin-top:6px;">
+          <a class="btn btn-a" href="#">
+            <mark class="todo" style="border-color:#fff; color:#fff;">카카오톡 채널 링크</mark>
+          </a>
+          <a class="btn btn-b" href="#">
+            <mark class="todo">이메일 주소</mark>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="shell">
+    <p class="fine">
+      인스타 카드 팩토리 · <mark class="todo">사업자명 / 대표자 / 사업자등록번호 / 연락처</mark><br><br>
+      이 페이지는 콘텐츠 <b>제작 시간 단축</b>을 판매합니다. 조회수·팔로워·수익을 보장하지 않습니다.
+      Instagram, Meta는 각 소유자의 상표이며 본 제품은 해당 회사와 제휴·후원·승인 관계가 없습니다.
+      Anthropic API 사용료는 구매 금액에 포함되지 않으며 구매자 본인 계정으로 청구됩니다.
+      발행하는 콘텐츠의 저작권·초상권·이미지 라이선스 준수 책임은 구매자에게 있습니다.
+    </p>
+  </div>
+</footer>
+
+<script>
+(function(){
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* 막대 그래프 — 보일 때 채우기 */
+  var fills = Array.prototype.slice.call(document.querySelectorAll(".fill"));
+  function paint(el){
+    var w = el.getAttribute("data-w") + "%";
+    if(reduce){ el.style.width = w; return; }
+    requestAnimationFrame(function(){ el.style.width = w; });
+  }
+  if(!("IntersectionObserver" in window)){
+    fills.forEach(paint);
+  } else {
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting){ paint(e.target); io.unobserve(e.target); }
+      });
+    }, {threshold:.4});
+    fills.forEach(function(el){ io.observe(el); });
+  }
+
+  /* 생산량 카운트업 — 숫자만 갈아끼우고 단위는 그대로 둔다 */
+  if(!reduce){
+    document.querySelectorAll(".readout .v[data-count]").forEach(function(el){
+      var target = parseInt(el.getAttribute("data-count"), 10);
+      if(!target || target < 2) return;
+      var unit = el.querySelector(".u");
+      var node = el.firstChild;
+      if(!node || node.nodeType !== 3) return;
+      var started = null, dur = 850;
+      node.nodeValue = "0";
+      function tick(t){
+        if(started === null) started = t;
+        var p = Math.min(1, (t - started) / dur);
+        var eased = 1 - Math.pow(1 - p, 3);
+        node.nodeValue = String(Math.round(target * eased));
+        if(p < 1) requestAnimationFrame(tick);
+        else node.nodeValue = String(target);
+      }
+      requestAnimationFrame(tick);
+      void unit;
+    });
+  }
+})();
+</script>
+
+</body>
+</html>
