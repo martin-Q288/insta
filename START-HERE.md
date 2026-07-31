@@ -23,7 +23,7 @@
 
 주요 파일:
 
-- `book/ebook.pdf` — 파는 물건. 17면, 완성본입니다
+- `book/ebook.pdf` — 파는 물건. 22면, 완성본입니다
 - `book/latpeed.md` — 래피드 등록 문안. 복붙용
 - `book/manuscript.md` — 원고. 고치면 다시 빌드하면 됩니다
 - `threads/ACCOUNT.md` — 계정 이름·핸들·소개글 (복붙용)
