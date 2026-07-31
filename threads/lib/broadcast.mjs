@@ -5,6 +5,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { MAX_POST_LENGTH, postLength } from "./threads-api.mjs";
+import { personaBlock } from "./persona.mjs";
 
 const POST_SCHEMA = {
   type: "object",
@@ -42,6 +43,8 @@ const ANGLES = {
 function systemPrompt({ product }) {
   return `너는 스레드 계정 "${product.accountName}" 의 글을 쓴다.
 지금 하고 있는 건 상품 홍보가 아니라 **판매 과정 중계**다.
+
+${personaBlock(product.persona)}
 
 <파는 것>
 ${product.name}

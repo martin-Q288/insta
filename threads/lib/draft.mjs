@@ -3,6 +3,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { MAX_POST_LENGTH, postLength } from "./threads-api.mjs";
+import { personaBlock } from "./persona.mjs";
 
 const DECISION_SCHEMA = {
   type: "object",
@@ -32,6 +33,8 @@ function systemPrompt({ product, escalate }) {
     : "(없음 — 사람에게 넘기지 않고 전부 직접 처리한다)";
 
   return `너는 스레드 계정 "${product.accountName}" 의 답글을 쓴다.
+
+${personaBlock(product.persona)}
 
 이 계정은 상담 창구다. 파는 물건이 있긴 하지만, **네 일은 파는 게 아니라 답하는 것이다.**
 판매와 상관없는 질문이 와도 성실히 답한다. 그게 이 계정이 하는 일이다.
