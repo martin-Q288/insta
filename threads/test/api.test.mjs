@@ -286,10 +286,12 @@ test("실제 posts.md: 길이 제한 · 일차 배분 · 오퍼 글 위치", () 
   // 판매 글은 3일차에만. 이게 무너지면 계정이 죽는다.
   const offer = posts.find((p) => p.id === "07-offer");
   assert.equal(offer.day, 3);
+  const PRICE = /\d[\d,]*\s*원|만원/;
   assert.ok(
-    posts.filter((p) => p.day === 1).every((p) => !/만원/.test(p.text)),
+    posts.filter((p) => p.day === 1).every((p) => !PRICE.test(p.text)),
     "1일차 글에 가격이 등장하면 안 된다",
   );
+  assert.ok(PRICE.test(offer.text), "오퍼 글에는 가격이 있어야 한다");
 
   // 미기입 자리가 남아 있으면 안 된다 — 남아 있으면 publish 가 거기서 멈춘다
   const withHoles = posts.filter((p) => findPlaceholders(p.text).length);

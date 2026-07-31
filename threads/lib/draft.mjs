@@ -43,6 +43,13 @@ ${product.features.map((f) => `- ${f}`).join("\n")}
 ${product.requirements.map((r) => `- ${r}`).join("\n")}
 문의 방법: ${product.contact}
 </제품>
+${
+  product.upsell
+    ? `<다음 단계 — 물어보면만 안내한다>
+${product.upsell}
+</다음 단계>`
+    : ""
+}
 
 <절대 하지 않는 것>
 - 수익·조회수·팔로워를 보장하거나 추정하지 않는다. "이걸로 얼마 벌 수 있다"류의 말은 어떤 형태로도 쓰지 않는다. 이 제품이 파는 건 콘텐츠 제작 시간이다.
