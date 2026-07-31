@@ -60,15 +60,15 @@ body{
 # ── 1. 표지 ──────────────────────────────────────────────────────
 COVER = """
 <style>
-h1{font-size:100px; font-weight:800; line-height:1.08; letter-spacing:-.05em; margin-top:52px;}
+h1{font-size:84px; font-weight:800; line-height:1.1; letter-spacing:-.05em; margin-top:44px;}
 h1 em{font-style:normal; color:var(--accent);}
-.sub{font-size:33px; color:var(--steel); line-height:1.45; margin-top:30px; font-weight:500;}
+.sub{font-size:32px; color:var(--steel); line-height:1.45; margin-top:26px; font-weight:500;}
 .what{
-  margin-top:44px; display:flex; flex-direction:column; gap:0;
+  margin-top:40px; display:flex; flex-direction:column; gap:0;
   border-top:2px solid var(--ink); border-bottom:2px solid var(--ink);
 }
 .what div{
-  padding:17px 4px; font-size:27px; letter-spacing:-.03em;
+  padding:19px 4px; font-size:27px; letter-spacing:-.03em;
   display:flex; gap:18px; align-items:baseline;
 }
 .what div + div{border-top:1px solid var(--rule);}
@@ -78,26 +78,28 @@ h1 em{font-style:normal; color:var(--accent);}
 }
 .what b{font-weight:700;}
 .slab{
-  margin-top:40px; background:var(--ink); color:#fff; border-radius:6px;
+  margin-top:36px; background:var(--ink); color:#fff; border-radius:6px;
   padding:30px 34px; display:flex; flex-direction:column; gap:12px;
 }
 .slab .n{font-family:var(--mono); font-size:18px; letter-spacing:.16em; color:#8996A3;}
-.slab .t{font-size:29px; font-weight:700; line-height:1.45; letter-spacing:-.03em;}
+.slab .t{font-size:28px; font-weight:700; line-height:1.5; letter-spacing:-.03em;}
 .slab .t b{color:#FF7A3D;}
 </style>
-<p class="eyebrow">전자책 · PDF 22면</p>
-<h1>만들 줄은<br>아는데<br><em>왜 못 팔까</em></h1>
-<p class="sub">AI로 만든 물건을 결제창까지 보내는 여섯 칸</p>
+<p class="eyebrow">전자책 · PDF 24면</p>
+<h1>AI 활용할 줄은<br>아는데<br><em>어떻게 수익화 할까</em></h1>
+<p class="sub">__SUBTITLE__</p>
 <div class="what">
-  <div><i>01</i><span>플랫폼 <b>실측 수수료표</b> — 1.6% 부터 20% 까지</span></div>
-  <div><i>02</i><span>자동발송이 <b>되는 곳과 안 되는 곳</b></span></div>
-  <div><i>03</i><span>통신판매업 <b>면제 기준</b>과 환불 규정 문안</span></div>
-  <div><i>04</i><span>후기가 <b>0개일 때</b> 그걸 대체하는 다섯 가지</span></div>
-  <div><i>05</i><span>복붙 프롬프트 <b>7종</b> · 출시 체크리스트</span></div>
+  <div><i>01</i><span>AI로 돈 버는 <b>네 가지 경로</b>와 실제 시장 단가</span></div>
+  <div><i>02</i><span>내 상황에 맞는 경로 <b>고르는 기준</b></span></div>
+  <div><i>03</i><span>구체적으로 <b>무엇을 팔 것인가</b></span></div>
+  <div><i>04</i><span>첫 고객 만드는 순서 — <b>단가별로 다릅니다</b></span></div>
+  <div><i>05</i><span>결제 · 전달 · 법 — <b>돈이 실제로 들어오게</b></span></div>
+  <div><i>06</i><span>복붙 프롬프트 <b>8종</b> · 출시 체크리스트</span></div>
 </div>
 <div class="slab">
-  <p class="n">이 책이 하지 않는 것</p>
-  <p class="t">수익을 약속하지 않습니다.<br>얼마를 번다는 말은 <b>한 줄도 없습니다.</b></p>
+  <p class="n">추정치가 아닙니다</p>
+  <p class="t">단가와 수수료는 전부 <b>직접 확인해서</b> 넣었습니다.<br>
+  숫자마다 <b>어디서 확인하는지</b>까지 적었습니다.</p>
 </div>
 <div class="foot">
   <span><b>라스트 아더</b> · 앞 3면 무료 미리보기</span>
@@ -106,51 +108,59 @@ h1 em{font-style:normal; color:var(--accent);}
 """
 
 # ── 2. 여섯 칸 ───────────────────────────────────────────────────
-STEPS = [
-    ("01", "뭘 팔지", "내가 가진 것에서 출발한다"),
-    ("02", "어디서 팔지", "수수료가 열 배 차이인 걸 모른다"),
-    ("03", "어떻게 전달", "결제만 붙이면 되는 줄 안다"),
-    ("04", "법", "환불 규정을 채널에 떠넘긴다"),
-    ("05", "신뢰", "후기 0개 앞에서 멈춘다"),
-    ("06", "유통", "판매 글만 올린다"),
+# 네 가지 수익화 모델. 이게 이 책의 1부이자 제목이 약속한 답이다.
+MODELS = [
+    ("①", "제품을 판다", "5천~5만원", "며칠", "사람이 없으면 0원"),
+    ("②", "만들어준다", "15만~200만원", "1~3주", "내가 멈추면 끝"),
+    ("③", "대신 돌린다", "월 단위·누적", "1개월+", "팔기가 어렵다"),
+    ("④", "가르친다", "폭이 넓다", "가장 오래", "실적이 먼저"),
 ]
 
 WALLS = (
     """
 <style>
-h1{font-size:62px; font-weight:800; line-height:1.2; letter-spacing:-.045em; margin-top:38px;}
-.lede{font-size:26px; color:var(--steel); margin-top:20px; line-height:1.5;}
-.rows{margin-top:38px; display:flex; flex-direction:column; gap:2px;
+h1{font-size:58px; font-weight:800; line-height:1.18; letter-spacing:-.045em; margin-top:32px;}
+.lede{font-size:25px; color:var(--steel); margin-top:16px; line-height:1.5;}
+.rows{margin-top:30px; display:flex; flex-direction:column; gap:2px;
       background:var(--rule); border:2px solid var(--ink); border-radius:6px; overflow:hidden;}
-.r{background:var(--panel); padding:27px 26px; display:grid;
-   grid-template-columns:64px 210px 1fr; align-items:center; gap:18px;}
-.r .n{font-family:var(--mono); font-size:23px; font-weight:700; color:var(--accent);}
-.r .t{font-size:31px; font-weight:800; letter-spacing:-.035em;}
-.r .d{font-size:24px; color:var(--steel); letter-spacing:-.02em; line-height:1.4;}
+.hd{background:var(--ink); color:#fff; padding:14px 24px; display:grid;
+    grid-template-columns:52px 1fr 250px 150px; gap:14px;
+    font-size:20px; font-weight:700; letter-spacing:-.02em;}
+.hd span:nth-child(3), .hd span:nth-child(4){text-align:right;}
+.r{background:var(--panel); padding:22px 24px; display:grid;
+   grid-template-columns:52px 1fr 250px 150px; align-items:baseline; gap:14px;}
+.r .n{font-family:var(--mono); font-size:24px; font-weight:700; color:var(--accent);}
+.r .t{font-size:30px; font-weight:800; letter-spacing:-.035em;}
+.r .p{font-size:26px; font-weight:700; text-align:right; letter-spacing:-.035em;}
+.r .w{font-size:24px; color:var(--steel); text-align:right; letter-spacing:-.03em;}
+.r .lim{grid-column:2 / -1; font-size:22px; color:var(--steel-2);
+        margin-top:6px; letter-spacing:-.02em;}
 .slab{
-  margin-top:36px; background:var(--ink); color:#fff; border-radius:6px;
-  padding:28px 32px; font-size:27px; line-height:1.5; letter-spacing:-.03em; font-weight:600;
+  margin-top:28px; background:var(--ink); color:#fff; border-radius:6px;
+  padding:26px 30px; font-size:26px; line-height:1.5; letter-spacing:-.03em; font-weight:600;
 }
 .slab b{color:#FF7A3D;}
 </style>
-<p class="eyebrow">만드는 것과 파는 것 사이</p>
-<h1>여섯 칸에서<br>사람들이 멈춥니다</h1>
-<p class="lede">어려워서가 아니라,<br>거기 칸이 있는 줄 몰라서 멈춥니다.</p>
+<p class="eyebrow">AI로 돈 버는 방법</p>
+<h1>구조는 네 가지뿐입니다</h1>
+<p class="lede">단가도, 첫 입금까지 걸리는 시간도,<br>늘어나는 방식도 전부 다릅니다.</p>
 <div class="rows">
+  <div class="hd"><span></span><span>모델</span><span>단가</span><span>첫 입금</span></div>
 """
     + "".join(
-        f'<div class="r"><span class="n">{n}</span>'
-        f'<span class="t">{t}</span><span class="d">{d}</span></div>'
-        for n, t, d in STEPS
+        f'<div class="r"><span class="n">{n}</span><span class="t">{t}</span>'
+        f'<span class="p">{price}</span><span class="w">{when}</span>'
+        f'<span class="lim">막히는 지점 — {lim}</span></div>'
+        for n, t, price, when, lim in MODELS
     )
     + """
 </div>
 <div class="slab">
-  이 여섯 칸은 <b>AI 지식으로 안 풀립니다.</b><br>
-  프롬프트를 아무리 잘 짜도 전자상거래법 제17조는 안 나옵니다.
+  사람이 없으면 <b>①번은 0원입니다.</b><br>
+  적은 사람에게 비싸게 파는 쪽이 먼저입니다.
 </div>
 <div class="foot">
-  <span><b>만들 줄은 아는데 왜 못 팔까</b> · PDF 22면</span>
+  <span><b>AI 활용할 줄은 아는데 어떻게 수익화 할까</b> · PDF 24면</span>
   <span class="handle">@ai.lo.lo</span>
 </div>
 """
@@ -230,7 +240,14 @@ tr.hot td:nth-child(2){color:var(--accent); font-weight:800;}
 """
 )
 
-CARDS = {"01-cover": COVER, "02-walls": WALLS, "03-fees": FEE}
+# 표지 부제. 전환 문구라 원고와 카드가 어긋나면 안 되므로 원고 머리말에서 읽는다.
+SUBTITLE = "네 가지 수익화 모델과 첫 입금까지의 거리"
+
+CARDS = {
+    "01-cover": COVER.replace("__SUBTITLE__", SUBTITLE),
+    "02-walls": WALLS,
+    "03-fees": FEE,
+}
 
 
 def shoot(chrome: str, html: Path, png: Path, w: int, h: int) -> None:
