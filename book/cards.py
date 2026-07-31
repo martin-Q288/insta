@@ -85,21 +85,21 @@ h1 em{font-style:normal; color:var(--accent);}
 .slab .t{font-size:28px; font-weight:700; line-height:1.5; letter-spacing:-.03em;}
 .slab .t b{color:#FF7A3D;}
 </style>
-<p class="eyebrow">전자책 · PDF 24면</p>
+<p class="eyebrow">전자책 · PDF 26면</p>
 <h1>AI 활용할 줄은<br>아는데<br><em>어떻게 수익화 할까</em></h1>
 <p class="sub">__SUBTITLE__</p>
 <div class="what">
-  <div><i>01</i><span>AI로 돈 버는 <b>네 가지 경로</b>와 실제 시장 단가</span></div>
-  <div><i>02</i><span>내 상황에 맞는 경로 <b>고르는 기준</b></span></div>
-  <div><i>03</i><span>구체적으로 <b>무엇을 팔 것인가</b></span></div>
-  <div><i>04</i><span>첫 고객 만드는 순서 — <b>단가별로 다릅니다</b></span></div>
-  <div><i>05</i><span>결제 · 전달 · 법 — <b>돈이 실제로 들어오게</b></span></div>
-  <div><i>06</i><span>복붙 프롬프트 <b>8종</b> · 출시 체크리스트</span></div>
+  <div><i>01</i><span>수익 모델 <b>4종</b>과 실제 시장 단가</span></div>
+  <div><i>02</i><span>내 조건에 맞는 모델 <b>선택 기준</b></span></div>
+  <div><i>03</i><span>아이템 발굴과 <b>시장 검증법</b></span></div>
+  <div><i>04</i><span><b>견적 산정</b>과 범위 합의</span></div>
+  <div><i>05</i><span>첫 문의부터 <b>입금까지의 프로세스</b></span></div>
+  <div><i>06</i><span>결제 · 납품 · 법무 &nbsp;·&nbsp; 프롬프트 <b>9종</b></span></div>
 </div>
 <div class="slab">
-  <p class="n">추정치가 아닙니다</p>
-  <p class="t">단가와 수수료는 전부 <b>직접 확인해서</b> 넣었습니다.<br>
-  숫자마다 <b>어디서 확인하는지</b>까지 적었습니다.</p>
+  <p class="n">이 자료의 기준</p>
+  <p class="t">단가·수수료·법 조항은 전부 <b>확인해서</b> 넣었습니다.<br>
+  수치마다 <b>확인 경로</b>를 부록에 함께 적었습니다.</p>
 </div>
 <div class="foot">
   <span><b>라스트 아더</b> · 앞 3면 무료 미리보기</span>
@@ -110,10 +110,10 @@ h1 em{font-style:normal; color:var(--accent);}
 # ── 2. 여섯 칸 ───────────────────────────────────────────────────
 # 네 가지 수익화 모델. 이게 이 책의 1부이자 제목이 약속한 답이다.
 MODELS = [
-    ("①", "제품을 판다", "5천~5만원", "며칠", "사람이 없으면 0원"),
-    ("②", "만들어준다", "15만~200만원", "1~3주", "내가 멈추면 끝"),
-    ("③", "대신 돌린다", "월 단위·누적", "1개월+", "팔기가 어렵다"),
-    ("④", "가르친다", "폭이 넓다", "가장 오래", "실적이 먼저"),
+    ("①", "제품 판매", "5천~5만원", "며칠", "트래픽"),
+    ("②", "제작 대행", "15만~200만원", "1~3주", "내 공수"),
+    ("③", "운영 대행", "월 과금·누적", "1개월+", "판매 난이도"),
+    ("④", "교육·컨설팅", "편차 큼", "가장 김", "레퍼런스"),
 ]
 
 WALLS = (
@@ -141,26 +141,26 @@ h1{font-size:58px; font-weight:800; line-height:1.18; letter-spacing:-.045em; ma
 }
 .slab b{color:#FF7A3D;}
 </style>
-<p class="eyebrow">AI로 돈 버는 방법</p>
+<p class="eyebrow">AI 수익화 모델</p>
 <h1>구조는 네 가지뿐입니다</h1>
-<p class="lede">단가도, 첫 입금까지 걸리는 시간도,<br>늘어나는 방식도 전부 다릅니다.</p>
+<p class="lede">객단가도, 리드타임도, 확장 방식도<br>전부 다른 사업입니다.</p>
 <div class="rows">
-  <div class="hd"><span></span><span>모델</span><span>단가</span><span>첫 입금</span></div>
+  <div class="hd"><span></span><span>모델</span><span>객단가</span><span>리드타임</span></div>
 """
     + "".join(
         f'<div class="r"><span class="n">{n}</span><span class="t">{t}</span>'
         f'<span class="p">{price}</span><span class="w">{when}</span>'
-        f'<span class="lim">막히는 지점 — {lim}</span></div>'
+        f'<span class="lim">병목 — {lim}</span></div>'
         for n, t, price, when, lim in MODELS
     )
     + """
 </div>
 <div class="slab">
-  사람이 없으면 <b>①번은 0원입니다.</b><br>
-  적은 사람에게 비싸게 파는 쪽이 먼저입니다.
+  오디언스가 없으면 <b>①번은 0원입니다.</b><br>
+  소수에게 고단가로 파는 쪽이 먼저입니다.
 </div>
 <div class="foot">
-  <span><b>AI 활용할 줄은 아는데 어떻게 수익화 할까</b> · PDF 24면</span>
+  <span><b>AI 활용할 줄은 아는데 어떻게 수익화 할까</b> · PDF 26면</span>
   <span class="handle">@ai.lo.lo</span>
 </div>
 """
@@ -241,7 +241,7 @@ tr.hot td:nth-child(2){color:var(--accent); font-weight:800;}
 )
 
 # 표지 부제. 전환 문구라 원고와 카드가 어긋나면 안 되므로 원고 머리말에서 읽는다.
-SUBTITLE = "네 가지 수익화 모델과 첫 입금까지의 거리"
+SUBTITLE = "네 가지 수익 모델과 첫 매출까지의 실행 순서"
 
 CARDS = {
     "01-cover": COVER.replace("__SUBTITLE__", SUBTITLE),
