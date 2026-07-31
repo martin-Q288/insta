@@ -85,21 +85,21 @@ h1 em{font-style:normal; color:var(--accent);}
 .slab .t{font-size:28px; font-weight:700; line-height:1.5; letter-spacing:-.03em;}
 .slab .t b{color:#FF7A3D;}
 </style>
-<p class="eyebrow">전자책 · PDF 26면</p>
+<p class="eyebrow">전자책 · PDF 30면</p>
 <h1>AI 활용할 줄은<br>아는데<br><em>어떻게 수익화 할까</em></h1>
 <p class="sub">__SUBTITLE__</p>
 <div class="what">
-  <div><i>01</i><span>수익 모델 <b>4종</b>과 실제 시장 단가</span></div>
-  <div><i>02</i><span>내 조건에 맞는 모델 <b>선택 기준</b></span></div>
-  <div><i>03</i><span>아이템 발굴과 <b>시장 검증법</b></span></div>
-  <div><i>04</i><span><b>견적 산정</b>과 범위 합의</span></div>
-  <div><i>05</i><span>첫 문의부터 <b>입금까지의 프로세스</b></span></div>
-  <div><i>06</i><span>결제 · 납품 · 법무 &nbsp;·&nbsp; 프롬프트 <b>9종</b></span></div>
+  <div><i>01</i><span>팔 수 있는 <b>아이템 30선</b> — 난이도·가격대별</span></div>
+  <div><i>02</i><span>객단가를 6배 올리는 <b>3단 구성</b> 설계</span></div>
+  <div><i>03</i><span>난이도별 <b>제작 방법</b>과 쓰는 도구</span></div>
+  <div><i>04</i><span><b>견적 계산식</b>과 견적서 필수 9개 항목</span></div>
+  <div><i>05</i><span>문의 응대 <b>대화 스크립트</b> · 이의 처리 4종</span></div>
+  <div><i>06</i><span><b>7일 실행 캘린더</b> · 프롬프트 10종</span></div>
 </div>
 <div class="slab">
-  <p class="n">이 자료의 기준</p>
-  <p class="t">단가·수수료·법 조항은 전부 <b>확인해서</b> 넣었습니다.<br>
-  수치마다 <b>확인 경로</b>를 부록에 함께 적었습니다.</p>
+  <p class="n">대상</p>
+  <p class="t"><b>ChatGPT에 질문해 본 적 있으면 됩니다.</b><br>
+  난이도 1 아이템에는 코드가 한 줄도 안 들어갑니다.</p>
 </div>
 <div class="foot">
   <span><b>라스트 아더</b> · 앞 3면 무료 미리보기</span>
@@ -160,7 +160,7 @@ h1{font-size:58px; font-weight:800; line-height:1.18; letter-spacing:-.045em; ma
   소수에게 고단가로 파는 쪽이 먼저입니다.
 </div>
 <div class="foot">
-  <span><b>AI 활용할 줄은 아는데 어떻게 수익화 할까</b> · PDF 26면</span>
+  <span><b>AI 활용할 줄은 아는데 어떻게 수익화 할까</b> · PDF 30면</span>
   <span class="handle">@ai.lo.lo</span>
 </div>
 """
@@ -241,7 +241,7 @@ tr.hot td:nth-child(2){color:var(--accent); font-weight:800;}
 )
 
 # 표지 부제. 전환 문구라 원고와 카드가 어긋나면 안 되므로 원고 머리말에서 읽는다.
-SUBTITLE = "네 가지 수익 모델과 첫 매출까지의 실행 순서"
+SUBTITLE = "판매 가능한 아이템 목록부터 견적·응대·입금까지"
 
 CARDS = {
     "01-cover": COVER.replace("__SUBTITLE__", SUBTITLE),
