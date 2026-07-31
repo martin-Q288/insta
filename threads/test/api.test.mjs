@@ -3,13 +3,19 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { ThreadsClient, postLength, MAX_POST_LENGTH } from "../lib/threads-api.mjs";
 import { Store } from "../lib/state.mjs";
 import { loadPosts, findPlaceholders } from "../lib/config.mjs";
+import {
+  computeMilestones,
+  pickNext,
+  priceAfter,
+  totalIfSoldOut,
+} from "../lib/sales.mjs";
 
 /** 요청을 기록하는 최소 목 서버. routes: {"METHOD /path": handler} */
 async function mockServer(routes) {
@@ -284,7 +290,7 @@ test("실제 posts.md: 길이 제한 · 일차 배분 · 오퍼 글 위치", () 
   assert.equal(posts[0].day, 1);
 
   // 판매 글은 3일차에만. 이게 무너지면 계정이 죽는다.
-  const offer = posts.find((p) => p.id === "07-offer");
+  const offer = posts.find((p) => p.id === "08-offer");
   assert.equal(offer.day, 3);
   const PRICE = /\d[\d,]*\s*원|만원/;
   assert.ok(
@@ -303,4 +309,114 @@ test("실제 posts.md: 길이 제한 · 일차 배분 · 오퍼 글 위치", () 
 
   // 자기소개는 없는 실적을 있는 척하지 않는다
   assert.match(posts[0].text, /실적은 아직 없습니다/);
+
+  // 상담 창구 글이 판매 글보다 먼저 나가야 한다. 원본 사례에서 판을 뒤집은
+  // 게 이 순서였다 — 답을 먼저 주고, 그 다음에 판다.
+  const clinic = posts.find((p) => p.id === "05-clinic");
+  assert.ok(clinic, "상담 창구 글이 있어야 한다");
+  assert.ok(clinic.day < offer.day, "상담 창구가 판매보다 먼저여야 한다");
+});
+
+// ── 판매 중계 ──────────────────────────────────────────────────
+
+const SALES = { total: 30, startPrice: 29000, step: 1000 };
+const hoursAgo = (h) => new Date(Date.now() - h * 3600 * 1000).toISOString();
+const keys = (ms) => ms.map((m) => m.key);
+
+test("중계: 판매 시작 전에는 아무 사건도 없다", () => {
+  assert.deepEqual(computeMilestones({ ...SALES, sold: 0, launchedAt: null }), []);
+});
+
+test("중계: 0건이어도 시간이 지나면 쓸 거리가 생긴다", () => {
+  const fresh = computeMilestones({ ...SALES, sold: 0, launchedAt: hoursAgo(1) });
+  assert.deepEqual(keys(fresh), ["launch"]);
+
+  const stale = computeMilestones({ ...SALES, sold: 0, launchedAt: hoursAgo(13) });
+  assert.deepEqual(keys(stale), ["launch", "quiet-6", "quiet-12"]);
+});
+
+test("중계: 팔리기 시작하면 quiet 은 더 이상 안 나온다", () => {
+  const ms = computeMilestones({ ...SALES, sold: 1, launchedAt: hoursAgo(13) });
+  assert.ok(!keys(ms).some((k) => k.startsWith("quiet")));
+  assert.ok(keys(ms).includes("first"));
+});
+
+test("중계: everyN 배수마다 사건이 생기고, 완판 건은 soldout 이 대신한다", () => {
+  const ms = computeMilestones({ ...SALES, sold: 9, launchedAt: hoursAgo(5), everyN: 3 });
+  assert.deepEqual(keys(ms), ["launch", "first", "count-3", "count-6", "count-9"]);
+
+  const done = computeMilestones({ ...SALES, sold: 30, launchedAt: hoursAgo(5), everyN: 3 });
+  assert.ok(keys(done).includes("soldout"));
+  assert.ok(!keys(done).includes("count-30"), "완판 건은 count 로 중복되면 안 된다");
+  assert.ok(!keys(done).includes("half"), "완판했으면 절반은 지난 사건이다");
+});
+
+test("중계: 절반과 막바지", () => {
+  const half = computeMilestones({ ...SALES, sold: 15, launchedAt: hoursAgo(5) });
+  assert.ok(keys(half).includes("half"));
+  assert.ok(!keys(half).includes("almost"));
+
+  const almost = computeMilestones({ ...SALES, sold: 28, launchedAt: hoursAgo(5) });
+  assert.ok(keys(almost).includes("almost"));
+});
+
+test("중계: 가격과 완판 총액 계산", () => {
+  // 29,000 시작 · 건당 1,000 인상 · 30권
+  assert.equal(priceAfter(0, SALES), 29000);
+  assert.equal(priceAfter(29, SALES), 58000); // 마지막 권
+  assert.equal(totalIfSoldOut(SALES), 1305000);
+
+  const ms = computeMilestones({ ...SALES, sold: 30, launchedAt: hoursAgo(5) });
+  const soldout = ms.find((m) => m.kind === "soldout");
+  assert.equal(soldout.facts.revenue, 1305000);
+  assert.equal(soldout.facts.finalPrice, 58000);
+});
+
+test("중계: 수량을 몰아서 넣어도 한 편만 나가고 나머지는 접힌다", () => {
+  // 0건에서 갑자기 30건으로 갱신된 상황 — 전부 올리면 도배다
+  const ms = computeMilestones({ ...SALES, sold: 30, launchedAt: hoursAgo(13) });
+  const { pick, superseded } = pickNext(ms, () => false);
+  assert.equal(pick.kind, "soldout", "가장 중요한 사건 하나만 고른다");
+  assert.ok(superseded.length > 0);
+  assert.ok(!keys(superseded).includes("soldout"));
+});
+
+test("중계: 이미 내보낸 사건은 다시 안 나온다", () => {
+  const ms = computeMilestones({ ...SALES, sold: 1, launchedAt: hoursAgo(2) });
+  const done = new Set(["launch", "first"]);
+  assert.equal(pickNext(ms, (k) => done.has(k)).pick, null);
+});
+
+test("판매 수량은 줄일 수 없다 — 오타로 중계가 꼬이는 걸 막는다", () => {
+  const dir = mkdtempSync(join(tmpdir(), "threads-sales-"));
+  try {
+    const s = new Store(join(dir, "state.json"));
+    s.launch();
+    s.setSold(5);
+    assert.equal(s.sales.sold, 5);
+    assert.throws(() => s.setSold(3), /줄일 수 없습니다/);
+    assert.throws(() => s.setSold(-1), /이상합니다/);
+
+    // 판매 시작 시각은 한 번만 찍힌다
+    const first = s.sales.launchedAt;
+    s.launch(new Date(0).toISOString());
+    assert.equal(s.sales.launchedAt, first);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("중계 설정이 판매 문서와 어긋나지 않는다", () => {
+  const cfg = JSON.parse(
+    readFileSync(new URL("../config.example.json", import.meta.url), "utf8"),
+  );
+  assert.equal(cfg.sales.total, 30);
+  assert.equal(cfg.sales.startPrice, 29000);
+  assert.equal(cfg.sales.step, 1000);
+
+  // 판매 글에 적힌 숫자와 중계 설정이 같아야 한다. 어긋나면 글이 거짓말을 한다.
+  const offer = loadPosts().find((p) => p.id === "08-offer");
+  assert.match(offer.text, /29,000원/);
+  assert.match(offer.text, /30권 한정/);
+  assert.match(offer.text, /1,000원 오릅니다/);
 });

@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { loadConfig, loadPosts, findPlaceholders, ROOT } from "../lib/config.mjs";
 import { ThreadsClient, postLength, MAX_POST_LENGTH } from "../lib/threads-api.mjs";
 import { Store } from "../lib/state.mjs";
+import { totalIfSoldOut } from "../lib/sales.mjs";
 
 let failed = 0;
 const ok = (m) => console.log(`  OK    ${m}`);
@@ -79,12 +80,40 @@ try {
   bad(`Anthropic API: ${err.message}`);
 }
 
-console.log("\n[5] 상태 파일");
+console.log("\n[5] 판매 중계 설정");
+{
+  const { total, startPrice, step } = cfg.sales;
+  ok(
+    `${total}권 한정 · ${startPrice.toLocaleString("ko-KR")}원 시작 · ` +
+      `건당 ${step.toLocaleString("ko-KR")}원 인상 → 완판 시 ` +
+      `${totalIfSoldOut(cfg.sales).toLocaleString("ko-KR")}원`,
+  );
+  // 판매 글에 적힌 숫자와 여기 설정이 어긋나면 중계 글이 거짓말을 한다.
+  try {
+    const offer = loadPosts().find((p) => /29,000|한정/.test(p.text) && p.day >= 3);
+    if (offer) {
+      const won = (n) => n.toLocaleString("ko-KR");
+      if (!offer.text.includes(won(startPrice)))
+        bad(`${offer.id} 의 가격이 sales.startPrice(${won(startPrice)}원)와 다릅니다`);
+      if (!offer.text.includes(`${total}권`))
+        bad(`${offer.id} 의 수량이 sales.total(${total}권)과 다릅니다`);
+    }
+  } catch {
+    /* [2] 에서 이미 보고했다 */
+  }
+}
+
+console.log("\n[6] 상태 파일");
 const store = new Store(join(ROOT, "state", "state.json"));
 ok(
   `발행 완료 ${Object.keys(store.data.posts).length}건 · 처리한 답글 ${
     Object.keys(store.data.replies).length
   }건`,
+);
+ok(
+  store.sales.launchedAt
+    ? `판매 진행 중 — ${store.sales.sold}/${cfg.sales.total}권 (시작 ${store.sales.launchedAt})`
+    : "판매 시작 전 — `npm run broadcast -- --launch` 로 엽니다",
 );
 
 console.log(

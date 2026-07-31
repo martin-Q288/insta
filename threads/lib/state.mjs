@@ -11,11 +11,13 @@ import { dirname } from "node:path";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const EMPTY = {
-  version: 1,
+  version: 2,
   posts: {}, // slug -> { mediaId, at }
   replies: {}, // 상대 답글 id -> { ourReplyId, at, action }
   postLog: [], // 발행 시각 ISO 문자열
   replyLog: [],
+  sales: { sold: 0, launchedAt: null }, // 중계의 기준이 되는 판매 상황
+  milestones: {}, // key -> { at, mediaId, superseded }
 };
 
 export class Store {
@@ -82,5 +84,59 @@ export class Store {
 
   publishedPostIds() {
     return Object.values(this.data.posts).map((p) => p.mediaId);
+  }
+
+  // ── 판매 중계 ────────────────────────────────────────────────
+
+  get sales() {
+    // v1 상태 파일에서 올라온 경우를 위해 여기서 채운다
+    this.data.sales ??= { sold: 0, launchedAt: null };
+    return this.data.sales;
+  }
+
+  /** 판매 시작 시각을 찍는다. 이미 찍혀 있으면 건드리지 않는다. */
+  launch(at = new Date().toISOString()) {
+    if (this.sales.launchedAt) return this.sales.launchedAt;
+    this.sales.launchedAt = at;
+    this.save();
+    return at;
+  }
+
+  /** 누적 판매 수량을 설정한다. 되돌리는 건 막는다 — 오타로 중계가 꼬인다. */
+  setSold(n) {
+    if (!Number.isInteger(n) || n < 0) throw new Error(`판매 수량이 이상합니다: ${n}`);
+    if (n < this.sales.sold)
+      throw new Error(
+        `판매 수량은 줄일 수 없습니다 (현재 ${this.sales.sold} → ${n}). ` +
+          `정말 고쳐야 하면 state.json 을 직접 수정하세요.`,
+      );
+    this.sales.sold = n;
+    this.save();
+    return n;
+  }
+
+  isMilestoneDone(key) {
+    this.data.milestones ??= {};
+    return Boolean(this.data.milestones[key]);
+  }
+
+  recordMilestone(key, { mediaId = null, superseded = false } = {}) {
+    this.data.milestones ??= {};
+    this.data.milestones[key] = { at: new Date().toISOString(), mediaId, superseded };
+    if (mediaId) this.data.postLog.push(new Date().toISOString());
+    this.save();
+  }
+
+  /** 최근에 올린 중계 글 본문. 같은 문장을 반복하지 않으려고 모델에 넘긴다. */
+  recentBroadcasts(n = 4) {
+    this.data.broadcastTexts ??= [];
+    return this.data.broadcastTexts.slice(-n);
+  }
+
+  rememberBroadcast(text) {
+    this.data.broadcastTexts ??= [];
+    this.data.broadcastTexts.push(text);
+    if (this.data.broadcastTexts.length > 12) this.data.broadcastTexts.shift();
+    this.save();
   }
 }

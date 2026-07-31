@@ -33,6 +33,19 @@ export function loadConfig(path = join(ROOT, "config.json")) {
   cfg.limits.publishDelayMs ??= 4000;
   cfg.escalate ??= [];
 
+  // 중계 기준. 여기 숫자가 판매 페이지와 어긋나면 글이 거짓말을 한다.
+  cfg.sales ??= {};
+  cfg.sales.total ??= 30;
+  cfg.sales.startPrice ??= 29000;
+  cfg.sales.step ??= 1000;
+  cfg.sales.everyN ??= 3;
+  cfg.sales.quietHours ??= [6, 12];
+  cfg.sales.almostLeft ??= 3;
+  if (!Number.isInteger(cfg.sales.total) || cfg.sales.total < 1)
+    throw new Error(`sales.total 은 1 이상 정수여야 합니다: ${cfg.sales.total}`);
+  if (!Array.isArray(cfg.sales.quietHours))
+    throw new Error("sales.quietHours 는 배열이어야 합니다 (예: [6, 12])");
+
   const missing = [];
   if (!cfg.threads.userId) missing.push("threads.userId");
   if (!cfg.threads.accessToken) missing.push("threads.accessToken");

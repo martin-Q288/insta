@@ -11,8 +11,10 @@ import { loadConfig, loadPosts, ROOT } from "../lib/config.mjs";
 import { ThreadsClient } from "../lib/threads-api.mjs";
 import { Store } from "../lib/state.mjs";
 import { ReplyDrafter } from "../lib/draft.mjs";
+import { BroadcastDrafter } from "../lib/broadcast.mjs";
 import { publishDuePosts } from "./publish.mjs";
 import { handleReplies } from "./reply.mjs";
+import { broadcastOnce } from "./broadcast.mjs";
 
 const argIdx = process.argv.indexOf("--interval");
 const intervalSec = argIdx > -1 ? Number(process.argv[argIdx + 1]) : 600;
@@ -35,6 +37,13 @@ const drafter = new ReplyDrafter({
   escalate: cfg.escalate,
   log,
 });
+const broadcaster = new BroadcastDrafter({
+  apiKey: cfg.anthropic.apiKey,
+  model: cfg.anthropic.model,
+  effort: cfg.anthropic.effort,
+  product: cfg.product,
+  log,
+});
 
 let stopping = false;
 for (const sig of ["SIGINT", "SIGTERM"]) {
@@ -52,6 +61,8 @@ while (!stopping) {
     // posts.md 를 매 주기 다시 읽는다 — 돌아가는 중에 글을 추가할 수 있다.
     const posts = loadPosts();
     await publishDuePosts({ cfg, posts, store, client });
+    // 판매 상황에 사건이 생겼으면 중계한다. 시작 전이면 아무것도 안 한다.
+    await broadcastOnce({ cfg, store, client, drafter: broadcaster });
     await handleReplies({ cfg, posts, store, client, drafter });
   } catch (err) {
     log(`주기 실패: ${err.message}`); // 죽지 않는다. 다음 주기에 다시 시도.
