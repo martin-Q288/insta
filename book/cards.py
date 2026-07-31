@@ -85,21 +85,21 @@ h1 em{font-style:normal; color:var(--accent);}
 .slab .t{font-size:28px; font-weight:700; line-height:1.5; letter-spacing:-.03em;}
 .slab .t b{color:#FF7A3D;}
 </style>
-<p class="eyebrow">전자책 · PDF 30면</p>
+<p class="eyebrow">전자책 · PDF 26면</p>
 <h1>AI 활용할 줄은<br>아는데<br><em>어떻게 수익화 할까</em></h1>
 <p class="sub">__SUBTITLE__</p>
 <div class="what">
-  <div><i>01</i><span>팔 수 있는 <b>아이템 30선</b> — 난이도·가격대별</span></div>
-  <div><i>02</i><span>객단가를 6배 올리는 <b>3단 구성</b> 설계</span></div>
-  <div><i>03</i><span>난이도별 <b>제작 방법</b>과 쓰는 도구</span></div>
-  <div><i>04</i><span><b>견적 계산식</b>과 견적서 필수 9개 항목</span></div>
-  <div><i>05</i><span>문의 응대 <b>대화 스크립트</b> · 이의 처리 4종</span></div>
-  <div><i>06</i><span><b>7일 실행 캘린더</b> · 프롬프트 10종</span></div>
+  <div><i>01</i><span>스레드 공식 API <b>세팅 전 과정</b></span></div>
+  <div><i>02</i><span>자동 발행 · 자동 응대 · 자동 중계 <b>3봇 구조</b></span></div>
+  <div><i>03</i><span>봇 <b>시스템 프롬프트 전문</b> — 그대로 복사</span></div>
+  <div><i>04</i><span>답할지 넘길지 숨길지 <b>판단 기준 설계</b></span></div>
+  <div><i>05</i><span>계정이 죽지 않는 <b>안전장치</b> 7가지</span></div>
+  <div><i>06</i><span>카테고리별 <b>페인포인트 지도</b> · 7일 실행</span></div>
 </div>
 <div class="slab">
-  <p class="n">대상</p>
-  <p class="t"><b>ChatGPT에 질문해 본 적 있으면 됩니다.</b><br>
-  난이도 1 아이템에는 코드가 한 줄도 안 들어갑니다.</p>
+  <p class="n">이 시스템이 하는 일</p>
+  <p class="t">새벽 3시 댓글에 <b>몇 분 안에 답합니다.</b><br>
+  안 팔리는 날에도 그 사실을 소재로 씁니다.</p>
 </div>
 <div class="foot">
   <span><b>라스트 아더</b> · 앞 3면 무료 미리보기</span>
@@ -110,10 +110,10 @@ h1 em{font-style:normal; color:var(--accent);}
 # ── 2. 여섯 칸 ───────────────────────────────────────────────────
 # 네 가지 수익화 모델. 이게 이 책의 1부이자 제목이 약속한 답이다.
 MODELS = [
-    ("①", "제품 판매", "5천~5만원", "며칠", "트래픽"),
-    ("②", "제작 대행", "15만~200만원", "1~3주", "내 공수"),
-    ("③", "운영 대행", "월 과금·누적", "1개월+", "판매 난이도"),
-    ("④", "교육·컨설팅", "편차 큼", "가장 김", "레퍼런스"),
+    ("①", "자동 발행", "정해진 순서로", "글 6건/일", "판매 글은 3일차 이후로 코드가 강제"),
+    ("②", "자동 응대", "몇 분 안에", "답글 80건/일", "reply·skip·hide·escalate 네 갈래"),
+    ("③", "자동 중계", "사건이 생기면", "한 번에 1편", "안 팔리는 시간도 사건으로 잡는다"),
+    ("—", "사람", "판단만", "하루 몇 분", "판매 수량 입력, 넘어온 문의 확인"),
 ]
 
 WALLS = (
@@ -141,26 +141,26 @@ h1{font-size:58px; font-weight:800; line-height:1.18; letter-spacing:-.045em; ma
 }
 .slab b{color:#FF7A3D;}
 </style>
-<p class="eyebrow">AI 수익화 모델</p>
-<h1>구조는 네 가지뿐입니다</h1>
-<p class="lede">객단가도, 리드타임도, 확장 방식도<br>전부 다른 사업입니다.</p>
+<p class="eyebrow">판매 자동화 구조</p>
+<h1>봇 셋이 24시간 돕니다</h1>
+<p class="lede">사람이 하는 일은 두 개뿐입니다.<br>판매 수량 입력과, 민감한 문의 확인.</p>
 <div class="rows">
-  <div class="hd"><span></span><span>모델</span><span>객단가</span><span>리드타임</span></div>
+  <div class="hd"><span></span><span>부품</span><span>언제</span><span>한도</span></div>
 """
     + "".join(
         f'<div class="r"><span class="n">{n}</span><span class="t">{t}</span>'
         f'<span class="p">{price}</span><span class="w">{when}</span>'
-        f'<span class="lim">병목 — {lim}</span></div>'
+        f'<span class="lim">{lim}</span></div>'
         for n, t, price, when, lim in MODELS
     )
     + """
 </div>
 <div class="slab">
-  오디언스가 없으면 <b>①번은 0원입니다.</b><br>
-  소수에게 고단가로 파는 쪽이 먼저입니다.
+  자동화의 가치는 발행량이 아니라 <b>꺼지지 않는 반응 속도</b>입니다.<br>
+  사람은 새벽 3시 댓글에 답할 수 없습니다.
 </div>
 <div class="foot">
-  <span><b>AI 활용할 줄은 아는데 어떻게 수익화 할까</b> · PDF 30면</span>
+  <span><b>AI 활용할 줄은 아는데 어떻게 수익화 할까</b> · PDF 26면</span>
   <span class="handle">@ai.lo.lo</span>
 </div>
 """
@@ -241,7 +241,7 @@ tr.hot td:nth-child(2){color:var(--accent); font-weight:800;}
 )
 
 # 표지 부제. 전환 문구라 원고와 카드가 어긋나면 안 되므로 원고 머리말에서 읽는다.
-SUBTITLE = "판매 가능한 아이템 목록부터 견적·응대·입금까지"
+SUBTITLE = "자는 동안 모객하고 응대하는 판매 자동화 만들기"
 
 CARDS = {
     "01-cover": COVER.replace("__SUBTITLE__", SUBTITLE),
