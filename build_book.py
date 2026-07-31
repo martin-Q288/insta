@@ -3,13 +3,24 @@
 
 사용:
     pip install markdown
-    python3 ebook/build.py
+    python3 build_book.py book      # book/manuscript.md → book/ebook.pdf
+    python3 build_book.py ebook
+
+표지 문구는 원고 맨 위 주석에서 읽습니다. 책마다 스크립트를 복제하지
+않으려고 이렇게 뒀습니다.
+
+    <!--
+    eyebrow: 실전 가이드
+    title: 제목<br>두 줄 가능
+    subtitle: 부제
+    -->
 
 PDF 렌더링은 크로미움 헤드리스를 씁니다. 한글은 Pretendard 를 쓰고,
 없으면 시스템 폰트로 떨어집니다(그 경우 자간이 어색해집니다 — 아래 안내 참고).
 """
 
 import base64
+import html as html_mod
 import re
 import shutil
 import subprocess
@@ -19,9 +30,6 @@ from pathlib import Path
 import markdown
 
 ROOT = Path(__file__).resolve().parent
-SRC = ROOT / "manuscript.md"
-HTML = ROOT / "ebook.html"
-PDF = ROOT / "ebook.pdf"
 
 # 판매용 파일에 미기입 자리가 남아 나가는 사고를 막는다 (판매 페이지와 같은 규칙)
 PLACEHOLDER = re.compile(r"「([^」]*)」")
@@ -145,15 +153,35 @@ pre code{ background:none; color:var(--ink); padding:0; font-size:inherit; }
 
 COVER = """
 <div class="cover">
-  <p class="eyebrow">프롬프트 팩 + 실전 가이드</p>
-  <h1>기사 하나로<br>콘텐츠 20개</h1>
-  <p class="sub">인스타 카드뉴스·릴스를<br>다국어로 대량 발행하는 실전 가이드</p>
+  <p class="eyebrow">__EYEBROW__</p>
+  <h1>__TITLE__</h1>
+  <p class="sub">__SUBTITLE__</p>
   <p class="foot">
-    이 자료는 콘텐츠 제작 시간 단축을 위한 것입니다.<br>
-    조회수·팔로워·수익을 보장하지 않습니다.
+    이 자료는 작업 시간 단축을 위한 것입니다.<br>
+    수익·성과를 보장하지 않습니다.
   </p>
 </div>
 """
+
+FRONT_MATTER = re.compile(r"\A<!--\s*\n(.*?)\n-->\s*\n", re.DOTALL)
+
+
+def read_front_matter(text: str) -> tuple[dict[str, str], str]:
+    """원고 맨 위 주석에서 표지 문구를 떼어낸다.
+
+    <br> 은 그대로 살려야 표지에서 줄을 끊을 수 있으므로, 이스케이프한 뒤
+    <br> 만 되돌린다. 없으면 빈 dict 을 주고 호출부에서 기본값을 채운다.
+    """
+    m = FRONT_MATTER.match(text)
+    if not m:
+        return {}, text
+    meta = {}
+    for line in m.group(1).splitlines():
+        if ":" not in line:
+            continue
+        k, _, v = line.partition(":")
+        meta[k.strip()] = html_mod.escape(v.strip()).replace("&lt;br&gt;", "<br>")
+    return meta, text[m.end():]
 
 
 def find_chromium() -> str | None:
@@ -170,12 +198,22 @@ def find_chromium() -> str | None:
     return None
 
 
-def main() -> int:
-    if not SRC.exists():
-        print(f"원고가 없습니다: {SRC}", file=sys.stderr)
+def main(argv: list[str]) -> int:
+    if len(argv) != 1:
+        print("사용: python3 build_book.py <디렉터리>   예) book, ebook", file=sys.stderr)
+        return 2
+
+    book = (ROOT / argv[0]).resolve()
+    src = book / "manuscript.md"
+    html_out = book / "ebook.html"
+    pdf_out = book / "ebook.pdf"
+
+    if not src.exists():
+        print(f"원고가 없습니다: {src}", file=sys.stderr)
         return 1
 
-    text = SRC.read_text(encoding="utf-8")
+    text = src.read_text(encoding="utf-8")
+    meta, text = read_front_matter(text)
 
     holes = PLACEHOLDER.findall(text)
     if holes:
@@ -203,19 +241,31 @@ def main() -> int:
         )
     css = CSS.replace("__FONT_FACES__", faces)
 
-    HTML.write_text(
+    title = meta.get("title") or book.name
+    cover = (
+        COVER.replace("__EYEBROW__", meta.get("eyebrow", ""))
+        .replace("__TITLE__", title)
+        .replace("__SUBTITLE__", meta.get("subtitle", ""))
+    )
+    # <title> 은 PDF 메타데이터로 들어가므로 표지의 줄바꿈 태그를 뺀다
+    doc_title = title.replace("<br>", " ")
+
+    html_out.write_text(
         "<!doctype html>\n"
         '<html lang="ko"><head><meta charset="utf-8">'
-        "<title>기사 하나로 콘텐츠 20개</title>"
-        f"<style>{css}</style></head><body>{COVER}{body}</body></html>\n",
+        f"<title>{doc_title}</title>"
+        f"<style>{css}</style></head><body>{cover}{body}</body></html>\n",
         encoding="utf-8",
     )
-    print(f"HTML 생성: {HTML.relative_to(ROOT.parent)}")
+    print(f"HTML 생성: {html_out.relative_to(ROOT)}")
 
     chrome = find_chromium()
     if not chrome:
         print("크로미움을 못 찾았습니다. HTML 을 브라우저에서 열어 PDF로 인쇄하세요.")
         return 0
+
+    # 크로미움은 실패해도 이전 PDF 를 지우지 않는다. 먼저 지워야 성공 판정이 맞다.
+    pdf_out.unlink(missing_ok=True)
 
     cmd = [
         chrome,
@@ -224,18 +274,18 @@ def main() -> int:
         "--no-sandbox",
         "--no-pdf-header-footer",
         "--allow-file-access-from-files",
-        f"--print-to-pdf={PDF}",
-        HTML.as_uri(),
+        f"--print-to-pdf={pdf_out}",
+        html_out.as_uri(),
     ]
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
-    if not PDF.exists():
+    if not pdf_out.exists():
         print("PDF 생성 실패:", r.stderr[-800:], file=sys.stderr)
         return 1
 
-    size_kb = PDF.stat().st_size / 1024
-    print(f"PDF 생성: {PDF.relative_to(ROOT.parent)} ({size_kb:.0f} KB)")
+    size_kb = pdf_out.stat().st_size / 1024
+    print(f"PDF 생성: {pdf_out.relative_to(ROOT)} ({size_kb:.0f} KB)")
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main(sys.argv[1:]))
