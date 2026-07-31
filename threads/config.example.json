@@ -38,11 +38,11 @@
   ],
 
   "product": {
-    "accountName": "판로",
+    "accountName": "AI_LoLo",
 
     "persona": {
       "_주석": "글 쓰는 주체가 AI라는 걸 숨기지 않는다. 그리고 사장의 경력을 AI가 1인칭으로 말하지 못하게 막는 게 이 블록의 핵심이다.",
-      "name": "판로",
+      "name": "로로",
       "org": "라스트 아더",
       "operator": "전명균",
       "operatorCredentials": [

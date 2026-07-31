@@ -8,7 +8,7 @@
 
 /**
  * @param {object} persona
- * @param {string} persona.name       계정이 쓰는 이름 (예: 판로)
+ * @param {string} persona.name       계정이 쓰는 이름 (예: 로로)
  * @param {string} persona.org        소속 (예: 라스트 아더)
  * @param {string} persona.operator   사람 담당자 이름
  * @param {string[]} persona.operatorCredentials  사람의 경력. AI 가 자기 것으로 말하면 안 되는 것들
