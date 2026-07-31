@@ -85,21 +85,20 @@ h1 em{font-style:normal; color:var(--accent);}
 .slab .t{font-size:28px; font-weight:700; line-height:1.5; letter-spacing:-.03em;}
 .slab .t b{color:#FF7A3D;}
 </style>
-<p class="eyebrow">전자책 · PDF 26면</p>
+<p class="eyebrow">전자책 · PDF 30면</p>
 <h1>AI 활용할 줄은<br>아는데<br><em>어떻게 수익화 할까</em></h1>
 <p class="sub">__SUBTITLE__</p>
 <div class="what">
-  <div><i>01</i><span>스레드 공식 API <b>세팅 전 과정</b></span></div>
-  <div><i>02</i><span>자동 발행 · 자동 응대 · 자동 중계 <b>3봇 구조</b></span></div>
-  <div><i>03</i><span>봇 <b>시스템 프롬프트 전문</b> — 그대로 복사</span></div>
-  <div><i>04</i><span>답할지 넘길지 숨길지 <b>판단 기준 설계</b></span></div>
-  <div><i>05</i><span>계정이 죽지 않는 <b>안전장치</b> 7가지</span></div>
-  <div><i>06</i><span>카테고리별 <b>페인포인트 지도</b> · 7일 실행</span></div>
+  <div><i>1부</i><span>어디에 등록할까 — <b>수수료 열 배 차이</b>와 선택 기준</span></div>
+  <div><i></i><span>상세페이지 8덩어리 · 결제와 전달 · 법 최소 세트</span></div>
+  <div><i>2부</i><span>스레드 API <b>세팅 전 과정</b>과 발행 구조</span></div>
+  <div><i>3부</i><span>봇 셋의 <b>시스템 프롬프트 전문</b> — 그대로 복사</span></div>
+  <div><i>4부</i><span>전환 장치 · <b>안전장치</b> · 7일 실행</span></div>
 </div>
 <div class="slab">
-  <p class="n">이 시스템이 하는 일</p>
-  <p class="t">새벽 3시 댓글에 <b>몇 분 안에 답합니다.</b><br>
-  안 팔리는 날에도 그 사실을 소재로 씁니다.</p>
+  <p class="n">순서를 지키면 됩니다</p>
+  <p class="t"><b>1부가 땅이고 2·3부가 건물입니다.</b><br>
+  팔 곳을 안 정한 채 봇부터 만들면 돌아갈 곳이 없습니다.</p>
 </div>
 <div class="foot">
   <span><b>라스트 아더</b> · 앞 3면 무료 미리보기</span>
@@ -160,7 +159,7 @@ h1{font-size:58px; font-weight:800; line-height:1.18; letter-spacing:-.045em; ma
   사람은 새벽 3시 댓글에 답할 수 없습니다.
 </div>
 <div class="foot">
-  <span><b>AI 활용할 줄은 아는데 어떻게 수익화 할까</b> · PDF 26면</span>
+  <span><b>AI 활용할 줄은 아는데 어떻게 수익화 할까</b> · PDF 30면</span>
   <span class="handle">@ai.lo.lo</span>
 </div>
 """
@@ -241,7 +240,7 @@ tr.hot td:nth-child(2){color:var(--accent); font-weight:800;}
 )
 
 # 표지 부제. 전환 문구라 원고와 카드가 어긋나면 안 되므로 원고 머리말에서 읽는다.
-SUBTITLE = "자는 동안 모객하고 응대하는 판매 자동화 만들기"
+SUBTITLE = "등록부터 자동 유통까지 — 0에서 첫 매출까지의 전 과정"
 
 CARDS = {
     "01-cover": COVER.replace("__SUBTITLE__", SUBTITLE),
