@@ -85,13 +85,13 @@ h1 em{font-style:normal; color:var(--accent);}
 .slab .t{font-size:28px; font-weight:700; line-height:1.5; letter-spacing:-.03em;}
 .slab .t b{color:#FF7A3D;}
 </style>
-<p class="eyebrow">전자책 · PDF 30면</p>
+<p class="eyebrow">전자책 · PDF 33면</p>
 <h1>AI 활용할 줄은<br>아는데<br><em>어떻게 수익화 할까</em></h1>
 <p class="sub">__SUBTITLE__</p>
 <div class="what">
   <div><i>1부</i><span>어디에 등록할까 — <b>수수료 열 배 차이</b>와 선택 기준</span></div>
   <div><i></i><span>상세페이지 8덩어리 · 결제와 전달 · 법 최소 세트</span></div>
-  <div><i>2부</i><span>스레드 API <b>세팅 전 과정</b>과 발행 구조</span></div>
+  <div><i>2부</i><span><b>유통 채널 지도</b> · 스레드 API 세팅 전 과정</span></div>
   <div><i>3부</i><span>봇 셋의 <b>시스템 프롬프트 전문</b> — 그대로 복사</span></div>
   <div><i>4부</i><span>전환 장치 · <b>안전장치</b> · 7일 실행</span></div>
 </div>
@@ -159,7 +159,7 @@ h1{font-size:58px; font-weight:800; line-height:1.18; letter-spacing:-.045em; ma
   사람은 새벽 3시 댓글에 답할 수 없습니다.
 </div>
 <div class="foot">
-  <span><b>AI 활용할 줄은 아는데 어떻게 수익화 할까</b> · PDF 30면</span>
+  <span><b>AI 활용할 줄은 아는데 어떻게 수익화 할까</b> · PDF 33면</span>
   <span class="handle">@ai.lo.lo</span>
 </div>
 """
