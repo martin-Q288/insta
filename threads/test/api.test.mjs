@@ -442,3 +442,24 @@ test("중계 설정이 판매 문서와 어긋나지 않는다", () => {
   assert.match(offer.text, /30권 한정/);
   assert.match(offer.text, /1,000원 오릅니다/);
 });
+
+test("수량을 못박은 글만 중계 설정과 대조한다", () => {
+  // check.mjs 가 예전에 '한정' 이라는 낱말만 보고 대조 대상을 골랐다. 그러면
+  // 가격 규칙을 설명만 하는 글(06-price-rule)이 걸려서 멀쩡한 세팅이 실패로 떴다.
+  // 대상은 구체적인 수량을 주장하는 글이어야 한다.
+  const posts = loadPosts();
+  const claims = posts.filter((p) => p.day >= 3 && /\d+\s*권/.test(p.text));
+
+  assert.ok(claims.length > 0, "수량을 못박은 글이 하나는 있어야 한다");
+  assert.ok(
+    claims.every((p) => /30권/.test(p.text)),
+    "수량을 말하는 글은 전부 sales.total 과 같아야 한다",
+  );
+
+  const explainer = posts.find((p) => p.id === "06-price-rule");
+  assert.ok(explainer, "가격 규칙 설명 글이 있어야 한다");
+  assert.ok(
+    !claims.includes(explainer),
+    "규칙만 설명하는 글은 대조 대상이 아니다 — 숫자를 주장하지 않는다",
+  );
+});

@@ -89,10 +89,18 @@ console.log("\n[5] 판매 중계 설정");
       `${totalIfSoldOut(cfg.sales).toLocaleString("ko-KR")}원`,
   );
   // 판매 글에 적힌 숫자와 여기 설정이 어긋나면 중계 글이 거짓말을 한다.
+  //
+  // 대상은 "구체적인 수량을 못박은 글"이다. 가격 규칙을 설명하기만 하는 글
+  // (예: "수량을 한정하고 한 권 나갈 때마다 올린다")은 숫자를 주장하지 않으므로
+  // 대조 대상이 아니다. 예전에 '한정' 이라는 낱말만 보고 골랐더니 설명 글이
+  // 걸려서 멀쩡한 세팅이 실패로 떴다.
   try {
-    const offer = loadPosts().find((p) => /29,000|한정/.test(p.text) && p.day >= 3);
-    if (offer) {
-      const won = (n) => n.toLocaleString("ko-KR");
+    const claims = loadPosts().filter((p) => p.day >= 3 && /\d+\s*권/.test(p.text));
+    if (!claims.length) {
+      bad("판매 수량을 못박은 글이 없습니다 — 오퍼 글에 '30권 한정' 같은 문구가 있어야 합니다");
+    }
+    const won = (n) => n.toLocaleString("ko-KR");
+    for (const offer of claims) {
       if (!offer.text.includes(won(startPrice)))
         bad(`${offer.id} 의 가격이 sales.startPrice(${won(startPrice)}원)와 다릅니다`);
       if (!offer.text.includes(`${total}권`))

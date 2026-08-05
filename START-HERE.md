@@ -31,6 +31,7 @@
 - `book/outreach.md` — 아웃리치. 어디서 누구에게 어떻게
 - `book/manuscript.md` — 원고. 고치면 다시 빌드하면 됩니다
 - `threads/ACCOUNT.md` — 계정 이름·핸들·소개글 (복붙용)
+- `threads/TOKEN.md` — **토큰 받아오기. 단계마다 확인 명령이 붙어 있습니다**
 - `threads/README.md` — 중계·상담 세팅
 - `research/README.md` — 왜 이 방향인지의 근거
 
@@ -113,8 +114,13 @@
 
 ### 2단계 — 자동화 켜기 (30~60분) · 번호 불필요
 
+**`threads/TOKEN.md` 를 그대로 따라가시면 됩니다.** 단계마다 확인 명령이
+붙어 있어서, 통과하면 다음으로 넘어가는 식입니다.
+
 - [ ] 메타 개발자 콘솔에서 Threads 앱 만들고 장기 토큰 발급
       권한: `threads_basic`, `threads_content_publish`, `threads_manage_replies`
+- [ ] **`/me` 호출로 `username` 이 `ai.lo.lo` 인지 확인** — 여기서 안 잡으면
+      엉뚱한 계정에 글이 올라갑니다
 - [ ] `threads/config.json` 채우기 (`config.example.json` 복사)
 - [ ] **`sales` 값을 `book/latpeed.md` 의 가격 정책과 맞추기** — 어긋나면 중계 글이
       거짓말을 합니다. `npm run check` 가 대조해서 잡아줍니다
